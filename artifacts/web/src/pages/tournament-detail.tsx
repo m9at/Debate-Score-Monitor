@@ -74,6 +74,11 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useTheme } from "@/context/ThemeContext";
+import { BRAND, BTN, BTN_PRIMARY_STYLE } from "@/lib/brand";
+import TournamentSidebar from "@/components/tournament/TournamentSidebar";
+import RoundBar from "@/components/tournament/RoundBar";
+import CaseCard from "@/components/tournament/CaseCard";
+import RoomCard from "@/components/tournament/RoomCard";
 import {
   Home,
   Plus,
@@ -2379,36 +2384,34 @@ export default function TournamentDetail() {
       ];
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
-      {/* Hero Header */}
-      <div className="relative pt-6 pb-6 overflow-hidden">
-        <div
-          className="absolute top-0 bottom-0 left-0"
-          style={{ right: "35%", backgroundColor: CYAN }}
-        />
-        <div
-          className="absolute top-0 bottom-0 right-0"
-          style={{ left: "65%", backgroundColor: PURPLE }}
-        />
+    <div
+      className="min-h-screen flex flex-col md:flex-row"
+      style={{ backgroundColor: BRAND.surface }}
+    >
+      <TournamentSidebar
+        tabs={tabs}
+        activeTab={activeTab}
+        onTabChange={(key) => setActiveTab(key as TabType)}
+        onHome={() => setLocation("/")}
+      />
 
-        <div className="relative max-w-5xl mx-auto px-4">
-          <div className="flex items-center gap-3 mb-5">
-            <button
-              onClick={() => setLocation("/")}
-              aria-label="الرئيسية"
-              className="w-10 h-10 rounded-xl bg-white/15 hover:bg-white/25 backdrop-blur-sm flex items-center justify-center transition-colors flex-shrink-0"
-              data-testid="button-back-home"
-            >
-              <Home className="w-4 h-4 text-white" />
-            </button>
-            <div className="flex-1 min-w-0">
+      <div className="flex-1 flex flex-col min-w-0">
+        {/* Page header */}
+        <header className="px-4 md:px-6 pt-5 pb-3">
+          <div className="max-w-6xl mx-auto flex items-center gap-2.5">
+            <div className="flex-1 min-w-0 text-right animate-in fade-in slide-in-from-top-2 duration-500">
               <h1
-                className="text-white font-bold text-lg truncate leading-tight"
+                className="text-xl md:text-2xl font-bold truncate leading-tight"
+                style={{ color: BRAND.ink }}
                 data-testid="text-tournament-name"
               >
                 {tournament.name}
               </h1>
-              <p className="text-white/75 text-xs mt-0.5">
+              <p
+                className="text-xs mt-1 font-medium"
+                style={{ color: BRAND.ink + "99" }}
+                data-testid="text-tournament-meta"
+              >
                 {tournament.teams.length} فريق
                 {tournament.started
                   ? ` · الجولة ${tournament.currentRound}${
@@ -2420,16 +2423,20 @@ export default function TournamentDetail() {
                 {tournament.finished ? " · منتهية" : ""}
               </p>
             </div>
+
             <button
               onClick={() => setHideScores((v) => !v)}
               aria-label={hideScores ? "إظهار الدرجات" : "إخفاء الدرجات"}
               title={hideScores ? "إظهار الدرجات" : "إخفاء الدرجات"}
               aria-pressed={hideScores}
-              className={`w-10 h-10 rounded-xl backdrop-blur-sm flex items-center justify-center transition-colors flex-shrink-0 ${
-                hideScores
-                  ? "bg-white/90 hover:bg-white text-purple-700"
-                  : "bg-white/15 hover:bg-white/25 text-white"
+              className={`w-9 h-9 rounded-xl border flex items-center justify-center shrink-0 transition-all active:scale-95 ${
+                hideScores ? "text-white" : "bg-white hover:bg-[#7B2D8E]/[0.06]"
               }`}
+              style={
+                hideScores
+                  ? { backgroundColor: BRAND.purple, borderColor: BRAND.purple }
+                  : { borderColor: BRAND.border, color: BRAND.ink }
+              }
               data-testid="button-toggle-hide-scores"
             >
               {hideScores ? (
@@ -2438,262 +2445,47 @@ export default function TournamentDetail() {
                 <Eye className="w-4 h-4" />
               )}
             </button>
+
             <button
               onClick={() => window.location.reload()}
               aria-label="تحديث الصفحة"
               title="تحديث الصفحة"
-              className="w-10 h-10 rounded-xl bg-white/15 hover:bg-white/25 backdrop-blur-sm flex items-center justify-center transition-colors flex-shrink-0"
+              className="w-9 h-9 rounded-xl border bg-white hover:bg-[#7B2D8E]/[0.06] flex items-center justify-center shrink-0 transition-all active:scale-95"
+              style={{ borderColor: BRAND.border, color: BRAND.ink }}
               data-testid="button-refresh-page"
             >
-              <span className="text-white text-base">↻</span>
+              <span className="text-base leading-none">↻</span>
+            </button>
+
+            <button
+              onClick={() => setLocation(`/results/${tournament.id}`)}
+              className={`${BTN.base} ${BTN.primary} h-10 px-4 shrink-0`}
+              style={BTN_PRIMARY_STYLE}
+              data-testid="button-announce-results"
+            >
+              <Megaphone className="w-4 h-4" />
+              إعلان النتائج
             </button>
           </div>
-
-          {/* Action chips row */}
-          <div className="flex gap-2">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button
-                  className="flex-1 h-11 rounded-xl bg-white/[0.14] hover:bg-white/25 border border-white/20 backdrop-blur-sm flex items-center justify-center gap-2 text-white text-[13px] font-semibold transition-all shadow-sm"
-                  data-testid="chip-stats"
-                >
-                  <Activity className="w-3.5 h-3.5" />
-                  إحصاءات
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56">
-                <DropdownMenuItem
-                  onClick={() => setLocation(`/stats/${tournament.id}`)}
-                  data-testid="menu-statistics"
-                >
-                  <Activity className="w-4 h-4 ml-2" style={{ color: CYAN }} />
-                  إحصائيات شاملة
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => setLocation(`/results/${tournament.id}`)}
-                  data-testid="menu-announce-results"
-                >
-                  <Megaphone className="w-4 h-4 ml-2" style={{ color: PURPLE }} />
-                  إعلان النتائج
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => setActiveTab("teams")}
-                  data-testid="menu-manage-teams"
-                >
-                  <Users className="w-4 h-4 ml-2" style={{ color: CYAN }} />
-                  إدارة الفرق
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button
-                  className="flex-1 h-11 rounded-xl bg-white/[0.14] hover:bg-white/25 border border-white/20 backdrop-blur-sm flex items-center justify-center gap-2 text-white text-[13px] font-semibold transition-all shadow-sm"
-                  data-testid="chip-reports"
-                >
-                  {pdfLoading || excelLoading ? (
-                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                  ) : (
-                    <FileText className="w-3.5 h-3.5" />
-                  )}
-                  تقارير
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56">
-                <DropdownMenuItem
-                  onClick={handleExportPdf}
-                  disabled={pdfLoading}
-                  data-testid="menu-export-pdf"
-                >
-                  <FileText className="w-4 h-4 ml-2" style={{ color: PURPLE }} />
-                  تنزيل تقرير PDF
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={handleExportExcel}
-                  disabled={excelLoading}
-                  data-testid="menu-export-excel"
-                >
-                  <FileSpreadsheet className="w-4 h-4 ml-2" style={{ color: SUCCESS }} />
-                  تنزيل ملف Excel
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button
-                  className="flex-1 h-11 rounded-xl bg-white/[0.14] hover:bg-white/25 border border-white/20 backdrop-blur-sm flex items-center justify-center gap-2 text-white text-[13px] font-semibold transition-all shadow-sm"
-                  data-testid="chip-links"
-                >
-                  <ShieldCheck className="w-3.5 h-3.5" />
-                  روابط
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56">
-                <DropdownMenuItem
-                  onClick={handleRegistrationLink}
-                  data-testid="menu-registration-link"
-                >
-                  <UserPlus className="w-4 h-4 ml-2" style={{ color: CYAN }} />
-                  رابط تسجيل الفرق
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => setImportTeamOpen(true)}
-                  data-testid="menu-import-team-code"
-                >
-                  <Download className="w-4 h-4 ml-2" style={{ color: PURPLE }} />
-                  استلام تسجيل فريق (رمز)
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={handleAdminLink}
-                  data-testid="menu-admin-link"
-                >
-                  <ShieldCheck className="w-4 h-4 ml-2" style={{ color: PURPLE }} />
-                  رابط الإدارة (تحكم كامل)
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button
-                  aria-label="المزيد"
-                  title="المزيد"
-                  className="w-11 h-11 rounded-xl bg-white/[0.14] hover:bg-white/25 border border-white/20 backdrop-blur-sm flex items-center justify-center text-white transition-all shadow-sm flex-shrink-0"
-                  data-testid="chip-more"
-                >
-                  <MoreHorizontal className="w-4 h-4" />
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56">
-                <DropdownMenuSub>
-                  <DropdownMenuSubTrigger data-testid="menu-theme-trigger">
-                    <Palette className="w-4 h-4 ml-2" style={{ color: CYAN }} />
-                    المظهر
-                  </DropdownMenuSubTrigger>
-                  <DropdownMenuSubContent>
-                    <DropdownMenuLabel>وضع الألوان</DropdownMenuLabel>
-                    <DropdownMenuRadioGroup
-                      value={themeMode}
-                      onValueChange={(v) =>
-                        setThemeMode(v as "light" | "dark" | "system")
-                      }
-                    >
-                      <DropdownMenuRadioItem value="light" data-testid="menu-theme-light">
-                        <Sun className="w-4 h-4 ml-2" />
-                        فاتح
-                      </DropdownMenuRadioItem>
-                      <DropdownMenuRadioItem value="dark" data-testid="menu-theme-dark">
-                        <Moon className="w-4 h-4 ml-2" />
-                        داكن
-                      </DropdownMenuRadioItem>
-                      <DropdownMenuRadioItem value="system" data-testid="menu-theme-system">
-                        <Monitor className="w-4 h-4 ml-2" />
-                        حسب النظام
-                      </DropdownMenuRadioItem>
-                    </DropdownMenuRadioGroup>
-                  </DropdownMenuSubContent>
-                </DropdownMenuSub>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  onClick={() => {
-                    const next = !tournament.semifinalEnabled;
-                    setEliminationMode(
-                      tournament.id,
-                      next,
-                      next ? true : (tournament.finalEnabled ?? false)
-                    );
-                  }}
-                  data-testid="menu-toggle-semifinal"
-                >
-                  <span className="ml-2 text-base">{tournament.semifinalEnabled ? "✓" : "○"}</span>
-                  نصف النهائي
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => {
-                    const next = !tournament.finalEnabled;
-                    setEliminationMode(
-                      tournament.id,
-                      next ? (tournament.semifinalEnabled ?? false) : false,
-                      next
-                    );
-                  }}
-                  data-testid="menu-toggle-final"
-                >
-                  <span className="ml-2 text-base">{tournament.finalEnabled ? "✓" : "○"}</span>
-                  النهائي
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                {tournament.finished ? (
-                  <DropdownMenuItem
-                    onClick={() => setConfirmReopenOpen(true)}
-                    data-testid="menu-reopen-tournament"
-                  >
-                    <Flag className="w-4 h-4 ml-2" />
-                    إعادة فتح البطولة
-                  </DropdownMenuItem>
-                ) : (
-                  <DropdownMenuItem
-                    onClick={() => setConfirmFinishOpen(true)}
-                    data-testid="menu-finish-tournament"
-                  >
-                    <Flag className="w-4 h-4 ml-2" />
-                    إنهاء البطولة
-                  </DropdownMenuItem>
-                )}
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  onClick={() => setConfirmDeleteOpen(true)}
-                  className="text-destructive focus:text-destructive"
-                  data-testid="menu-delete-tournament"
-                >
-                  <Trash2 className="w-4 h-4 ml-2" />
-                  حذف البطولة
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-
-          {tournament.finished && (
+        </header>
+        {tournament.finished && (
+          <div className="px-4 md:px-6 pb-1">
             <div
-              className="flex items-center gap-2 mt-3 px-3 py-2 rounded-xl text-sm font-bold text-white"
-              style={{ background: "linear-gradient(135deg, #FFD70033, #FFD70011)", border: "1px solid #FFD70066" }}
+              className="max-w-6xl mx-auto flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-bold"
+              style={{
+                backgroundColor: BRAND.gold + "1f",
+                border: `1px solid ${BRAND.gold}59`,
+                color: "#8A5A00",
+              }}
               data-testid="banner-finished"
             >
               <Flag className="w-4 h-4" />
               <span>تم إنهاء البطولة — العرض للقراءة فقط (يمكن إعادة فتحها من الإعدادات)</span>
             </div>
-          )}
-
-          {/* Tabs */}
-          <div className="flex bg-white/15 rounded-xl p-1 gap-1 mt-5 border border-white/15">
-            {tabs.map((tab) => {
-              const Icon = tab.icon;
-              const active = activeTab === tab.key;
-              return (
-                <button
-                  key={tab.key}
-                  onClick={() => setActiveTab(tab.key)}
-                  className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg transition-colors ${
-                    active ? "bg-white" : "hover:bg-white/10"
-                  }`}
-                  style={{
-                    color: active ? PURPLE : "rgba(255,255,255,0.85)",
-                  }}
-                  data-testid={`tab-${tab.key}`}
-                >
-                  <Icon className="w-4 h-4" />
-                  <span className="text-sm font-semibold">{tab.label}</span>
-                </button>
-              );
-            })}
           </div>
-        </div>
-      </div>
-
+        )}
       {/* Content */}
-      <div className="flex-1 max-w-5xl w-full mx-auto px-4 pb-32 pt-4">
+      <div className="flex-1 max-w-6xl w-full mx-auto px-4 md:px-6 pb-28 pt-2">
         {activeTab === "teams" && (
           <div>
             <div className="flex items-center justify-between mb-4">
@@ -3006,84 +2798,25 @@ export default function TournamentDetail() {
               </div>
             ) : (
               <>
-                {/* Round Navigation */}
-                <div className="flex items-center justify-between py-3 border-b border-border mb-3 -mx-4 px-4">
-                  <button
-                    disabled={currentRoundNum <= 1}
-                    onClick={() => {
+                {/* Round header */}
+                <div className="mb-3">
+                  <RoundBar
+                    roundNumber={currentRoundNum}
+                    completedCount={completedCount}
+                    totalMatches={totalMatches}
+                    allComplete={allRoomsComplete}
+                    canPrev={currentRoundNum > 1}
+                    canNext={currentRoundNum < tournament.rounds.length}
+                    onPrev={() => {
                       setViewingRound(currentRoundNum - 1);
                       setRoundNotification(false);
                     }}
-                    aria-label="الجولة السابقة"
-                    className="w-10 h-10 rounded-lg flex items-center justify-center disabled:opacity-30 transition-colors"
-                    style={{
-                      backgroundColor:
-                        currentRoundNum > 1 ? CYAN + "26" : "transparent",
-                    }}
-                  >
-                    <ChevronRight
-                      className="w-5 h-5"
-                      style={{
-                        color: currentRoundNum <= 1 ? "var(--border)" : CYAN,
-                      }}
-                    />
-                  </button>
-
-                  <div className="flex-1 mx-3 text-center">
-                    <div className="font-bold text-base mb-1.5">
-                      الجولة {currentRoundNum}
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
-                        <div
-                          className="h-full rounded-full transition-all"
-                          style={{
-                            width:
-                              totalMatches > 0
-                                ? `${(completedCount / totalMatches) * 100}%`
-                                : "0%",
-                            backgroundColor: allRoomsComplete ? SUCCESS : CYAN,
-                          }}
-                        />
-                      </div>
-                      <span
-                        className="text-xs font-semibold"
-                        style={{
-                          color: allRoomsComplete ? SUCCESS : "var(--muted-foreground)",
-                        }}
-                      >
-                        {completedCount}/{totalMatches}
-                      </span>
-                    </div>
-                  </div>
-
-                  <button
-                    disabled={currentRoundNum >= tournament.rounds.length}
-                    onClick={() => {
+                    onNext={() => {
                       setViewingRound(currentRoundNum + 1);
                       setRoundNotification(false);
                     }}
-                    aria-label="الجولة التالية"
-                    className="w-10 h-10 rounded-lg flex items-center justify-center disabled:opacity-30 transition-colors"
-                    style={{
-                      backgroundColor:
-                        currentRoundNum < tournament.rounds.length
-                          ? CYAN + "26"
-                          : "transparent",
-                    }}
-                  >
-                    <ChevronLeft
-                      className="w-5 h-5"
-                      style={{
-                        color:
-                          currentRoundNum >= tournament.rounds.length
-                            ? "var(--border)"
-                            : CYAN,
-                      }}
-                    />
-                  </button>
+                  />
                 </div>
-
                 {/* Delete round — only if no data recorded yet */}
                 {currentRound && completedCount === 0 && !currentRound.completed && !tournament.finished && (
                   <div className="flex justify-end mb-2">
@@ -3124,39 +2857,17 @@ export default function TournamentDetail() {
 
                 {/* Case / motion editor */}
                 {currentRound && (
-                  <div
-                    className="mb-3 rounded-xl p-3 border"
-                    style={{
-                      backgroundColor: PURPLE + "0d",
-                      borderColor: PURPLE + "33",
-                    }}
-                  >
-                    <Label
-                      htmlFor={`case-${currentRoundNum}`}
-                      className="text-xs font-bold mb-1.5 block"
-                      style={{ color: PURPLE }}
-                    >
-                      نص القضية للجولة {currentRoundNum}
-                    </Label>
-                    <textarea
-                      id={`case-${currentRoundNum}`}
+                  <div className="mb-3">
+                    <CaseCard
+                      roundNumber={currentRoundNum}
                       value={currentRound.caseText ?? ""}
-                      onChange={(e) =>
-                        setRoundCase(
-                          tournament.id,
-                          currentRoundNum,
-                          e.target.value
-                        )
-                      }
                       readOnly={
                         tournament.finished ||
                         currentRoundNum !== tournament.currentRound
                       }
-                      placeholder="اكتب نص القضية هنا (سيظهر للمحكمين والفرق)..."
-                      className="w-full text-base rounded-lg p-3 bg-background border border-border resize-y min-h-[80px] text-right leading-relaxed"
-                      style={{ fontSize: "1.05rem" }}
-                      dir="rtl"
-                      data-testid={`textarea-case-${currentRoundNum}`}
+                      onChange={(v) =>
+                        setRoundCase(tournament.id, currentRoundNum, v)
+                      }
                     />
                   </div>
                 )}
@@ -3260,14 +2971,14 @@ export default function TournamentDetail() {
                     <p className="text-muted-foreground">لا توجد مباريات</p>
                   </div>
                 ) : (
-                  <div>
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
                     {currentRound?.matches.map((match) => (
-                      <MatchCard
+                      <RoomCard
                         key={match.id}
                         match={match}
                         teamMap={teamMap}
                         hideScores={hideScores}
-                        onClick={() =>
+                        onOpen={() =>
                           setLocation(
                             `/match/${tournament.id}/${currentRoundNum}/${match.id}`
                           )
@@ -3594,6 +3305,217 @@ export default function TournamentDetail() {
             onRejectResult={(id) => removePendingResult(tournament.id, id)}
           />
         )}
+        {/* Bottom toolbar — quick actions */}
+        <div
+          className="mt-4 pt-3 border-t flex items-center gap-2"
+          style={{ borderColor: BRAND.border }}
+          data-testid="tournament-toolbar"
+        >
+          <div className="flex gap-2">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  className="flex-1 h-9 rounded-xl bg-white hover:bg-[#7B2D8E]/[0.06] border border-[#E7E9F2] flex items-center justify-center gap-2 text-[#2B1B45] text-[13px] font-semibold transition-all shadow-sm"
+                  data-testid="chip-stats"
+                >
+                  <Activity className="w-3.5 h-3.5" />
+                  إحصاءات
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuItem
+                  onClick={() => setLocation(`/stats/${tournament.id}`)}
+                  data-testid="menu-statistics"
+                >
+                  <Activity className="w-4 h-4 ml-2" style={{ color: CYAN }} />
+                  إحصائيات شاملة
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => setLocation(`/results/${tournament.id}`)}
+                  data-testid="menu-announce-results"
+                >
+                  <Megaphone className="w-4 h-4 ml-2" style={{ color: PURPLE }} />
+                  إعلان النتائج
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => setActiveTab("teams")}
+                  data-testid="menu-manage-teams"
+                >
+                  <Users className="w-4 h-4 ml-2" style={{ color: CYAN }} />
+                  إدارة الفرق
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  className="flex-1 h-9 rounded-xl bg-white hover:bg-[#7B2D8E]/[0.06] border border-[#E7E9F2] flex items-center justify-center gap-2 text-[#2B1B45] text-[13px] font-semibold transition-all shadow-sm"
+                  data-testid="chip-reports"
+                >
+                  {pdfLoading || excelLoading ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <FileText className="w-3.5 h-3.5" />
+                  )}
+                  تقارير
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuItem
+                  onClick={handleExportPdf}
+                  disabled={pdfLoading}
+                  data-testid="menu-export-pdf"
+                >
+                  <FileText className="w-4 h-4 ml-2" style={{ color: PURPLE }} />
+                  تنزيل تقرير PDF
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={handleExportExcel}
+                  disabled={excelLoading}
+                  data-testid="menu-export-excel"
+                >
+                  <FileSpreadsheet className="w-4 h-4 ml-2" style={{ color: SUCCESS }} />
+                  تنزيل ملف Excel
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  className="flex-1 h-9 rounded-xl bg-white hover:bg-[#7B2D8E]/[0.06] border border-[#E7E9F2] flex items-center justify-center gap-2 text-[#2B1B45] text-[13px] font-semibold transition-all shadow-sm"
+                  data-testid="chip-links"
+                >
+                  <ShieldCheck className="w-3.5 h-3.5" />
+                  روابط
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuItem
+                  onClick={handleRegistrationLink}
+                  data-testid="menu-registration-link"
+                >
+                  <UserPlus className="w-4 h-4 ml-2" style={{ color: CYAN }} />
+                  رابط تسجيل الفرق
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => setImportTeamOpen(true)}
+                  data-testid="menu-import-team-code"
+                >
+                  <Download className="w-4 h-4 ml-2" style={{ color: PURPLE }} />
+                  استلام تسجيل فريق (رمز)
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={handleAdminLink}
+                  data-testid="menu-admin-link"
+                >
+                  <ShieldCheck className="w-4 h-4 ml-2" style={{ color: PURPLE }} />
+                  رابط الإدارة (تحكم كامل)
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  aria-label="المزيد"
+                  title="المزيد"
+                  className="w-9 h-9 rounded-xl bg-white hover:bg-[#7B2D8E]/[0.06] border border-[#E7E9F2] flex items-center justify-center text-white transition-all shadow-sm flex-shrink-0"
+                  data-testid="chip-more"
+                >
+                  <MoreHorizontal className="w-4 h-4" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuSub>
+                  <DropdownMenuSubTrigger data-testid="menu-theme-trigger">
+                    <Palette className="w-4 h-4 ml-2" style={{ color: CYAN }} />
+                    المظهر
+                  </DropdownMenuSubTrigger>
+                  <DropdownMenuSubContent>
+                    <DropdownMenuLabel>وضع الألوان</DropdownMenuLabel>
+                    <DropdownMenuRadioGroup
+                      value={themeMode}
+                      onValueChange={(v) =>
+                        setThemeMode(v as "light" | "dark" | "system")
+                      }
+                    >
+                      <DropdownMenuRadioItem value="light" data-testid="menu-theme-light">
+                        <Sun className="w-4 h-4 ml-2" />
+                        فاتح
+                      </DropdownMenuRadioItem>
+                      <DropdownMenuRadioItem value="dark" data-testid="menu-theme-dark">
+                        <Moon className="w-4 h-4 ml-2" />
+                        داكن
+                      </DropdownMenuRadioItem>
+                      <DropdownMenuRadioItem value="system" data-testid="menu-theme-system">
+                        <Monitor className="w-4 h-4 ml-2" />
+                        حسب النظام
+                      </DropdownMenuRadioItem>
+                    </DropdownMenuRadioGroup>
+                  </DropdownMenuSubContent>
+                </DropdownMenuSub>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onClick={() => {
+                    const next = !tournament.semifinalEnabled;
+                    setEliminationMode(
+                      tournament.id,
+                      next,
+                      next ? true : (tournament.finalEnabled ?? false)
+                    );
+                  }}
+                  data-testid="menu-toggle-semifinal"
+                >
+                  <span className="ml-2 text-base">{tournament.semifinalEnabled ? "✓" : "○"}</span>
+                  نصف النهائي
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => {
+                    const next = !tournament.finalEnabled;
+                    setEliminationMode(
+                      tournament.id,
+                      next ? (tournament.semifinalEnabled ?? false) : false,
+                      next
+                    );
+                  }}
+                  data-testid="menu-toggle-final"
+                >
+                  <span className="ml-2 text-base">{tournament.finalEnabled ? "✓" : "○"}</span>
+                  النهائي
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                {tournament.finished ? (
+                  <DropdownMenuItem
+                    onClick={() => setConfirmReopenOpen(true)}
+                    data-testid="menu-reopen-tournament"
+                  >
+                    <Flag className="w-4 h-4 ml-2" />
+                    إعادة فتح البطولة
+                  </DropdownMenuItem>
+                ) : (
+                  <DropdownMenuItem
+                    onClick={() => setConfirmFinishOpen(true)}
+                    data-testid="menu-finish-tournament"
+                  >
+                    <Flag className="w-4 h-4 ml-2" />
+                    إنهاء البطولة
+                  </DropdownMenuItem>
+                )}
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onClick={() => setConfirmDeleteOpen(true)}
+                  className="text-destructive focus:text-destructive"
+                  data-testid="menu-delete-tournament"
+                >
+                  <Trash2 className="w-4 h-4 ml-2" />
+                  حذف البطولة
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        </div>
       </div>
 
       {/* Bottom action bar - Advance round */}
@@ -4936,6 +4858,7 @@ export default function TournamentDetail() {
             })()}
         </DialogContent>
       </Dialog>
+      </div>
     </div>
   );
 }
