@@ -1,0 +1,12 @@
+{
+  "previewPort": 3000,
+  "healthPath": "/",
+  "startCommand": "docker compose -f docker-compose.base44.yml up -d",
+  "secrets": [
+    {
+      "name": "VITE_CLERK_PUBLISHABLE_KEY",
+      "description": "Clerk publishable key (pk_test_... or pk_live_...) from Clerk dashboard → API Keys. Required for the web app to render its UI.",
+      "requiredAtBoot": false
+    }
+  ]
+}
