@@ -1,0 +1,18 @@
+previewPath = "/api/"
+title = "Oman Debates API"
+router = "path"
+
+[[services]]
+name = "api"
+paths = [ "/api" ]
+localPort = 5050
+
+[services.development]
+run = "pnpm --filter @workspace/api-server run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/api-server", "run", "build" ]
+run = "pnpm --filter @workspace/api-server run start"
+
+[services.env]
+PORT = "5050"

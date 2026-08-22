@@ -1,0 +1,28 @@
+{
+  "name": "@workspace/api-server",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "esbuild src/index.ts --bundle --platform=node --format=esm --outfile=dist/index.mjs --external:express --external:cors --external:pg --external:drizzle-orm --external:drizzle-zod --external:zod",
+    "start": "NODE_ENV=production node dist/index.mjs",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@workspace/db": "workspace:*",
+    "cors": "^2.8.5",
+    "drizzle-orm": "catalog:",
+    "express": "^5.0.1",
+    "pg": "^8.20.0"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.17",
+    "@types/express": "^5.0.0",
+    "@types/node": "catalog:",
+    "@types/pg": "^8.18.0",
+    "esbuild": "^0.27.3",
+    "tsx": "catalog:",
+    "typescript": "^5.9.0"
+  }
+}
