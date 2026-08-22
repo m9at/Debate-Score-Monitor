@@ -1,0 +1,71 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: oman
+      POSTGRES_PASSWORD: oman_debates_dev
+      POSTGRES_DB: oman_debates
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U oman -d oman_debates"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  setup:
+    image: node:24
+    working_dir: /app
+    volumes:
+      - ./:/app
+    command: sh -c "npm install -g pnpm@10 && pnpm install --frozen-lockfile"
+    restart: "no"
+
+  migrate:
+    image: node:24
+    working_dir: /app
+    volumes:
+      - ./:/app
+    command: sh -c "npm install -g pnpm@10 && pnpm --filter @workspace/db run push"
+    environment:
+      DATABASE_URL: postgresql://oman:oman_debates_dev@db:5432/oman_debates
+    restart: "no"
+    depends_on:
+      db:
+        condition: service_healthy
+      setup:
+        condition: service_completed_successfully
+
+  api:
+    image: node:24
+    working_dir: /app
+    volumes:
+      - ./:/app
+    command: sh -c "npm install -g pnpm@10 && pnpm --filter @workspace/api-server run dev"
+    environment:
+      DATABASE_URL: postgresql://oman:oman_debates_dev@db:5432/oman_debates
+      PORT: "5050"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  web:
+    image: node:24
+    working_dir: /app
+    volumes:
+      - ./:/app
+    command: sh -c "npm install -g pnpm@10 && pnpm --filter @workspace/web run dev"
+    environment:
+      PORT: "3000"
+      BASE_PATH: "/"
+      API_URL: "http://api:5050"
+    env_file:
+      - /run/base44/app.env
+    ports:
+      - "3000:3000"
+    depends_on:
+      setup:
+        condition: service_completed_successfully
+
+volumes:
+  pgdata:
