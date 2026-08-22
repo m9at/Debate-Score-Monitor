@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { Check, Pencil } from "lucide-react";
-import { BRAND, BTN } from "@/lib/brand";
+import { Check, Pencil, Quote } from "lucide-react";
+import { BRAND, BRAND_GRADIENT, BTN, BTN_PRIMARY_STYLE } from "@/lib/brand";
 
 interface CaseCardProps {
   roundNumber: number;
@@ -10,8 +10,8 @@ interface CaseCardProps {
 }
 
 /**
- * Motion / case text for the round. Collapsed to a clean single row by default,
- * expands into an editor when the edit button is pressed.
+ * Motion / case text for the round — the headline content of the round,
+ * shown large and readable, with an inline editor.
  */
 export default function CaseCard({
   roundNumber,
@@ -24,75 +24,86 @@ export default function CaseCard({
 
   return (
     <div
-      className="rounded-2xl bg-white border shadow-sm px-3 py-2.5 animate-in fade-in duration-300"
+      className="relative rounded-2xl bg-white border shadow-sm overflow-hidden
+                 animate-in fade-in slide-in-from-top-1 duration-300"
       style={{ borderColor: BRAND.border }}
       data-testid="case-card"
     >
-      <div className="flex items-center gap-3">
-        <div className="flex-1 min-w-0 text-right">
-          <div
-            className="text-[13px] font-bold"
-            style={{ color: BRAND.ink }}
+      {/* brand accent edge */}
+      <span
+        aria-hidden
+        className="absolute top-0 bottom-0 right-0 w-1"
+        style={{ backgroundImage: BRAND_GRADIENT }}
+      />
+
+      <div className="p-4 pr-5">
+        <div className="flex items-start gap-3 mb-2">
+          <span
+            className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0"
+            style={{ backgroundColor: `${BRAND.purple}14`, color: BRAND.purple }}
           >
-            نص القضية للجولة {roundNumber}
-          </div>
-          {!editing && (
-            <p
-              className={`text-xs mt-0.5 truncate ${text ? "" : "italic"}`}
-              style={{ color: `${BRAND.ink}80` }}
-              data-testid="text-case-preview"
+            <Quote className="w-4 h-4" />
+          </span>
+
+          <div className="flex-1 min-w-0 text-right">
+            <div
+              className="text-[11px] font-bold tracking-wide uppercase"
+              style={{ color: `${BRAND.purple}` }}
             >
-              {text || "لم يُضف نص القضية بعد"}
-            </p>
+              نص القضية · الجولة {roundNumber}
+            </div>
+          </div>
+
+          {!readOnly && (
+            <button
+              type="button"
+              onClick={() => setEditing((v) => !v)}
+              className={`${BTN.base} ${editing ? BTN.primary : BTN.secondary} shrink-0`}
+              style={editing ? BTN_PRIMARY_STYLE : undefined}
+              data-testid="button-edit-case"
+            >
+              {editing ? (
+                <>
+                  <Check className="w-3.5 h-3.5" />
+                  تم
+                </>
+              ) : (
+                <>
+                  <Pencil className="w-3.5 h-3.5" />
+                  تعديل
+                </>
+              )}
+            </button>
           )}
         </div>
 
-        {!readOnly && (
-          <button
-            type="button"
-            onClick={() => setEditing((v) => !v)}
-            className={`${BTN.base} ${editing ? BTN.primary : BTN.secondary}`}
-            style={editing ? { backgroundColor: BRAND.purple } : undefined}
-            data-testid="button-edit-case"
+        {editing && !readOnly ? (
+          <textarea
+            id={`case-${roundNumber}`}
+            autoFocus
+            value={value ?? ""}
+            onChange={(e) => onChange(e.target.value)}
+            placeholder="اكتب نص القضية هنا (سيظهر للمحكمين والفرق)..."
+            className="w-full rounded-xl p-3.5 bg-[#F7F8FC] border resize-y min-h-[120px]
+                       text-right leading-loose text-lg font-semibold outline-none
+                       focus:border-[#7B2D8E]/50 transition-colors
+                       animate-in fade-in slide-in-from-top-1 duration-200"
+            style={{ borderColor: BRAND.border, color: BRAND.ink }}
+            dir="rtl"
+            data-testid={`textarea-case-${roundNumber}`}
+          />
+        ) : (
+          <p
+            className={`text-right leading-loose ${
+              text ? "text-lg md:text-xl font-bold" : "text-sm italic"
+            }`}
+            style={{ color: text ? BRAND.ink : `${BRAND.ink}80` }}
+            data-testid="text-case-preview"
           >
-            {editing ? (
-              <>
-                <Check className="w-3.5 h-3.5" />
-                تم
-              </>
-            ) : (
-              <>
-                <Pencil className="w-3.5 h-3.5" />
-                تعديل
-              </>
-            )}
-          </button>
+            {text || "لم يُضف نص القضية لهذه الجولة بعد"}
+          </p>
         )}
       </div>
-
-      {editing && !readOnly && (
-        <textarea
-          id={`case-${roundNumber}`}
-          autoFocus
-          value={value ?? ""}
-          onChange={(e) => onChange(e.target.value)}
-          placeholder="اكتب نص القضية هنا (سيظهر للمحكمين والفرق)..."
-          className="mt-2.5 w-full rounded-xl p-3 bg-[#F7F8FC] border resize-y min-h-[90px]
-                     text-right leading-relaxed text-[15px] outline-none
-                     focus:border-[#7B2D8E]/50 transition-colors animate-in fade-in slide-in-from-top-1 duration-200"
-          style={{ borderColor: BRAND.border }}
-          data-testid="input-case-text"
-        />
-      )}
-
-      {!editing && readOnly && text && (
-        <p
-          className="mt-2 text-sm leading-relaxed text-right"
-          style={{ color: `${BRAND.ink}CC` }}
-        >
-          {text}
-        </p>
-      )}
     </div>
   );
 }

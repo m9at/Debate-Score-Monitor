@@ -206,10 +206,10 @@ export default function JudgePage() {
       <div className="judge-wrap">
         {matchInfo.caseText && (
           <div style={{
-            background: "#7B5EA70d", border: "1px solid #7B5EA733",
+            background: "#7B2D8E0d", border: "1px solid #7B2D8E33",
             borderRadius: 12, padding: 12, marginBottom: 12,
           }}>
-            <div style={{ fontSize: 12, fontWeight: 700, color: "#7B5EA7", marginBottom: 4 }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: "#7B2D8E", marginBottom: 4 }}>
               نص القضية
             </div>
             <div style={{ fontSize: 14, whiteSpace: "pre-wrap", lineHeight: 1.6 }}>
@@ -342,8 +342,8 @@ function ReplySection({ role, speakerNames, replyNum, setReplyNum, replyScore, s
                   padding: "8px 10px",
                   borderRadius: 10,
                   border: "1px solid var(--border)",
-                  background: active ? (isGov ? "#4ECDC420" : "#7B5EA720") : "var(--surface-2, #f5f5f5)",
-                  color: active ? (isGov ? "#4ECDC4" : "#7B5EA7") : "inherit",
+                  background: active ? (isGov ? "#29ABE220" : "#7B2D8E20") : "var(--surface-2, #f5f5f5)",
+                  color: active ? (isGov ? "#29ABE2" : "#7B2D8E") : "inherit",
                   fontWeight: active ? 700 : 500,
                   fontSize: 13,
                   textAlign: "right",
@@ -356,8 +356,8 @@ function ReplySection({ role, speakerNames, replyNum, setReplyNum, replyScore, s
                     width: 22,
                     height: 22,
                     borderRadius: 6,
-                    background: active ? (isGov ? "#4ECDC4" : "#7B5EA7") : (isGov ? "#4ECDC426" : "#7B5EA726"),
-                    color: active ? "#fff" : (isGov ? "#4ECDC4" : "#7B5EA7"),
+                    background: active ? (isGov ? "#29ABE2" : "#7B2D8E") : (isGov ? "#29ABE226" : "#7B2D8E26"),
+                    color: active ? "#fff" : (isGov ? "#29ABE2" : "#7B2D8E"),
                     display: "inline-flex",
                     alignItems: "center",
                     justifyContent: "center",
@@ -374,7 +374,7 @@ function ReplySection({ role, speakerNames, replyNum, setReplyNum, replyScore, s
                 {active && (
                   <span style={{
                     fontSize: 10, padding: "2px 6px", borderRadius: 4,
-                    background: isGov ? "#4ECDC4" : "#7B5EA7", color: "#fff", fontWeight: 700,
+                    background: isGov ? "#29ABE2" : "#7B2D8E", color: "#fff", fontWeight: 700,
                   }}>الرد</span>
                 )}
               </button>

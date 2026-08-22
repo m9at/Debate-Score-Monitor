@@ -11,6 +11,7 @@ import type {
   PendingJudgeRegistration,
   PendingMatchResult,
   MatchJudgeAssignment,
+  TournamentProtection,
 } from "@/types/tournament";
 import {
   fetchAllShared,
@@ -56,7 +57,8 @@ type Action =
   | { type: "SET_MATCH_JUDGES"; tournamentId: string; roundNumber: number; matchId: string; assignment: MatchJudgeAssignment }
   | { type: "FINISH_TOURNAMENT"; tournamentId: string }
   | { type: "REOPEN_TOURNAMENT"; tournamentId: string }
-  | { type: "DELETE_ROUND"; tournamentId: string; roundNumber: number };
+  | { type: "DELETE_ROUND"; tournamentId: string; roundNumber: number }
+  | { type: "SET_PROTECTION"; tournamentId: string; protection: TournamentProtection };
 
 function reducer(state: TournamentState, action: Action): TournamentState {
   switch (action.type) {
@@ -216,6 +218,13 @@ function reducer(state: TournamentState, action: Action): TournamentState {
             finalEnabled: action.final,
           };
         }),
+      };
+    }
+    case "SET_PROTECTION": {
+      return {
+        tournaments: state.tournaments.map((t) =>
+          t.id === action.tournamentId ? { ...t, protection: action.protection } : t
+        ),
       };
     }
     case "SET_ROUND_CASE": {
@@ -762,6 +771,7 @@ interface TournamentContextType {
   setEliminationMode: (tournamentId: string, semifinal: boolean, final: boolean) => void;
   submitMatch: (tournamentId: string, roundNumber: number, match: Match) => void;
   setRoundCase: (tournamentId: string, roundNumber: number, caseText: string) => void;
+  setProtection: (tournamentId: string, protection: TournamentProtection) => void;
   setMatchRoom: (
     tournamentId: string,
     roundNumber: number,
@@ -1167,6 +1177,13 @@ export function TournamentProvider({ children }: { children: ReactNode }) {
     []
   );
 
+  const setProtection = useCallback(
+    (tournamentId: string, protection: TournamentProtection) => {
+      dispatch({ type: "SET_PROTECTION", tournamentId, protection });
+    },
+    []
+  );
+
   const setRoundCase = useCallback(
     (tournamentId: string, roundNumber: number, caseText: string) => {
       dispatch({ type: "SET_ROUND_CASE", tournamentId, roundNumber, caseText });
@@ -1459,6 +1476,7 @@ export function TournamentProvider({ children }: { children: ReactNode }) {
         setEliminationMode,
         submitMatch,
         setRoundCase,
+        setProtection,
         setMatchRoom,
         addDemoTournament,
         fillDummyData,

@@ -14,9 +14,11 @@ import {
   Sparkles,
 } from "lucide-react";
 
-const CYAN = "#4ECDC4";
-const PURPLE = "#7B5EA7";
-const GOLD = "#FFC107";
+import { BRAND, BRAND_GRADIENT, BTN } from "@/lib/brand";
+
+const CYAN = BRAND.blue;
+const PURPLE = BRAND.purple;
+const GOLD = BRAND.gold;
 
 export default function ResultsPage() {
   const [, params] = useRoute("/results/:id");
@@ -110,7 +112,7 @@ export default function ResultsPage() {
   const champion = tournament.finished ? sortedTeams[0] : null;
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div className="min-h-screen flex flex-col" style={{ backgroundColor: BRAND.surface }}>
       {/* Victory popup overlay */}
       <AnimatePresence>
         {winnerPopup && (
@@ -157,7 +159,7 @@ export default function ResultsPage() {
               {Array.from({ length: 12 }).map((_, i) => {
                 const angle = (Math.PI * 2 * i) / 12;
                 const r = 120 + (i % 3) * 30;
-                const colors = [GOLD, CYAN, PURPLE, "#FF6B6B", "#4ECDC4"];
+                const colors = [GOLD, CYAN, PURPLE, "#FF6B6B", "#29ABE2"];
                 return (
                   <motion.div
                     key={i}
@@ -180,74 +182,106 @@ export default function ResultsPage() {
         )}
       </AnimatePresence>
 
-      {/* Hero Header */}
-      <div className="relative pt-6 pb-6 overflow-hidden">
+      {/* Branded hero */}
+      <header
+        className="relative overflow-hidden"
+        style={{ backgroundColor: BRAND.ink }}
+      >
         <div
-          className="absolute top-0 bottom-0 left-0"
-          style={{ right: "35%", backgroundColor: CYAN }}
+          aria-hidden
+          className="pointer-events-none absolute -top-24 right-1/4 w-80 h-80 rounded-full opacity-40 blur-3xl"
+          style={{ backgroundImage: BRAND_GRADIENT }}
         />
         <div
-          className="absolute top-0 bottom-0 right-0"
-          style={{ left: "65%", backgroundColor: PURPLE }}
+          aria-hidden
+          className="pointer-events-none absolute -bottom-28 left-0 w-72 h-72 rounded-full opacity-25 blur-3xl"
+          style={{ backgroundColor: BRAND.blue }}
         />
 
-        <div className="relative max-w-5xl mx-auto px-4">
-          <div className="flex items-center gap-3 mb-3">
+        <div className="relative max-w-5xl mx-auto px-4 pt-4 pb-6">
+          <div className="flex items-center gap-3">
             <button
               onClick={() => setLocation(`/tournament/${tournament.id}`)}
               aria-label="رجوع"
-              className="w-10 h-10 rounded-lg bg-white/20 hover:bg-white/30 flex items-center justify-center transition-colors"
+              className="w-10 h-10 rounded-xl bg-white/[0.1] hover:bg-white/20 border border-white/15
+                         backdrop-blur-sm flex items-center justify-center transition-all active:scale-95 shrink-0"
               data-testid="button-back"
             >
               <ArrowRight className="w-4 h-4 text-white" />
             </button>
-            <div className="flex-1 min-w-0 text-center">
-              <h1
-                className="text-white font-bold text-lg truncate"
-                data-testid="text-tournament-name"
-              >
-                {tournament.name}
-              </h1>
-              <p className="text-white/80 text-xs">إعلان النتائج</p>
-            </div>
+            <span className="flex-1" />
             <button
               onClick={resetReveals}
               aria-label="إخفاء النتائج"
               title="إخفاء جميع النتائج"
-              className="w-10 h-10 rounded-lg bg-white/20 hover:bg-white/30 flex items-center justify-center transition-colors"
+              className="w-10 h-10 rounded-xl bg-white/[0.1] hover:bg-white/20 border border-white/15
+                         backdrop-blur-sm flex items-center justify-center transition-all active:scale-95 shrink-0"
               data-testid="button-reset-reveals"
             >
               <RotateCcw className="w-4 h-4 text-white" />
             </button>
           </div>
 
+          {/* Logo + titles */}
+          <div className="flex flex-col items-center text-center mt-2 animate-in fade-in zoom-in-95 duration-500">
+            <span
+              className="w-16 h-16 rounded-2xl bg-white flex items-center justify-center mb-3"
+              style={{ boxShadow: `0 0 34px ${BRAND.purple}66` }}
+            >
+              <img
+                src={`${import.meta.env.BASE_URL}logo-mark.png`}
+                alt="مناظرات عُمان"
+                className="w-12 h-12 object-contain"
+              />
+            </span>
+            <p className="text-white/55 text-[11px] font-bold tracking-[0.2em] mb-1">
+              إعلان النتائج
+            </p>
+            <h1
+              className="text-white font-bold text-xl md:text-2xl truncate max-w-full"
+              data-testid="text-tournament-name"
+            >
+              {tournament.name}
+            </h1>
+          </div>
+
           {champion && (
             <motion.div
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              className="bg-white rounded-2xl p-4 mb-3 shadow-lg flex items-center gap-3"
+              initial={{ opacity: 0, scale: 0.92, y: 10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              transition={{ type: "spring", stiffness: 200, damping: 20, delay: 0.2 }}
+              className="mt-5 rounded-2xl p-4 flex items-center gap-3 border backdrop-blur-md"
+              style={{
+                backgroundColor: "rgba(255,255,255,0.08)",
+                borderColor: `${GOLD}59`,
+                boxShadow: `0 0 30px ${GOLD}33`,
+              }}
               data-testid="card-champion"
             >
               <div
-                className="w-14 h-14 rounded-full flex items-center justify-center"
-                style={{ backgroundColor: GOLD + "26" }}
+                className="w-14 h-14 rounded-2xl flex items-center justify-center shrink-0"
+                style={{ backgroundColor: GOLD + "2e", boxShadow: `0 0 20px ${GOLD}55` }}
               >
                 <Crown className="w-7 h-7" style={{ color: GOLD }} />
               </div>
-              <div className="flex-1">
-                <p className="text-xs font-semibold" style={{ color: GOLD }}>
+              <div className="flex-1 min-w-0">
+                <p className="text-[11px] font-bold tracking-wide" style={{ color: GOLD }}>
                   بطل البطولة
                 </p>
-                <p className="font-bold text-base">{champion.name}</p>
+                <p className="font-bold text-lg text-white truncate">{champion.name}</p>
               </div>
             </motion.div>
           )}
         </div>
-      </div>
+      </header>
 
-      {/* Round Navigation */}
-      <div className="max-w-5xl w-full mx-auto px-4 pt-4">
-        <div className="flex items-center justify-between py-3 border-b border-border mb-4">
+      {/* Round stepper */}
+      <div className="max-w-5xl w-full mx-auto px-4 -mt-3">
+        <div
+          className="rounded-2xl bg-white border shadow-sm p-2 flex items-center gap-2"
+          style={{ borderColor: BRAND.border }}
+          data-testid="round-stepper"
+        >
           <button
             disabled={viewingRound <= 1}
             onClick={() => {
@@ -255,20 +289,44 @@ export default function ResultsPage() {
               resetReveals();
             }}
             aria-label="الجولة السابقة"
-            className="w-10 h-10 rounded-lg flex items-center justify-center disabled:opacity-30"
-            style={{
-              backgroundColor: viewingRound > 1 ? CYAN + "26" : "transparent",
-            }}
+            className="w-9 h-9 rounded-xl border flex items-center justify-center shrink-0
+                       transition-all active:scale-95 disabled:opacity-30 hover:bg-[#7B2D8E]/[0.06]"
+            style={{ borderColor: BRAND.border, color: BRAND.purple }}
             data-testid="button-prev-round"
           >
-            <ChevronRight className="w-5 h-5" style={{ color: CYAN }} />
+            <ChevronRight className="w-4 h-4" />
           </button>
 
-          <div className="flex flex-col items-center">
-            <span className="text-xs text-muted-foreground">الجولة</span>
-            <span className="text-lg font-bold" style={{ color: PURPLE }}>
-              {viewingRound} / {tournament.rounds.length}
-            </span>
+          <div className="flex-1 min-w-0 flex items-center gap-1.5 overflow-x-auto">
+            {tournament.rounds.map((r) => {
+              const active = r.roundNumber === viewingRound;
+              return (
+                <button
+                  key={r.roundNumber}
+                  onClick={() => {
+                    setViewingRound(r.roundNumber);
+                    resetReveals();
+                  }}
+                  className={`${BTN.base} shrink-0 ${
+                    active ? "text-white shadow-sm" : BTN.secondary
+                  }`}
+                  style={active ? { backgroundImage: BRAND_GRADIENT } : undefined}
+                  data-testid={`step-round-${r.roundNumber}`}
+                >
+                  الجولة {r.roundNumber}
+                </button>
+              );
+            })}
+            {champion && (
+              <span
+                className={`${BTN.base} shrink-0 pointer-events-none`}
+                style={{ backgroundColor: `${GOLD}24`, color: "#8A5A00" }}
+                data-testid="step-final"
+              >
+                <Crown className="w-3.5 h-3.5" />
+                النتيجة النهائية
+              </span>
+            )}
           </div>
 
           <button
@@ -278,22 +336,18 @@ export default function ResultsPage() {
               resetReveals();
             }}
             aria-label="الجولة التالية"
-            className="w-10 h-10 rounded-lg flex items-center justify-center disabled:opacity-30"
-            style={{
-              backgroundColor:
-                viewingRound < tournament.rounds.length
-                  ? CYAN + "26"
-                  : "transparent",
-            }}
+            className="w-9 h-9 rounded-xl border flex items-center justify-center shrink-0
+                       transition-all active:scale-95 disabled:opacity-30 hover:bg-[#7B2D8E]/[0.06]"
+            style={{ borderColor: BRAND.border, color: BRAND.purple }}
             data-testid="button-next-round"
           >
-            <ChevronLeft className="w-5 h-5" style={{ color: CYAN }} />
+            <ChevronLeft className="w-4 h-4" />
           </button>
         </div>
       </div>
 
       {/* Rooms */}
-      <main className="flex-1 max-w-5xl w-full mx-auto px-4 pb-8">
+      <main className="flex-1 max-w-5xl w-full mx-auto px-4 pt-4 pb-10">
         <div className="flex flex-col gap-4 max-w-2xl mx-auto">
           {round?.matches.map((match, idx) => {
             const govTeam = tournament.teams.find(
@@ -320,7 +374,8 @@ export default function ResultsPage() {
                 initial={{ opacity: 0, y: 12 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: idx * 0.06 }}
-                className="bg-card rounded-2xl shadow-sm overflow-hidden cursor-pointer hover:shadow-md transition-shadow"
+                className="bg-white rounded-2xl border shadow-sm overflow-hidden cursor-pointer hover:shadow-lg transition-all duration-300"
+                style={{ borderColor: BRAND.border }}
                 onClick={() => match.completed && startReveal(match.id, match.winnerId ?? undefined)}
                 data-testid={`card-room-${match.roomNumber}`}
               >

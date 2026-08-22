@@ -10,8 +10,8 @@ import {
 } from "@/lib/registrationsApi";
 import type { TeamDocument } from "@/types/tournament";
 
-const CYAN = "#4ECDC4";
-const PURPLE = "#7B5EA7";
+const CYAN = "#29ABE2";
+const PURPLE = "#7B2D8E";
 
 const MAX_FILE_SIZE = 800 * 1024;
 

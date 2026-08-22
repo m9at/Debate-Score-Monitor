@@ -129,6 +129,18 @@ export interface Tournament {
   pendingResults?: PendingMatchResult[];
   semifinalEnabled?: boolean;
   finalEnabled?: boolean;
+  /** Access-code protection for viewing and editing this tournament. */
+  protection?: TournamentProtection;
+}
+
+export interface TournamentProtection {
+  enabled: boolean;
+  /** 4 or 6 digits. */
+  code: string;
+  /** Ask for the code before the tournament can be viewed at all. */
+  protectView: boolean;
+  /** Ask for the code before rounds, scores and settings can be changed. */
+  protectEdit: boolean;
 }
 
 export interface TournamentGroup {

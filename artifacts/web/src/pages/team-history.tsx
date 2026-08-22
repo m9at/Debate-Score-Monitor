@@ -4,8 +4,8 @@ import { useTournament } from "@/context/TournamentContext";
 import { ArrowRight, History, Trophy, X as XIcon, Award } from "lucide-react";
 import { motion } from "framer-motion";
 
-const CYAN = "#4ECDC4";
-const PURPLE = "#7B5EA7";
+const CYAN = "#29ABE2";
+const PURPLE = "#7B2D8E";
 const SUCCESS = "#34C759";
 const DANGER = "#FF3B30";
 

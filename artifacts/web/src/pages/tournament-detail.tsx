@@ -64,21 +64,16 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
   DropdownMenuSeparator,
-  DropdownMenuSub,
-  DropdownMenuSubContent,
-  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { useTheme } from "@/context/ThemeContext";
 import { BRAND, BTN, BTN_PRIMARY_STYLE } from "@/lib/brand";
 import TournamentSidebar from "@/components/tournament/TournamentSidebar";
 import RoundBar from "@/components/tournament/RoundBar";
 import CaseCard from "@/components/tournament/CaseCard";
 import RoomCard from "@/components/tournament/RoomCard";
+import ProtectionSettingsDialog from "@/components/tournament/ProtectionSettingsDialog";
+import UnlockGate from "@/components/tournament/UnlockGate";
 import {
   Home,
   Plus,
@@ -106,11 +101,7 @@ import {
   X,
   Pencil,
   Flag,
-  Sun,
-  Moon,
-  Monitor,
   Megaphone,
-  Palette,
   ShieldCheck,
   UserPlus,
   Activity,
@@ -137,8 +128,8 @@ import type {
   PendingMatchResult,
 } from "@/types/tournament";
 
-const CYAN = "#4ECDC4";
-const PURPLE = "#7B5EA7";
+const CYAN = "#29ABE2";
+const PURPLE = "#7B2D8E";
 const SUCCESS = "#34C759";
 
 type TabType = "teams" | "rounds" | "standings" | "speakers" | "judges" | "pending";
@@ -202,14 +193,14 @@ function buildPdfHtml(tournament: Tournament): string {
       return `
     <tr style="${i % 2 === 0 ? "background:#F8F8FF" : ""}">
       <td style="padding:10px 14px;text-align:center;font-weight:700;color:${
-        i === 0 ? "#7B5EA7" : i === 1 ? "#4ECDC4" : "#666"
+        i === 0 ? "#7B2D8E" : i === 1 ? "#29ABE2" : "#666"
       }">${medal}</td>
       <td style="padding:10px 14px;text-align:right;font-weight:600">${escHtml(t.name)}</td>
       <td style="padding:10px 14px;text-align:center;color:#34C759;font-weight:700">${t.wins}</td>
       <td style="padding:10px 14px;text-align:center;color:#FF3B30;font-weight:700">${t.losses}</td>
       <td style="padding:10px 14px;text-align:center;font-weight:600">${t.matchesPlayed}</td>
       <td style="padding:10px 14px;text-align:center;font-weight:600">${winPct}%</td>
-      <td style="padding:10px 14px;text-align:center;color:#4ECDC4;font-weight:700">${t.totalPoints}</td>
+      <td style="padding:10px 14px;text-align:center;color:#29ABE2;font-weight:700">${t.totalPoints}</td>
       <td style="padding:10px 14px;text-align:center;font-weight:600">${avg}</td>
     </tr>`;
     })
@@ -221,13 +212,13 @@ function buildPdfHtml(tournament: Tournament): string {
       const speakerChips = t.speakerNames
         .map(
           (sp, i) =>
-            `<span style="display:inline-block;padding:4px 10px;margin:2px;border-radius:999px;background:#7B5EA714;color:#7B5EA7;font-size:11px;font-weight:600">
+            `<span style="display:inline-block;padding:4px 10px;margin:2px;border-radius:999px;background:#7B2D8E14;color:#7B2D8E;font-size:11px;font-weight:600">
               ${i + 1}. ${escHtml(sp || `متحدث ${i + 1}`)}
             </span>`
         )
         .join("");
       return `
-      <div style="margin-bottom:10px;padding:12px 14px;border:1px solid #E5E5EA;border-radius:10px;border-right:4px solid #4ECDC4">
+      <div style="margin-bottom:10px;padding:12px 14px;border:1px solid #E5E5EA;border-radius:10px;border-right:4px solid #29ABE2">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
           <div style="font-weight:700;font-size:14px;color:#1A1A2E">${escHtml(t.name)}</div>
           <div style="font-size:11px;color:#888">${t.speakersPerTeam} متحدثين</div>
@@ -305,14 +296,14 @@ function buildPdfHtml(tournament: Tournament): string {
             i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : `${i + 1}`;
           return `<tr style="${i % 2 === 0 ? "background:#F8F8FF" : ""}">
         <td style="padding:8px 12px;text-align:center;font-weight:700;color:${
-          i === 0 ? "#7B5EA7" : i === 1 ? "#4ECDC4" : "#666"
+          i === 0 ? "#7B2D8E" : i === 1 ? "#29ABE2" : "#666"
         }">${medal}</td>
         <td style="padding:8px 12px;text-align:right;font-weight:600">${escHtml(a.speaker)}</td>
         <td style="padding:8px 12px;text-align:right;color:#666;font-size:11px">${escHtml(a.team)}</td>
         <td style="padding:8px 12px;text-align:center">${a.speeches}</td>
-        <td style="padding:8px 12px;text-align:center;color:#4ECDC4;font-weight:700">${a.speechPoints}</td>
+        <td style="padding:8px 12px;text-align:center;color:#29ABE2;font-weight:700">${a.speechPoints}</td>
         <td style="padding:8px 12px;text-align:center">${avg}</td>
-        <td style="padding:8px 12px;text-align:center;color:#7B5EA7;font-weight:600">${a.replyPoints}</td>
+        <td style="padding:8px 12px;text-align:center;color:#7B2D8E;font-weight:600">${a.replyPoints}</td>
         <td style="padding:8px 12px;text-align:center;color:#FFC107;font-weight:700">${a.bestSpeakerCount}</td>
         <td style="padding:8px 12px;text-align:center;font-weight:700">${total}</td>
       </tr>`;
@@ -353,7 +344,7 @@ function buildPdfHtml(tournament: Tournament): string {
               (sp) =>
                 `<span style="display:inline-block;margin:1px 3px;font-size:11px;color:#666">${escHtml(
                   sp.name
-                )}: <b style="color:#4ECDC4">${sp.score}</b></span>`
+                )}: <b style="color:#29ABE2">${sp.score}</b></span>`
             )
             .join("");
           const oppBreakdown = m.team2.speakers
@@ -361,13 +352,13 @@ function buildPdfHtml(tournament: Tournament): string {
               (sp) =>
                 `<span style="display:inline-block;margin:1px 3px;font-size:11px;color:#666">${escHtml(
                   sp.name
-                )}: <b style="color:#7B5EA7">${sp.score}</b></span>`
+                )}: <b style="color:#7B2D8E">${sp.score}</b></span>`
             )
             .join("");
           const judgeBadges = (m.judgeNames || [])
             .map(
               (n) =>
-                `<span style="display:inline-block;padding:3px 8px;margin:2px;border-radius:6px;background:#4ECDC414;color:#4ECDC4;font-size:11px;font-weight:600">${escHtml(
+                `<span style="display:inline-block;padding:3px 8px;margin:2px;border-radius:6px;background:#29ABE214;color:#29ABE2;font-size:11px;font-weight:600">${escHtml(
                   n
                 )}</span>`
             )
@@ -389,36 +380,36 @@ function buildPdfHtml(tournament: Tournament): string {
             <div style="padding:10px 12px">
               <table style="width:100%;border-collapse:collapse">
                 <tr>
-                  <td style="padding:6px 8px;border-right:3px solid #4ECDC4;width:42%">
-                    <div style="font-size:10px;color:#4ECDC4;font-weight:700;margin-bottom:2px">موالاة${
+                  <td style="padding:6px 8px;border-right:3px solid #29ABE2;width:42%">
+                    <div style="font-size:10px;color:#29ABE2;font-weight:700;margin-bottom:2px">موالاة${
                       isGovWin ? " · فائز" : ""
                     }</div>
                     <div style="font-size:13px;font-weight:${isGovWin ? 700 : 600}">${escHtml(govTeam?.name ?? "-")}</div>
                     ${govBreakdown ? `<div style="margin-top:4px">${govBreakdown}</div>` : ""}
                     ${
                       m.completed
-                        ? `<div style="margin-top:3px;font-size:11px;color:#888">رد: ${escHtml(govReplyName)} (<b style="color:#4ECDC4">${m.team1.replyScore}</b>)</div>`
+                        ? `<div style="margin-top:3px;font-size:11px;color:#888">رد: ${escHtml(govReplyName)} (<b style="color:#29ABE2">${m.team1.replyScore}</b>)</div>`
                         : ""
                     }
                   </td>
                   <td style="padding:6px 8px;text-align:center;width:16%">
                     ${
                       m.completed
-                        ? `<div style="font-size:18px;font-weight:900;color:#4ECDC4">${m.team1.totalScore}</div>
+                        ? `<div style="font-size:18px;font-weight:900;color:#29ABE2">${m.team1.totalScore}</div>
                            <div style="font-size:10px;color:#aaa;margin:2px 0">VS</div>
-                           <div style="font-size:18px;font-weight:900;color:#7B5EA7">${m.team2.totalScore}</div>`
+                           <div style="font-size:18px;font-weight:900;color:#7B2D8E">${m.team2.totalScore}</div>`
                         : `<div style="font-size:11px;color:#aaa">VS</div>`
                     }
                   </td>
-                  <td style="padding:6px 8px;border-right:3px solid #7B5EA7;width:42%">
-                    <div style="font-size:10px;color:#7B5EA7;font-weight:700;margin-bottom:2px">معارضة${
+                  <td style="padding:6px 8px;border-right:3px solid #7B2D8E;width:42%">
+                    <div style="font-size:10px;color:#7B2D8E;font-weight:700;margin-bottom:2px">معارضة${
                       isOppWin ? " · فائز" : ""
                     }</div>
                     <div style="font-size:13px;font-weight:${isOppWin ? 700 : 600}">${escHtml(oppTeam?.name ?? "-")}</div>
                     ${oppBreakdown ? `<div style="margin-top:4px">${oppBreakdown}</div>` : ""}
                     ${
                       m.completed
-                        ? `<div style="margin-top:3px;font-size:11px;color:#888">رد: ${escHtml(oppReplyName)} (<b style="color:#7B5EA7">${m.team2.replyScore}</b>)</div>`
+                        ? `<div style="margin-top:3px;font-size:11px;color:#888">رد: ${escHtml(oppReplyName)} (<b style="color:#7B2D8E">${m.team2.replyScore}</b>)</div>`
                         : ""
                     }
                   </td>
@@ -454,7 +445,7 @@ function buildPdfHtml(tournament: Tournament): string {
         .join("");
       const roundDone = round.matches.filter((m) => m.completed).length;
       return `<div style="margin-bottom:24px;page-break-inside:avoid">
-      <h3 style="font-size:17px;font-weight:700;color:#7B5EA7;margin:0 0 12px 0;border-right:4px solid #7B5EA7;padding-right:12px">
+      <h3 style="font-size:17px;font-weight:700;color:#7B2D8E;margin:0 0 12px 0;border-right:4px solid #7B2D8E;padding-right:12px">
         ${escHtml(roundLabel(round))}
         <span style="font-size:12px;color:#888;font-weight:500">· ${roundDone}/${round.matches.length} مكتملة</span>
       </h3>
@@ -551,7 +542,7 @@ function buildPdfHtml(tournament: Tournament): string {
 <head><meta charset="UTF-8"><title>${escHtml(tournament.name)}</title><style>
   *{box-sizing:border-box}
   body{font-family:'Cairo',-apple-system,BlinkMacSystemFont,'Segoe UI',Tahoma,sans-serif;margin:0;padding:0;color:#1A1A2E;direction:rtl;background:#fff}
-  .cover{background:linear-gradient(135deg,#4ECDC4 0%,#7B5EA7 100%);padding:40px 32px;color:#fff;text-align:center}
+  .cover{background:linear-gradient(135deg,#29ABE2 0%,#7B2D8E 100%);padding:40px 32px;color:#fff;text-align:center}
   .logo-text{font-size:26px;font-weight:700;letter-spacing:1px;margin-bottom:4px}
   .logo-sub{font-size:14px;opacity:.8;margin-bottom:24px}
   .t-name{font-size:32px;font-weight:900;margin-bottom:8px}
@@ -563,7 +554,7 @@ function buildPdfHtml(tournament: Tournament): string {
   .section{padding:24px 32px;page-break-inside:avoid}
   h2{font-size:20px;font-weight:700;color:#1A1A2E;margin-bottom:16px;padding-bottom:8px;border-bottom:2px solid #E5E5EA}
   table{width:100%;border-collapse:collapse}
-  th{font-size:12px;padding:10px 14px;text-align:right;background:linear-gradient(135deg,#4ECDC4,#7B5EA7);color:#fff}
+  th{font-size:12px;padding:10px 14px;text-align:right;background:linear-gradient(135deg,#29ABE2,#7B2D8E);color:#fff}
   td{padding:10px 14px;border-bottom:1px solid #F0F0F0;font-size:13px}
   .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
   .footer{text-align:center;padding:20px;color:#aaa;font-size:11px;border-top:1px solid #F0F0F0}
@@ -940,6 +931,7 @@ export default function TournamentDetail() {
     setEliminationMode,
     addRegisteredTeam,
     setRoundCase,
+    setProtection,
     setMatchRoom,
     submitMatch,
     addJudge,
@@ -955,7 +947,6 @@ export default function TournamentDetail() {
     setMatchJudges,
     autoAssignJudges,
   } = useTournament();
-  const { themeMode, setThemeMode } = useTheme();
   const tournament = getTournament(params?.id || "");
 
   const [activeTab, setActiveTab] = useState<TabType>("teams");
@@ -1031,6 +1022,8 @@ export default function TournamentDetail() {
     roomLabel: string;
   } | null>(null);
   const [roundNotification, setRoundNotification] = useState(false);
+  const [protectionOpen, setProtectionOpen] = useState(false);
+  const [unlocked, setUnlocked] = useState(false);
   const prevCompletedRef = useRef<boolean | null>(null);
   const consumedRef = useRef<Set<string>>(new Set());
   const tournamentRef = useRef(tournament);
@@ -1424,6 +1417,32 @@ export default function TournamentDetail() {
       <div className="min-h-screen bg-background flex items-center justify-center">
         <p className="text-muted-foreground">البطولة غير موجودة</p>
       </div>
+    );
+  }
+
+  // ── Access-code protection ────────────────────────────────────────────────
+  const protection = tournament.protection;
+  const unlockKey = `tournament_unlocked_${tournament.id}`;
+  const needsUnlock =
+    !!protection?.enabled &&
+    !!protection.code &&
+    (protection.protectView || protection.protectEdit) &&
+    !unlocked &&
+    sessionStorage.getItem(unlockKey) !== protection.code;
+
+  if (needsUnlock) {
+    return (
+      <UnlockGate
+        tournamentName={tournament.name}
+        codeLength={protection!.code.length}
+        onSubmit={(code) => {
+          if (code !== protection!.code) return false;
+          sessionStorage.setItem(unlockKey, code);
+          setUnlocked(true);
+          return true;
+        }}
+        onBack={() => setLocation("/")}
+      />
     );
   }
 
@@ -2467,6 +2486,204 @@ export default function TournamentDetail() {
               إعلان النتائج
             </button>
           </div>
+        {/* Quick actions toolbar */}
+        <div
+          className="max-w-6xl mx-auto mt-3 flex items-center gap-2"
+          style={{ borderColor: BRAND.border }}
+          data-testid="tournament-toolbar"
+        >
+          <div className="flex gap-2">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  className="flex-1 h-9 rounded-xl bg-white hover:bg-[#7B2D8E]/[0.06] border border-[#E7E9F2] flex items-center justify-center gap-2 text-[#2B1B45] text-[13px] font-semibold transition-all shadow-sm"
+                  data-testid="chip-stats"
+                >
+                  <Activity className="w-3.5 h-3.5" />
+                  إحصاءات
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuItem
+                  onClick={() => setLocation(`/stats/${tournament.id}`)}
+                  data-testid="menu-statistics"
+                >
+                  <Activity className="w-4 h-4 ml-2" style={{ color: CYAN }} />
+                  إحصائيات شاملة
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => setLocation(`/results/${tournament.id}`)}
+                  data-testid="menu-announce-results"
+                >
+                  <Megaphone className="w-4 h-4 ml-2" style={{ color: PURPLE }} />
+                  إعلان النتائج
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => setActiveTab("teams")}
+                  data-testid="menu-manage-teams"
+                >
+                  <Users className="w-4 h-4 ml-2" style={{ color: CYAN }} />
+                  إدارة الفرق
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  className="flex-1 h-9 rounded-xl bg-white hover:bg-[#7B2D8E]/[0.06] border border-[#E7E9F2] flex items-center justify-center gap-2 text-[#2B1B45] text-[13px] font-semibold transition-all shadow-sm"
+                  data-testid="chip-reports"
+                >
+                  {pdfLoading || excelLoading ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <FileText className="w-3.5 h-3.5" />
+                  )}
+                  تقارير
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuItem
+                  onClick={handleExportPdf}
+                  disabled={pdfLoading}
+                  data-testid="menu-export-pdf"
+                >
+                  <FileText className="w-4 h-4 ml-2" style={{ color: PURPLE }} />
+                  تنزيل تقرير PDF
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={handleExportExcel}
+                  disabled={excelLoading}
+                  data-testid="menu-export-excel"
+                >
+                  <FileSpreadsheet className="w-4 h-4 ml-2" style={{ color: SUCCESS }} />
+                  تنزيل ملف Excel
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  className="flex-1 h-9 rounded-xl bg-white hover:bg-[#7B2D8E]/[0.06] border border-[#E7E9F2] flex items-center justify-center gap-2 text-[#2B1B45] text-[13px] font-semibold transition-all shadow-sm"
+                  data-testid="chip-links"
+                >
+                  <ShieldCheck className="w-3.5 h-3.5" />
+                  روابط
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuItem
+                  onClick={handleRegistrationLink}
+                  data-testid="menu-registration-link"
+                >
+                  <UserPlus className="w-4 h-4 ml-2" style={{ color: CYAN }} />
+                  رابط تسجيل الفرق
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => setImportTeamOpen(true)}
+                  data-testid="menu-import-team-code"
+                >
+                  <Download className="w-4 h-4 ml-2" style={{ color: PURPLE }} />
+                  استلام تسجيل فريق (رمز)
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={handleAdminLink}
+                  data-testid="menu-admin-link"
+                >
+                  <ShieldCheck className="w-4 h-4 ml-2" style={{ color: PURPLE }} />
+                  رابط الإدارة (تحكم كامل)
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  aria-label="المزيد"
+                  title="المزيد"
+                  className="w-9 h-9 rounded-xl bg-white hover:bg-[#7B2D8E]/[0.06] border border-[#E7E9F2] flex items-center justify-center text-white transition-all shadow-sm flex-shrink-0"
+                  data-testid="chip-more"
+                >
+                  <MoreHorizontal className="w-4 h-4" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuItem
+                  onClick={() => setProtectionOpen(true)}
+                  data-testid="menu-protection"
+                >
+                  <ShieldCheck className="w-4 h-4 ml-2" style={{ color: BRAND.purple }} />
+                  حماية البطولة
+                  {tournament.protection?.enabled && (
+                    <span
+                      className="mr-auto text-[10px] font-bold px-1.5 py-0.5 rounded"
+                      style={{ backgroundColor: BRAND.purple + "1f", color: BRAND.purple }}
+                    >
+                      مُفعّلة
+                    </span>
+                  )}
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onClick={() => {
+                    const next = !tournament.semifinalEnabled;
+                    setEliminationMode(
+                      tournament.id,
+                      next,
+                      next ? true : (tournament.finalEnabled ?? false)
+                    );
+                  }}
+                  data-testid="menu-toggle-semifinal"
+                >
+                  <span className="ml-2 text-base">{tournament.semifinalEnabled ? "✓" : "○"}</span>
+                  نصف النهائي
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => {
+                    const next = !tournament.finalEnabled;
+                    setEliminationMode(
+                      tournament.id,
+                      next ? (tournament.semifinalEnabled ?? false) : false,
+                      next
+                    );
+                  }}
+                  data-testid="menu-toggle-final"
+                >
+                  <span className="ml-2 text-base">{tournament.finalEnabled ? "✓" : "○"}</span>
+                  النهائي
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                {tournament.finished ? (
+                  <DropdownMenuItem
+                    onClick={() => setConfirmReopenOpen(true)}
+                    data-testid="menu-reopen-tournament"
+                  >
+                    <Flag className="w-4 h-4 ml-2" />
+                    إعادة فتح البطولة
+                  </DropdownMenuItem>
+                ) : (
+                  <DropdownMenuItem
+                    onClick={() => setConfirmFinishOpen(true)}
+                    data-testid="menu-finish-tournament"
+                  >
+                    <Flag className="w-4 h-4 ml-2" />
+                    إنهاء البطولة
+                  </DropdownMenuItem>
+                )}
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onClick={() => setConfirmDeleteOpen(true)}
+                  className="text-destructive focus:text-destructive"
+                  data-testid="menu-delete-tournament"
+                >
+                  <Trash2 className="w-4 h-4 ml-2" />
+                  حذف البطولة
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        </div>
         </header>
         {tournament.finished && (
           <div className="px-4 md:px-6 pb-1">
@@ -2904,19 +3121,19 @@ export default function TournamentDetail() {
                     )}
                 </AnimatePresence>
 
-                {/* Judge link + PDF buttons */}
+                {/* Round actions */}
                 {currentRoundNum === tournament.currentRound &&
                   !tournament.finished && (
-                    <div className="flex gap-2 mb-3">
+                    <div
+                      className="mb-3 rounded-2xl bg-white border shadow-sm p-2 flex flex-wrap items-center gap-2"
+                      style={{ borderColor: BRAND.border }}
+                      data-testid="round-actions"
+                    >
                       <button
                         onClick={handleRoundJudgeLink}
                         disabled={linkLoading}
-                        className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border transition-colors disabled:opacity-60"
-                        style={{
-                          backgroundColor: PURPLE + "1f",
-                          borderColor: PURPLE + "66",
-                          color: PURPLE,
-                        }}
+                        className={`${BTN.base} ${BTN.primary} flex-1 min-w-[150px]`}
+                        style={BTN_PRIMARY_STYLE}
                         data-testid="button-judge-link"
                       >
                         {linkLoading ? (
@@ -2924,46 +3141,36 @@ export default function TournamentDetail() {
                         ) : (
                           <LinkIcon className="w-4 h-4" />
                         )}
-                        <span className="text-sm font-semibold">
-                          {linkLoading ? "جارٍ الإنشاء..." : "رابط المحكمين"}
-                        </span>
+                        {linkLoading ? "جارٍ الإنشاء..." : "رابط المحكمين"}
                       </button>
+
                       <button
-                        onClick={() => { setPasteResultsReport(""); setPasteResultsOpen(true); }}
-                        className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border transition-colors"
-                        style={{
-                          backgroundColor: SUCCESS + "1f",
-                          borderColor: SUCCESS + "66",
-                          color: SUCCESS,
+                        onClick={() => {
+                          setPasteResultsReport("");
+                          setPasteResultsOpen(true);
                         }}
+                        className={`${BTN.base} ${BTN.secondary} flex-1 min-w-[150px]`}
                         data-testid="button-paste-results"
                       >
-                        <Download className="w-4 h-4" />
-                        <span className="text-sm font-semibold">لصق نتائج المحكم</span>
+                        <Download className="w-4 h-4" style={{ color: BRAND.blue }} />
+                        لصق نتائج المحكم
                       </button>
+
                       <button
                         onClick={handleExportPdf}
                         disabled={pdfLoading}
-                        className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border transition-colors disabled:opacity-60"
-                        style={{
-                          backgroundColor: CYAN + "1f",
-                          borderColor: CYAN + "66",
-                          color: CYAN,
-                        }}
+                        className={`${BTN.base} ${BTN.secondary} flex-1 min-w-[150px]`}
                         data-testid="button-export-pdf"
                       >
                         {pdfLoading ? (
                           <Loader2 className="w-4 h-4 animate-spin" />
                         ) : (
-                          <FileText className="w-4 h-4" />
+                          <FileText className="w-4 h-4" style={{ color: BRAND.purple }} />
                         )}
-                        <span className="text-sm font-semibold">
-                          {pdfLoading ? "جارٍ التصدير..." : "تصدير PDF"}
-                        </span>
+                        {pdfLoading ? "جارٍ التصدير..." : "تصدير PDF"}
                       </button>
                     </div>
                   )}
-
                 {/* Match list */}
                 {currentRound?.matches.length === 0 ? (
                   <div className="text-center py-12">
@@ -3305,217 +3512,6 @@ export default function TournamentDetail() {
             onRejectResult={(id) => removePendingResult(tournament.id, id)}
           />
         )}
-        {/* Bottom toolbar — quick actions */}
-        <div
-          className="mt-4 pt-3 border-t flex items-center gap-2"
-          style={{ borderColor: BRAND.border }}
-          data-testid="tournament-toolbar"
-        >
-          <div className="flex gap-2">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button
-                  className="flex-1 h-9 rounded-xl bg-white hover:bg-[#7B2D8E]/[0.06] border border-[#E7E9F2] flex items-center justify-center gap-2 text-[#2B1B45] text-[13px] font-semibold transition-all shadow-sm"
-                  data-testid="chip-stats"
-                >
-                  <Activity className="w-3.5 h-3.5" />
-                  إحصاءات
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56">
-                <DropdownMenuItem
-                  onClick={() => setLocation(`/stats/${tournament.id}`)}
-                  data-testid="menu-statistics"
-                >
-                  <Activity className="w-4 h-4 ml-2" style={{ color: CYAN }} />
-                  إحصائيات شاملة
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => setLocation(`/results/${tournament.id}`)}
-                  data-testid="menu-announce-results"
-                >
-                  <Megaphone className="w-4 h-4 ml-2" style={{ color: PURPLE }} />
-                  إعلان النتائج
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => setActiveTab("teams")}
-                  data-testid="menu-manage-teams"
-                >
-                  <Users className="w-4 h-4 ml-2" style={{ color: CYAN }} />
-                  إدارة الفرق
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button
-                  className="flex-1 h-9 rounded-xl bg-white hover:bg-[#7B2D8E]/[0.06] border border-[#E7E9F2] flex items-center justify-center gap-2 text-[#2B1B45] text-[13px] font-semibold transition-all shadow-sm"
-                  data-testid="chip-reports"
-                >
-                  {pdfLoading || excelLoading ? (
-                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                  ) : (
-                    <FileText className="w-3.5 h-3.5" />
-                  )}
-                  تقارير
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56">
-                <DropdownMenuItem
-                  onClick={handleExportPdf}
-                  disabled={pdfLoading}
-                  data-testid="menu-export-pdf"
-                >
-                  <FileText className="w-4 h-4 ml-2" style={{ color: PURPLE }} />
-                  تنزيل تقرير PDF
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={handleExportExcel}
-                  disabled={excelLoading}
-                  data-testid="menu-export-excel"
-                >
-                  <FileSpreadsheet className="w-4 h-4 ml-2" style={{ color: SUCCESS }} />
-                  تنزيل ملف Excel
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button
-                  className="flex-1 h-9 rounded-xl bg-white hover:bg-[#7B2D8E]/[0.06] border border-[#E7E9F2] flex items-center justify-center gap-2 text-[#2B1B45] text-[13px] font-semibold transition-all shadow-sm"
-                  data-testid="chip-links"
-                >
-                  <ShieldCheck className="w-3.5 h-3.5" />
-                  روابط
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56">
-                <DropdownMenuItem
-                  onClick={handleRegistrationLink}
-                  data-testid="menu-registration-link"
-                >
-                  <UserPlus className="w-4 h-4 ml-2" style={{ color: CYAN }} />
-                  رابط تسجيل الفرق
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => setImportTeamOpen(true)}
-                  data-testid="menu-import-team-code"
-                >
-                  <Download className="w-4 h-4 ml-2" style={{ color: PURPLE }} />
-                  استلام تسجيل فريق (رمز)
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={handleAdminLink}
-                  data-testid="menu-admin-link"
-                >
-                  <ShieldCheck className="w-4 h-4 ml-2" style={{ color: PURPLE }} />
-                  رابط الإدارة (تحكم كامل)
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button
-                  aria-label="المزيد"
-                  title="المزيد"
-                  className="w-9 h-9 rounded-xl bg-white hover:bg-[#7B2D8E]/[0.06] border border-[#E7E9F2] flex items-center justify-center text-white transition-all shadow-sm flex-shrink-0"
-                  data-testid="chip-more"
-                >
-                  <MoreHorizontal className="w-4 h-4" />
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56">
-                <DropdownMenuSub>
-                  <DropdownMenuSubTrigger data-testid="menu-theme-trigger">
-                    <Palette className="w-4 h-4 ml-2" style={{ color: CYAN }} />
-                    المظهر
-                  </DropdownMenuSubTrigger>
-                  <DropdownMenuSubContent>
-                    <DropdownMenuLabel>وضع الألوان</DropdownMenuLabel>
-                    <DropdownMenuRadioGroup
-                      value={themeMode}
-                      onValueChange={(v) =>
-                        setThemeMode(v as "light" | "dark" | "system")
-                      }
-                    >
-                      <DropdownMenuRadioItem value="light" data-testid="menu-theme-light">
-                        <Sun className="w-4 h-4 ml-2" />
-                        فاتح
-                      </DropdownMenuRadioItem>
-                      <DropdownMenuRadioItem value="dark" data-testid="menu-theme-dark">
-                        <Moon className="w-4 h-4 ml-2" />
-                        داكن
-                      </DropdownMenuRadioItem>
-                      <DropdownMenuRadioItem value="system" data-testid="menu-theme-system">
-                        <Monitor className="w-4 h-4 ml-2" />
-                        حسب النظام
-                      </DropdownMenuRadioItem>
-                    </DropdownMenuRadioGroup>
-                  </DropdownMenuSubContent>
-                </DropdownMenuSub>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  onClick={() => {
-                    const next = !tournament.semifinalEnabled;
-                    setEliminationMode(
-                      tournament.id,
-                      next,
-                      next ? true : (tournament.finalEnabled ?? false)
-                    );
-                  }}
-                  data-testid="menu-toggle-semifinal"
-                >
-                  <span className="ml-2 text-base">{tournament.semifinalEnabled ? "✓" : "○"}</span>
-                  نصف النهائي
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => {
-                    const next = !tournament.finalEnabled;
-                    setEliminationMode(
-                      tournament.id,
-                      next ? (tournament.semifinalEnabled ?? false) : false,
-                      next
-                    );
-                  }}
-                  data-testid="menu-toggle-final"
-                >
-                  <span className="ml-2 text-base">{tournament.finalEnabled ? "✓" : "○"}</span>
-                  النهائي
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                {tournament.finished ? (
-                  <DropdownMenuItem
-                    onClick={() => setConfirmReopenOpen(true)}
-                    data-testid="menu-reopen-tournament"
-                  >
-                    <Flag className="w-4 h-4 ml-2" />
-                    إعادة فتح البطولة
-                  </DropdownMenuItem>
-                ) : (
-                  <DropdownMenuItem
-                    onClick={() => setConfirmFinishOpen(true)}
-                    data-testid="menu-finish-tournament"
-                  >
-                    <Flag className="w-4 h-4 ml-2" />
-                    إنهاء البطولة
-                  </DropdownMenuItem>
-                )}
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  onClick={() => setConfirmDeleteOpen(true)}
-                  className="text-destructive focus:text-destructive"
-                  data-testid="menu-delete-tournament"
-                >
-                  <Trash2 className="w-4 h-4 ml-2" />
-                  حذف البطولة
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-        </div>
       </div>
 
       {/* Bottom action bar - Advance round */}
@@ -4859,6 +4855,21 @@ export default function TournamentDetail() {
         </DialogContent>
       </Dialog>
       </div>
+
+      <ProtectionSettingsDialog
+        open={protectionOpen}
+        onOpenChange={setProtectionOpen}
+        value={tournament.protection}
+        onSave={(p) => {
+          setProtection(tournament.id, p);
+          if (p.enabled && p.code) {
+            sessionStorage.setItem(unlockKey, p.code);
+            setUnlocked(true);
+          } else {
+            sessionStorage.removeItem(unlockKey);
+          }
+        }}
+      />
     </div>
   );
 }

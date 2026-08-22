@@ -9,8 +9,8 @@ import {
   submitJudgeRegistration,
 } from "@/lib/registrationsApi";
 
-const CYAN = "#4ECDC4";
-const PURPLE = "#7B5EA7";
+const CYAN = "#29ABE2";
+const PURPLE = "#7B2D8E";
 
 export default function JudgeRegisterPage() {
   const [info, setInfo] = useState<JudgeRegistrationInfo | null>(null);

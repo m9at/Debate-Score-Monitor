@@ -14,8 +14,8 @@ import {
   Trophy,
 } from "lucide-react";
 
-const CYAN = "#4ECDC4";
-const PURPLE = "#7B5EA7";
+const CYAN = "#29ABE2";
+const PURPLE = "#7B2D8E";
 const GOLD = "#FFC107";
 
 export default function StatsPage() {

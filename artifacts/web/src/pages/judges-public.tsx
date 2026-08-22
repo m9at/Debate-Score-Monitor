@@ -3,8 +3,8 @@ import { Trophy, UserCheck, Crown, Building2, Award, RefreshCw } from "lucide-re
 import { fetchSharedById } from "@/lib/sharedTournamentsApi";
 import type { Tournament } from "@/types/tournament";
 
-const CYAN = "#4ECDC4";
-const PURPLE = "#7B5EA7";
+const CYAN = "#29ABE2";
+const PURPLE = "#7B2D8E";
 const GOLD = "#FFC107";
 
 interface PublicJudge {

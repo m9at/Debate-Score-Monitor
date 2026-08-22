@@ -35,8 +35,8 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
-const CYAN = "#4ECDC4";
-const PURPLE = "#7B5EA7";
+const CYAN = "#29ABE2";
+const PURPLE = "#7B2D8E";
 
 export default function Home() {
   const { tournaments, addTournament, deleteTournament } = useTournament();
@@ -57,7 +57,7 @@ export default function Home() {
     (t) => !groups.some((g) => g.tournamentIds.includes(t.id))
   );
 
-  const logoSrc = `${import.meta.env.BASE_URL}logo.jpg`;
+  const logoSrc = `${import.meta.env.BASE_URL}logo-mark.png`;
 
   const handleCreate = () => {
     if (!newName.trim()) return;
@@ -101,7 +101,7 @@ export default function Home() {
             style={{
               width: 180,
               height: 180,
-              backgroundColor: "rgba(78,205,196,0.21)",
+              backgroundColor: "rgba(41,171,226,0.21)",
             }}
           />
           {/* Inner glow backdrop (white) */}
@@ -138,13 +138,13 @@ export default function Home() {
                   width: 108,
                   height: 108,
                   border: "3px solid #fff",
-                  boxShadow: "0 0 25px rgba(78,205,196,0.6)",
+                  boxShadow: "0 0 28px rgba(123,45,142,0.55)",
                 }}
               >
                 <img
                   src={logoSrc}
                   alt="مناظرات عُمان"
-                  className="w-full h-full object-cover"
+                  className="w-full h-full object-contain p-1.5"
                 />
               </div>
             </div>
@@ -479,7 +479,7 @@ export default function Home() {
                 width: 56,
                 backgroundColor: CYAN,
                 borderRadius: 16,
-                boxShadow: "0 4px 14px rgba(78,205,196,0.4)",
+                boxShadow: "0 4px 14px rgba(41,171,226,0.4)",
                 flexShrink: 0,
               }}
               data-testid="button-create-group"
