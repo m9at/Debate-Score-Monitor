@@ -3,6 +3,11 @@ import type { DrawPairing } from "./draw";
 
 /** Everything the creation wizard collects before the tournament exists. */
 export interface TournamentSetup {
+  /**
+   * Draft id, minted when the wizard opens and kept as the tournament's real id
+   * on creation — so registration links exist and stay valid from step one.
+   */
+  draftId: string;
   name: string;
   description?: string;
   logoDataUrl?: string;
@@ -45,6 +50,7 @@ export type WizardStepKey = (typeof WIZARD_STEPS)[number]["key"];
 
 export function emptySetup(): TournamentSetup {
   return {
+    draftId: crypto.randomUUID(),
     name: "",
     totalRounds: 3,
     expectedTeams: 8,

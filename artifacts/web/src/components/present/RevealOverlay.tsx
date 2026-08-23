@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Trophy, X } from "lucide-react";
+import { RotateCcw, Trophy, X } from "lucide-react";
 import type { Match, Round, Tournament } from "@/types/tournament";
 import { BRAND, BRAND_GRADIENT } from "@/lib/brand";
 import { revealVisibility, roomTitle, roundTitle } from "@/lib/reveal";
@@ -40,6 +40,8 @@ export default function RevealOverlay({
   onClose,
 }: RevealOverlayProps) {
   const [phase, setPhase] = useState<Phase>("round");
+  /** Bumped by إعادة عرض الإعلان — replays the scene, never the result. */
+  const [runId, setRunId] = useState(0);
 
   const teams = useMemo(() => {
     const byId = new Map(tournament.teams.map((t) => [t.id, t.name]));
@@ -66,7 +68,7 @@ export default function RevealOverlay({
       window.setTimeout(() => setPhase(t.phase), t.after)
     );
     return () => timers.forEach(window.clearTimeout);
-  }, [match.id]);
+  }, [match.id, runId]);
 
   useEffect(() => {
     if (phase === "winner") onRevealed();
@@ -217,12 +219,23 @@ export default function RevealOverlay({
                     animate={{
                       opacity: 1,
                       scale: trophyMoving ? 1.35 : [1, 1.08, 1],
-                      x: trophyMoving ? travelX : 0,
-                      y: "-50%",
+                      // Suspense: right → centre → left → centre, then the
+                      // final, decisive move to the winning side.
+                      x: trophyMoving ? travelX : ["0%", "30%", "0%", "-30%", "0%"],
+                      // Once it settles on a side it rises ABOVE the card so the
+                      // team name is never covered.
+                      y: trophyMoving && !isDraw ? "-170%" : "-50%",
                       rotate: trophyMoving ? 0 : [-7, 7, -7],
                     }}
                     transition={{
-                      x: { duration: 1.9, ease: [0.22, 1, 0.36, 1] },
+                      x: trophyMoving
+                        ? { duration: 1.9, ease: [0.22, 1, 0.36, 1] }
+                        : {
+                            duration: 5.4,
+                            repeat: Infinity,
+                            ease: "easeInOut",
+                          },
+                      y: { duration: 1.4, ease: [0.22, 1, 0.36, 1] },
                       scale: trophyMoving
                         ? { duration: 1.9 }
                         : { duration: 2.6, repeat: Infinity, ease: "easeInOut" },
@@ -331,20 +344,35 @@ export default function RevealOverlay({
           </AnimatePresence>
         </div>
 
-        {/* Back to the round — appears only once the reveal is complete */}
+        {/* Controls — appear only once the reveal is complete */}
         {revealed && (
-          <motion.button
-            type="button"
-            onClick={onClose}
+          <motion.div
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 1.6 }}
-            className="mt-10 h-12 px-8 rounded-2xl bg-white/10 hover:bg-white/20 text-white
-                       text-base md:text-lg font-bold transition-colors"
-            data-testid="button-back-to-round"
+            transition={{ delay: 2.6 }}
+            className="mt-10 flex flex-wrap items-center justify-center gap-3"
           >
-            العودة إلى الجولة
-          </motion.button>
+            <button
+              type="button"
+              onClick={onClose}
+              className="h-12 px-8 rounded-2xl bg-white/10 hover:bg-white/20 text-white
+                         text-base md:text-lg font-bold transition-colors"
+              data-testid="button-back-to-round"
+            >
+              العودة إلى القاعات
+            </button>
+            <button
+              type="button"
+              onClick={() => setRunId((n) => n + 1)}
+              className="h-12 px-8 rounded-2xl border border-white/25 text-white/85
+                         hover:bg-white/10 text-base md:text-lg font-bold transition-colors
+                         inline-flex items-center gap-2.5"
+              data-testid="button-replay-reveal"
+            >
+              <RotateCcw className="w-5 h-5" />
+              إعادة عرض الإعلان
+            </button>
+          </motion.div>
         )}
       </div>
 

@@ -1375,7 +1375,8 @@ export function TournamentProvider({ children }: { children: ReactNode }) {
     rounds.sort((a, b) => a.roundNumber - b.roundNumber);
 
     const tournament: Tournament = {
-      id: crypto.randomUUID(),
+      // Keep the draft id so links shared during the wizard stay valid.
+      id: setup.draftId || crypto.randomUUID(),
       name: setup.name.trim(),
       createdAt: Date.now(),
       totalRounds: setup.totalRounds,

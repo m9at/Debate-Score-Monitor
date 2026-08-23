@@ -90,6 +90,12 @@ export default function PresentationMode({
     ({ match }) => getRevealStatus(match) === "revealed",
   ).length;
 
+  /** Winner name, but ONLY for rooms whose result is already revealed. */
+  const revealedWinnerName = (match: (typeof rooms)[number]["match"]) =>
+    getRevealStatus(match) === "revealed" && match.winnerId
+      ? teamName(match.winnerId)
+      : null;
+
   const focused = focusedRoomId
     ? (rooms.find(({ match }) => match.id === focusedRoomId) ?? null)
     : null;
@@ -141,7 +147,9 @@ export default function PresentationMode({
               govName={teamName(focused.match.team1.teamId)}
               oppName={teamName(focused.match.team2.teamId)}
               canAnnounce={canAnnounce}
+              winnerName={revealedWinnerName(focused.match)}
               onAnnounce={() => setAnnouncingId(focused.match.id)}
+              onReplay={() => setAnnouncingId(focused.match.id)}
               onBack={() => setFocusedRoomId(null)}
             />
           </motion.div>
@@ -177,8 +185,10 @@ export default function PresentationMode({
                       oppName={teamName(match.team2.teamId)}
                       selected={false}
                       canAnnounce={canAnnounce}
+                      winnerName={revealedWinnerName(match)}
                       onSelect={() => setFocusedRoomId(match.id)}
-                      onAnnounce={() => setFocusedRoomId(match.id)}
+                      onAnnounce={() => setAnnouncingId(match.id)}
+                      onReplay={() => setAnnouncingId(match.id)}
                     />
                   ))}
                 </div>

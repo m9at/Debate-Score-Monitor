@@ -1,4 +1,11 @@
-import { CheckCircle2, Loader2, Megaphone, Sparkles, Clock } from "lucide-react";
+import {
+  CheckCircle2,
+  Clock,
+  Loader2,
+  Megaphone,
+  RotateCcw,
+  Sparkles,
+} from "lucide-react";
 import type { Match } from "@/types/tournament";
 import { BRAND } from "@/lib/brand";
 import type { RoomStatus } from "@/lib/roomStatus";
@@ -29,8 +36,12 @@ interface Props {
   selected: boolean;
   /** Only the admin who opened presentation mode may announce. */
   canAnnounce: boolean;
+  /** Winner name — passed ONLY once the result is officially revealed. */
+  winnerName?: string | null;
   onSelect: () => void;
   onAnnounce: () => void;
+  /** Replays the announcement scene for an already revealed room. */
+  onReplay?: () => void;
 }
 
 /**
@@ -44,12 +55,15 @@ export default function PresentRoomCard({
   oppName,
   selected,
   canAnnounce,
+  winnerName,
   onSelect,
   onAnnounce,
+  onReplay,
 }: Props) {
   const state = PUBLIC_STATE[status];
   const StateIcon = state.icon;
   const readyToAnnounce = status === "ready";
+  const announced = status === "announced";
 
   return (
     <div
@@ -137,6 +151,30 @@ export default function PresentRoomCard({
           <p className="text-center text-white/30 font-black text-base select-none">VS</p>
         </div>
 
+        {/* Judging received — states the fact without hinting at the winner */}
+        {readyToAnnounce && (
+          <p
+            className="mt-5 text-center font-bold text-base md:text-xl inline-flex items-center
+                       justify-center gap-2 w-full"
+            style={{ color: "#86EFAC" }}
+            data-testid={`present-received-${match.roomNumber}`}
+          >
+            <CheckCircle2 className="w-5 h-5" />
+            تم استلام نتائج التحكيم
+          </p>
+        )}
+
+        {/* Winner — only after the result was officially announced */}
+        {announced && winnerName && (
+          <p
+            className="mt-5 text-center font-black text-xl md:text-3xl"
+            style={{ color: BRAND.gold }}
+            data-testid={`present-winner-${match.roomNumber}`}
+          >
+            🏆 الفائز: {winnerName}
+          </p>
+        )}
+
         {canAnnounce && readyToAnnounce && (
           <button
             type="button"
@@ -155,6 +193,23 @@ export default function PresentRoomCard({
           >
             <Megaphone className="w-5 h-5" />
             إعلان النتيجة
+          </button>
+        )}
+
+        {canAnnounce && announced && onReplay && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onReplay();
+            }}
+            className="mt-5 w-full h-12 rounded-2xl font-bold text-base md:text-lg text-white/85
+                       border border-white/25 hover:bg-white/10 inline-flex items-center
+                       justify-center gap-2.5 transition-colors"
+            data-testid={`button-replay-${match.roomNumber}`}
+          >
+            <RotateCcw className="w-5 h-5" />
+            إعادة عرض النتيجة
           </button>
         )}
       </div>

@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { ArrowRight, Megaphone } from "lucide-react";
+import { ArrowRight, CheckCircle2, Megaphone, RotateCcw } from "lucide-react";
 import type { Match } from "@/types/tournament";
 import { BRAND, BRAND_GRADIENT } from "@/lib/brand";
 import { roomTitle } from "@/lib/reveal";
@@ -12,7 +12,10 @@ interface Props {
   oppName: string;
   /** Only the admin who opened the mode may announce. */
   canAnnounce: boolean;
+  /** Winner name — passed ONLY once the result is officially revealed. */
+  winnerName?: string | null;
   onAnnounce: () => void;
+  onReplay?: () => void;
   onBack: () => void;
 }
 
@@ -37,7 +40,9 @@ export default function PresentRoomFocus({
   govName,
   oppName,
   canAnnounce,
+  winnerName,
   onAnnounce,
+  onReplay,
   onBack,
 }: Props) {
   const sides = [
@@ -116,6 +121,28 @@ export default function PresentRoomFocus({
           </p>
         </div>
 
+        {status === "ready" && (
+          <p
+            className="mt-10 text-center font-bold text-xl md:text-2xl inline-flex items-center
+                       justify-center gap-2.5 w-full"
+            style={{ color: "#86EFAC" }}
+            data-testid="focus-received"
+          >
+            <CheckCircle2 className="w-6 h-6" />
+            تم استلام نتائج التحكيم — جاهزة للإعلان
+          </p>
+        )}
+
+        {status === "announced" && winnerName && (
+          <p
+            className="mt-10 text-center font-black text-3xl md:text-5xl"
+            style={{ color: BRAND.gold }}
+            data-testid="focus-winner"
+          >
+            🏆 الفائز: {winnerName}
+          </p>
+        )}
+
         <div className="mt-12 flex flex-wrap items-center justify-center gap-4">
           <button
             type="button"
@@ -142,6 +169,19 @@ export default function PresentRoomFocus({
             >
               <Megaphone className="w-7 h-7" />
               إعلان النتيجة
+            </button>
+          )}
+
+          {canAnnounce && status === "announced" && onReplay && (
+            <button
+              type="button"
+              onClick={onReplay}
+              className="h-14 px-8 rounded-2xl font-bold text-lg text-white/85 border
+                         border-white/25 hover:bg-white/10 inline-flex items-center gap-2.5 transition-colors"
+              data-testid="button-focus-replay"
+            >
+              <RotateCcw className="w-5 h-5" />
+              إعادة عرض الإعلان
             </button>
           )}
         </div>

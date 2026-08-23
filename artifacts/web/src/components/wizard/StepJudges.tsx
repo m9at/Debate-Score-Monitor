@@ -4,6 +4,8 @@ import { BRAND, BTN, BTN_PRIMARY_STYLE, BTN_SIZE } from "@/lib/brand";
 import type { Judge } from "@/types/tournament";
 import type { TournamentSetup } from "@/lib/wizard/types";
 import { Panel, inputClass, inputStyle } from "./ui";
+import RegistrationLinkCard from "@/components/register/RegistrationLinkCard";
+import { buildJudgeRegisterUrl } from "@/lib/judgeRegistrationCodec";
 
 interface StepJudgesProps {
   setup: TournamentSetup;
