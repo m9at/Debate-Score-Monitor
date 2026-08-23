@@ -72,6 +72,8 @@ import TournamentSidebar from "@/components/tournament/TournamentSidebar";
 import RoundBar from "@/components/tournament/RoundBar";
 import CaseCard from "@/components/tournament/CaseCard";
 import RoomCard from "@/components/tournament/RoomCard";
+import { getRoomStatus } from "@/lib/roomStatus";
+import RegistrationLinksCard from "@/components/tournament/RegistrationLinksCard";
 import OverviewDashboard from "@/components/tournament/OverviewDashboard";
 import ResultsAdmin from "@/components/tournament/ResultsAdmin";
 import RoundControlCenter from "@/components/tournament/RoundControlCenter";
@@ -1441,6 +1443,21 @@ export default function TournamentDetail() {
   const currentRound = tournament?.rounds.find(
     (r) => r.roundNumber === currentRoundNum
   );
+  // Navigation follows the rounds that actually exist, since a tournament may
+  // start from a later round and its numbers need not begin at 1.
+  const roundNumbers = useMemo(
+    () =>
+      (tournament?.rounds ?? [])
+        .map((r) => r.roundNumber)
+        .sort((a, b) => a - b),
+    [tournament?.rounds]
+  );
+  const viewedIndex = roundNumbers.indexOf(currentRoundNum);
+  const prevRoundNum = viewedIndex > 0 ? roundNumbers[viewedIndex - 1] : null;
+  const nextRoundNum =
+    viewedIndex >= 0 && viewedIndex < roundNumbers.length - 1
+      ? roundNumbers[viewedIndex + 1]
+      : null;
   const completedCount =
     currentRound?.matches.filter((m) => m.completed).length ?? 0;
   const totalMatches = currentRound?.matches.length ?? 0;
@@ -2830,6 +2847,16 @@ export default function TournamentDetail() {
         )}
       {/* Content */}
       <div className={`flex-1 ${LAYOUT.page} pb-28 pt-2`}>
+        {activeTab === "overview" && can("manageTeams") && (
+          <div className="mb-3">
+            <RegistrationLinksCard
+              pendingTeams={tournament.pendingTeams?.length ?? 0}
+              pendingJudges={tournament.pendingJudges?.length ?? 0}
+              onTeamLink={handleRegistrationLink}
+              onJudgeLink={handleJudgeRegistrationLink}
+            />
+          </div>
+        )}
         {activeTab === "overview" && (
           <OverviewDashboard
             tournament={tournament}
@@ -3205,14 +3232,22 @@ export default function TournamentDetail() {
                     completedCount={completedCount}
                     totalMatches={totalMatches}
                     allComplete={allRoomsComplete}
-                    canPrev={currentRoundNum > 1}
-                    canNext={currentRoundNum < tournament.rounds.length}
+                    canPrev={prevRoundNum !== null}
+                    canNext={nextRoundNum !== null}
+                    roundNumbers={roundNumbers}
+                    liveRoundNumber={tournament.currentRound || undefined}
+                    onSelectRound={(n) => {
+                      setViewingRound(n);
+                      setRoundNotification(false);
+                    }}
                     onPrev={() => {
-                      setViewingRound(currentRoundNum - 1);
+                      if (prevRoundNum === null) return;
+                      setViewingRound(prevRoundNum);
                       setRoundNotification(false);
                     }}
                     onNext={() => {
-                      setViewingRound(currentRoundNum + 1);
+                      if (nextRoundNum === null) return;
+                      setViewingRound(nextRoundNum);
                       setRoundNotification(false);
                     }}
                   />
@@ -3368,6 +3403,14 @@ export default function TournamentDetail() {
                         match={match}
                         teamMap={teamMap}
                         hideScores={hideScores}
+                        status={getRoomStatus({
+                          match,
+                          pending: tournament.pendingResults ?? [],
+                          expectedJudges:
+                            currentRound?.judgesPerRoom ??
+                            tournament.settings?.judgesPerRoom ??
+                            0,
+                        })}
                         onOpen={() =>
                           setLocation(
                             `/match/${tournament.id}/${currentRoundNum}/${match.id}`

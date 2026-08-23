@@ -1,6 +1,8 @@
-import { Award, CheckCircle, Clock, Pencil, Star } from "lucide-react";
+import { Award, Pencil, Star } from "lucide-react";
 import type { Match } from "@/types/tournament";
 import { BRAND, BRAND_GRADIENT, BTN, BTN_PRIMARY_STYLE } from "@/lib/brand";
+import { roomStatusMeta, type RoomStatus } from "@/lib/roomStatus";
+import RoomStatusBadge from "./RoomStatusBadge";
 
 const HIDDEN_SCORE = "••";
 
@@ -12,6 +14,8 @@ interface RoomCardProps {
   match: Match;
   teamMap: Map<string, { name: string }>;
   hideScores?: boolean;
+  /** Where the room stands in the round — drives the badge and accent bar. */
+  status: RoomStatus;
   onOpen: () => void;
   onEditRoom?: () => void;
 }
@@ -71,9 +75,11 @@ export default function RoomCard({
   match,
   teamMap,
   hideScores,
+  status,
   onOpen,
   onEditRoom,
 }: RoomCardProps) {
+  const statusColor = roomStatusMeta(status).dot;
   const govName = teamMap.get(match.team1.teamId)?.name ?? "-";
   const oppName = teamMap.get(match.team2.teamId)?.name ?? "-";
   const isGovWinner = match.winnerId === match.team1.teamId;
@@ -85,18 +91,28 @@ export default function RoomCard({
 
   return (
     <div
-      className="group rounded-2xl bg-white border shadow-sm hover:shadow-lg p-3
-                 transition-all duration-300 hover:-translate-y-0.5 animate-in fade-in zoom-in-95"
+      className="group rounded-2xl bg-white border shadow-sm hover:shadow-lg
+                 overflow-hidden transition-all duration-300 hover:-translate-y-0.5
+                 animate-in fade-in zoom-in-95"
       style={{ borderColor: BRAND.border }}
       data-testid={`card-match-${match.id}`}
     >
+      {/* Status accent bar */}
+      <div
+        aria-hidden
+        className="h-1 w-full transition-colors duration-300"
+        style={{ backgroundColor: statusColor }}
+        data-testid={`accent-match-${match.id}`}
+      />
+      <div className="p-3">
       {/* Head: room name + status */}
       <div className="flex items-center gap-2 mb-2.5">
         <span
+          aria-hidden
           className="w-2 h-2 rounded-full shrink-0"
           style={{
-            backgroundColor: match.completed ? BRAND.success : BRAND.warning,
-            boxShadow: `0 0 8px ${match.completed ? BRAND.success : BRAND.warning}`,
+            backgroundColor: statusColor,
+            boxShadow: `0 0 8px ${statusColor}`,
           }}
         />
         <span
@@ -125,21 +141,8 @@ export default function RoomCard({
 
         <span className="flex-1" />
 
-        <span
-          className="flex items-center gap-1.5 px-2.5 h-6 rounded-full text-[11px] font-bold"
-          style={
-            match.completed
-              ? { backgroundColor: `${BRAND.success}1f`, color: "#15803D" }
-              : { backgroundColor: `${BRAND.warning}24`, color: "#B45309" }
-          }
-          data-testid={`status-match-${match.id}`}
-        >
-          {match.completed ? (
-            <CheckCircle className="w-3 h-3" />
-          ) : (
-            <Clock className="w-3 h-3" />
-          )}
-          {match.completed ? "مكتمل" : "قيد الانتظار"}
+        <span data-testid={`status-match-${match.id}`}>
+          <RoomStatusBadge status={status} size="sm" />
         </span>
       </div>
 
@@ -222,6 +225,7 @@ export default function RoomCard({
             تفاصيل الغرفة
           </button>
         )}
+        </div>
       </div>
     </div>
   );
