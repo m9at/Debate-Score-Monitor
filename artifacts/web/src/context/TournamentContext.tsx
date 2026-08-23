@@ -45,6 +45,8 @@ type Action =
   | { type: "SET_ELIMINATION_MODE"; tournamentId: string; semifinal: boolean; final: boolean }
   | { type: "SUBMIT_MATCH"; tournamentId: string; roundNumber: number; match: Match }
   | { type: "SET_ROUND_CASE"; tournamentId: string; roundNumber: number; caseText: string }
+  | { type: "SET_CURRENT_ROUND"; tournamentId: string; roundNumber: number }
+  | { type: "SET_PRESENTED_ROUND"; tournamentId: string; roundNumber: number }
   | { type: "SET_MATCH_ROOM"; tournamentId: string; roundNumber: number; matchId: string; roomNumber?: number; roomLabel?: string }
   | { type: "ADD_JUDGE"; tournamentId: string; judge: Judge }
   | { type: "UPDATE_JUDGE"; tournamentId: string; judge: Judge }
@@ -175,11 +177,24 @@ function reducer(state: TournamentState, action: Action): TournamentState {
           if (t.rounds.length === 0 && !round.caseText && t.openingCaseText) {
             round.caseText = t.openingCaseText;
           }
-          const newTotal = Math.max(t.totalRounds, round.roundNumber);
+          // Rounds are created empty at setup time, so a draw fills the first
+          // empty slot instead of being appended after it.
+          const slot = t.rounds
+            .filter((r) => r.matches.length === 0)
+            .sort((a, b) => a.roundNumber - b.roundNumber)[0];
+          if (slot) {
+            round.roundNumber = slot.roundNumber;
+            round.caseText = slot.caseText ?? round.caseText;
+            round.judgesPerRoom = slot.judgesPerRoom ?? round.judgesPerRoom;
+            round.kind = slot.kind ?? round.kind;
+          }
+          const rounds = slot
+            ? t.rounds.map((r) => (r.roundNumber === slot.roundNumber ? round : r))
+            : [...t.rounds, round];
           return {
             ...t,
-            rounds: [...t.rounds, round],
-            totalRounds: newTotal,
+            rounds,
+            totalRounds: Math.max(t.totalRounds, round.roundNumber),
             currentRound: round.roundNumber,
             finished: false,
           };
@@ -250,6 +265,25 @@ function reducer(state: TournamentState, action: Action): TournamentState {
                 : r
             ),
           };
+        }),
+      };
+    }
+    case "SET_CURRENT_ROUND": {
+      // Only the round the tournament works on — never what the audience sees.
+      return {
+        tournaments: state.tournaments.map((t) => {
+          if (t.id !== action.tournamentId) return t;
+          if (!t.rounds.some((r) => r.roundNumber === action.roundNumber)) return t;
+          return { ...t, currentRound: action.roundNumber, started: true };
+        }),
+      };
+    }
+    case "SET_PRESENTED_ROUND": {
+      return {
+        tournaments: state.tournaments.map((t) => {
+          if (t.id !== action.tournamentId) return t;
+          if (!t.rounds.some((r) => r.roundNumber === action.roundNumber)) return t;
+          return { ...t, presentedRound: action.roundNumber };
         }),
       };
     }
@@ -784,6 +818,10 @@ interface TournamentContextType {
   setEliminationMode: (tournamentId: string, semifinal: boolean, final: boolean) => void;
   submitMatch: (tournamentId: string, roundNumber: number, match: Match) => void;
   setRoundCase: (tournamentId: string, roundNumber: number, caseText: string) => void;
+  /** Makes a round the one the tournament works on (organiser decision). */
+  setCurrentRound: (tournamentId: string, roundNumber: number) => void;
+  /** Chooses the round the audience screen shows. */
+  setPresentedRound: (tournamentId: string, roundNumber: number) => void;
   setProtection: (tournamentId: string, protection: TournamentProtection) => void;
   setMatchRoom: (
     tournamentId: string,
@@ -1321,6 +1359,21 @@ export function TournamentProvider({ children }: { children: ReactNode }) {
       });
     }
 
+    // The whole round structure exists from the start: the drawn round plus an
+    // empty round per remaining one, each ready to hold its own motion.
+    for (let n = startRound; n <= setup.totalRounds; n++) {
+      if (rounds.some((r) => r.roundNumber === n)) continue;
+      rounds.push({
+        roundNumber: n,
+        matches: [],
+        completed: false,
+        judgesPerRoom: setup.settings.judgesPerRoom,
+        kind: "regular",
+        caseText: n === startRound ? setup.caseText?.trim() || undefined : undefined,
+      });
+    }
+    rounds.sort((a, b) => a.roundNumber - b.roundNumber);
+
     const tournament: Tournament = {
       id: crypto.randomUUID(),
       name: setup.name.trim(),
@@ -1329,8 +1382,9 @@ export function TournamentProvider({ children }: { children: ReactNode }) {
       teams,
       judges,
       rounds,
-      currentRound: rounds.length > 0 ? startRound : 0,
-      started: rounds.length > 0,
+      currentRound: startRound,
+      presentedRound: startRound,
+      started: rounds.some((r) => r.matches.length > 0),
       finished: false,
       description: setup.description?.trim() || undefined,
       logoDataUrl: setup.logoDataUrl,
@@ -1363,6 +1417,20 @@ export function TournamentProvider({ children }: { children: ReactNode }) {
   const setRoundCase = useCallback(
     (tournamentId: string, roundNumber: number, caseText: string) => {
       dispatch({ type: "SET_ROUND_CASE", tournamentId, roundNumber, caseText });
+    },
+    []
+  );
+
+  const setCurrentRound = useCallback(
+    (tournamentId: string, roundNumber: number) => {
+      dispatch({ type: "SET_CURRENT_ROUND", tournamentId, roundNumber });
+    },
+    []
+  );
+
+  const setPresentedRound = useCallback(
+    (tournamentId: string, roundNumber: number) => {
+      dispatch({ type: "SET_PRESENTED_ROUND", tournamentId, roundNumber });
     },
     []
   );
@@ -1737,6 +1805,8 @@ export function TournamentProvider({ children }: { children: ReactNode }) {
         setEliminationMode,
         submitMatch,
         setRoundCase,
+        setCurrentRound,
+        setPresentedRound,
         setProtection,
         updateTournamentInfo,
         setTournamentArchived,

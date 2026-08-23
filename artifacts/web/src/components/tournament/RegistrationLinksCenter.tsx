@@ -23,6 +23,8 @@ interface Props {
   tournamentId: string;
   teamUrl: string;
   judgeUrl: string;
+  /** Opens the list of everyone registered through a link. */
+  onViewRegistrants: (kind: Kind) => void;
 }
 
 type Kind = "team" | "judge";
@@ -39,6 +41,7 @@ export default function RegistrationLinksCenter({
   tournamentId,
   teamUrl,
   judgeUrl,
+  onViewRegistrants,
 }: Props) {
   const [states, setStates] = useState<Record<Kind, LinkState>>({
     team: "open",
@@ -107,6 +110,7 @@ export default function RegistrationLinksCenter({
             url={c.url}
             state={states[c.kind]}
             onState={(s) => update(c.kind, s)}
+            onViewRegistrants={() => onViewRegistrants(c.kind)}
           />
         ))}
       </div>
@@ -120,12 +124,14 @@ function LinkCard({
   url,
   state,
   onState,
+  onViewRegistrants,
 }: {
   title: string;
   icon: typeof Users;
   url: string;
   state: LinkState;
   onState: (s: LinkState) => void;
+  onViewRegistrants: () => void;
 }) {
   const [copied, setCopied] = useState(false);
   const [qr, setQr] = useState(false);
@@ -214,6 +220,15 @@ function LinkCard({
         >
           {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
           {copied ? "تم النسخ" : "نسخ الرابط"}
+        </button>
+        <button
+          type="button"
+          onClick={onViewRegistrants}
+          className={`${BTN.base} ${BTN.secondary} h-9 px-3 text-[12.5px]`}
+          data-testid="button-view-registrants"
+        >
+          <Users className="w-4 h-4" />
+          عرض المسجلين
         </button>
         <button
           type="button"

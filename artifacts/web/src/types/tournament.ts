@@ -156,7 +156,14 @@ export interface Tournament {
   totalRounds: number;
   teams: Team[];
   rounds: Round[];
+  /** The round the tournament is actually working on right now. */
   currentRound: number;
+  /**
+   * The round the audience screen shows. Chosen by the organiser and kept
+   * separate from `currentRound`, so browsing the admin panel or advancing the
+   * tournament never changes what the projector displays.
+   */
+  presentedRound?: number;
   started: boolean;
   finished: boolean;
   judges?: Judge[];

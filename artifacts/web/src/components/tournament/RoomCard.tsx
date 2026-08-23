@@ -82,8 +82,14 @@ export default function RoomCard({
   const statusColor = roomStatusMeta(status).dot;
   const govName = teamMap.get(match.team1.teamId)?.name ?? "-";
   const oppName = teamMap.get(match.team2.teamId)?.name ?? "-";
-  const isGovWinner = match.winnerId === match.team1.teamId;
-  const isOppWinner = match.winnerId === match.team2.teamId;
+  /**
+   * Hiding results hides the RESULT itself: with the toggle on, a room whose
+   * result has not been announced yet shows only its status — never the winner,
+   * the best speaker or any score.
+   */
+  const resultHidden = !!hideScores && !match.resultAnnounced;
+  const isGovWinner = !resultHidden && match.winnerId === match.team1.teamId;
+  const isOppWinner = !resultHidden && match.winnerId === match.team2.teamId;
   const roomText = match.roomLabel?.trim()
     ? match.roomLabel
     : `القاعة ${match.roomNumber}`;
@@ -154,7 +160,7 @@ export default function RoomCard({
           teamName={govName}
           score={match.team1.totalScore}
           isWinner={isGovWinner}
-          showScore={match.completed}
+          showScore={match.completed && !resultHidden}
           hideScores={hideScores}
         />
         <SideRow
@@ -163,7 +169,7 @@ export default function RoomCard({
           teamName={oppName}
           score={match.team2.totalScore}
           isWinner={isOppWinner}
-          showScore={match.completed}
+          showScore={match.completed && !resultHidden}
           hideScores={hideScores}
         />
 
@@ -179,9 +185,9 @@ export default function RoomCard({
       </div>
 
       {/* Best speaker + judges */}
-      {(match.completed && match.bestSpeaker) || judges.length > 0 ? (
+      {(match.completed && match.bestSpeaker && !resultHidden) || judges.length > 0 ? (
         <div className="mt-2.5 pt-2.5 border-t flex flex-wrap items-center gap-x-3 gap-y-1" style={{ borderColor: BRAND.border }}>
-          {match.completed && match.bestSpeaker && (
+          {match.completed && match.bestSpeaker && !resultHidden && (
             <span className="flex items-center gap-1.5 text-[11px] min-w-0">
               <Star className="w-3.5 h-3.5 shrink-0" style={{ color: BRAND.gold }} />
               <span style={{ color: `${BRAND.ink}99` }}>أفضل متحدث:</span>
