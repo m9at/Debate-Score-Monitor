@@ -73,6 +73,11 @@ import RoundBar from "@/components/tournament/RoundBar";
 import CaseCard from "@/components/tournament/CaseCard";
 import RoomCard from "@/components/tournament/RoomCard";
 import OverviewDashboard from "@/components/tournament/OverviewDashboard";
+import ResultsAdmin from "@/components/tournament/ResultsAdmin";
+import RoundControlCenter from "@/components/tournament/RoundControlCenter";
+import AuditLog from "@/components/tournament/AuditLog";
+import PresentationMode from "@/components/tournament/PresentationMode";
+import AnnouncePickerDialog from "@/components/announce/AnnouncePickerDialog";
 import type { SidebarGroup } from "@/components/tournament/TournamentSidebar";
 import ProtectionSettingsDialog from "@/components/tournament/ProtectionSettingsDialog";
 import UnlockGate from "@/components/tournament/UnlockGate";
@@ -110,7 +115,11 @@ import {
   Building2,
   FileBox,
   Download,
+  Projector,
   Eye,
+  ListChecks,
+  ClipboardList,
+  History,
   EyeOff,
   MoreHorizontal,
   GitCompare,
@@ -118,6 +127,7 @@ import {
   LayoutDashboard,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useToast } from "@/hooks/use-toast";
 import type * as XLSXType from "@/lib/excel-export";
 import type {
   Tournament,
@@ -142,7 +152,10 @@ type TabType =
   | "standings"
   | "speakers"
   | "judges"
-  | "pending";
+  | "pending"
+  | "control"
+  | "resultsAdmin"
+  | "audit";
 
 const GOLD = "#FFC107";
 
@@ -956,10 +969,15 @@ export default function TournamentDetail() {
     setRoundJudgesPerRoom,
     setMatchJudges,
     autoAssignJudges,
+    setRoundLocked,
+    logAction,
   } = useTournament();
   const tournament = getTournament(params?.id || "");
 
   const [activeTab, setActiveTab] = useState<TabType>("overview");
+  const [announceOpen, setAnnounceOpen] = useState(false);
+  const [presentMode, setPresentMode] = useState(false);
+  const { toast } = useToast();
   // Selected round numbers for the standings tab. Empty set = all rounds.
   const [standingsRoundFilter, setStandingsRoundFilter] = useState<Set<number>>(
     () => new Set()
@@ -2406,19 +2424,48 @@ export default function TournamentDetail() {
       ],
     },
     {
+      title: "التحكيم",
+      tabs: [{ key: "control", label: "مركز تحكم الجولة", icon: ListChecks }],
+    },
+    {
       title: "النتائج",
       tabs: [
+        { key: "resultsAdmin", label: "إدارة النتائج", icon: ClipboardList, restricted: true },
         { key: "standings", label: "الترتيب", icon: BarChart2, restricted: true },
         { key: "speakers", label: "المتحدثين", icon: Mic, restricted: true },
       ],
     },
+    {
+      title: "النظام",
+      tabs: [{ key: "audit", label: "سجل العمليات", icon: History }],
+    },
   ];
+
+  if (presentMode) {
+    return (
+      <PresentationMode
+        tournament={tournament}
+        onExit={() => setPresentMode(false)}
+      />
+    );
+  }
 
   return (
     <div
       className="min-h-screen flex flex-col md:flex-row"
       style={{ backgroundColor: BRAND.surface }}
     >
+      <AnnouncePickerDialog
+        tournament={tournament}
+        open={announceOpen}
+        onOpenChange={setAnnounceOpen}
+        onAnnounce={(match) =>
+          setLocation(
+            `/announce/${tournament.id}/${tournament.currentRound}/${match.id}`
+          )
+        }
+      />
+
       <TournamentSidebar
         groups={navGroups}
         activeTab={activeTab}
@@ -2489,8 +2536,17 @@ export default function TournamentDetail() {
             </button>
 
             <button
-              onClick={() => setLocation(`/results/${tournament.id}`)}
-              className={`${BTN.base} ${BTN.primary} h-10 px-4 shrink-0`}
+              onClick={() => setPresentMode(true)}
+              className={`${BTN.base} ${BTN.secondary} h-11 px-4 shrink-0`}
+              data-testid="button-presentation-mode"
+            >
+              <Projector className="w-4 h-4" />
+              وضع العرض 🎥
+            </button>
+
+            <button
+              onClick={() => setAnnounceOpen(true)}
+              className={`${BTN.base} ${BTN.primary} h-11 px-5 shrink-0 shadow-lg`}
               style={BTN_PRIMARY_STYLE}
               data-testid="button-announce-results"
             >
@@ -2719,15 +2775,57 @@ export default function TournamentDetail() {
           <OverviewDashboard
             tournament={tournament}
             onOpenRounds={() => setActiveTab("rounds")}
-            onFollowJudging={() => setActiveTab("rounds")}
+            onFollowJudging={() => setActiveTab("control")}
             onRoomDetails={(match) =>
               setLocation(
                 `/match/${tournament.id}/${tournament.currentRound}/${match.id}`
               )
             }
-            onAnnounce={() => setLocation(`/results/${tournament.id}`)}
+            onAnnounce={() => setAnnounceOpen(true)}
           />
         )}
+
+        {activeTab === "control" && (
+          <RoundControlCenter
+            tournament={tournament}
+            onOpenMatch={(match) =>
+              setLocation(
+                `/match/${tournament.id}/${tournament.currentRound}/${match.id}`
+              )
+            }
+            onAnnounce={() => setAnnounceOpen(true)}
+            onToggleLock={(locked) => {
+              setRoundLocked(tournament.id, tournament.currentRound, locked);
+              toast({
+                title: locked ? "تم إغلاق الجولة" : "تم فتح الجولة للتعديل",
+              });
+            }}
+            onRemindJudge={(judgeName, match) => {
+              logAction(
+                tournament.id,
+                "إرسال تذكير لمحكم",
+                `${judgeName} — ${match.roomLabel?.trim() || `القاعة ${match.roomNumber}`}`
+              );
+              toast({
+                title: "تم إرسال التذكير",
+                description: `تذكير للمحكم ${judgeName}`,
+              });
+            }}
+          />
+        )}
+
+        {activeTab === "resultsAdmin" && (
+          <ResultsAdmin
+            tournament={tournament}
+            onOpenMatch={(match) =>
+              setLocation(
+                `/match/${tournament.id}/${tournament.currentRound}/${match.id}`
+              )
+            }
+          />
+        )}
+
+        {activeTab === "audit" && <AuditLog entries={tournament.auditLog ?? []} />}
 
         {activeTab === "teams" && (
           <div>

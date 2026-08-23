@@ -12,6 +12,7 @@ import type {
   PendingMatchResult,
   MatchJudgeAssignment,
   TournamentProtection,
+  AuditEntry,
 } from "@/types/tournament";
 import type { TournamentSetup } from "@/lib/wizard/types";
 import {
@@ -809,6 +810,27 @@ interface TournamentContextType {
   duplicateTournament: (tournamentId: string) => string | undefined;
   /** Creates a fully configured tournament from the setup wizard. Returns its id. */
   createTournamentFromSetup: (setup: TournamentSetup) => string;
+  /** Flags a room's result as publicly announced (idempotent). */
+  markResultAnnounced: (
+    tournamentId: string,
+    roundNumber: number,
+    matchId: string,
+    actor?: string
+  ) => void;
+  /** Locks or reopens a round for result editing. */
+  setRoundLocked: (
+    tournamentId: string,
+    roundNumber: number,
+    locked: boolean,
+    actor?: string
+  ) => void;
+  /** Appends an entry to the tournament's audit trail. */
+  logAction: (
+    tournamentId: string,
+    action: string,
+    detail?: string,
+    actor?: string
+  ) => void;
 }
 
 const DEMO_TEAM_NAMES = [
@@ -1575,6 +1597,91 @@ export function TournamentProvider({ children }: { children: ReactNode }) {
     []
   );
 
+  /** Appends an audit entry, keeping the most recent 300. */
+  const logAction = useCallback(
+    (tournamentId: string, action: string, detail?: string, actor = "مدير البطولة") => {
+      const t = stateRef.current.tournaments.find((x) => x.id === tournamentId);
+      if (!t) return;
+      const entry: AuditEntry = {
+        id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        at: Date.now(),
+        actor,
+        action,
+        detail,
+      };
+      dispatch({
+        type: "UPDATE_TOURNAMENT",
+        tournament: { ...t, auditLog: [entry, ...(t.auditLog ?? [])].slice(0, 300) },
+      });
+    },
+    []
+  );
+
+  const markResultAnnounced = useCallback(
+    (tournamentId: string, roundNumber: number, matchId: string, actor = "مدير البطولة") => {
+      const t = stateRef.current.tournaments.find((x) => x.id === tournamentId);
+      if (!t) return;
+      const round = t.rounds.find((r) => r.roundNumber === roundNumber);
+      const match = round?.matches.find((m) => m.id === matchId);
+      // Idempotent: announcing twice must not duplicate work or log entries.
+      if (!match || match.resultAnnounced) return;
+
+      const entry: AuditEntry = {
+        id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        at: Date.now(),
+        actor,
+        action: "إعلان نتيجة",
+        detail: `الجولة ${roundNumber} — ${
+          match.roomLabel?.trim() || `القاعة ${match.roomNumber}`
+        }`,
+      };
+
+      dispatch({
+        type: "UPDATE_TOURNAMENT",
+        tournament: {
+          ...t,
+          rounds: t.rounds.map((r) =>
+            r.roundNumber === roundNumber
+              ? {
+                  ...r,
+                  matches: r.matches.map((m) =>
+                    m.id === matchId ? { ...m, resultAnnounced: true } : m
+                  ),
+                }
+              : r
+          ),
+          auditLog: [entry, ...(t.auditLog ?? [])].slice(0, 300),
+        },
+      });
+    },
+    []
+  );
+
+  const setRoundLocked = useCallback(
+    (tournamentId: string, roundNumber: number, locked: boolean, actor = "مدير البطولة") => {
+      const t = stateRef.current.tournaments.find((x) => x.id === tournamentId);
+      if (!t) return;
+      const entry: AuditEntry = {
+        id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        at: Date.now(),
+        actor,
+        action: locked ? "إغلاق الجولة" : "فتح الجولة للتعديل",
+        detail: `الجولة ${roundNumber}`,
+      };
+      dispatch({
+        type: "UPDATE_TOURNAMENT",
+        tournament: {
+          ...t,
+          rounds: t.rounds.map((r) =>
+            r.roundNumber === roundNumber ? { ...r, locked } : r
+          ),
+          auditLog: [entry, ...(t.auditLog ?? [])].slice(0, 300),
+        },
+      });
+    },
+    []
+  );
+
   return (
     <TournamentContext.Provider
       value={{
@@ -1597,6 +1704,9 @@ export function TournamentProvider({ children }: { children: ReactNode }) {
         setTournamentArchived,
         duplicateTournament,
         createTournamentFromSetup,
+        markResultAnnounced,
+        setRoundLocked,
+        logAction,
         setMatchRoom,
         addDemoTournament,
         fillDummyData,

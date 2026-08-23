@@ -43,6 +43,17 @@ export interface Round {
   caseText?: string;
   judgesPerRoom?: number;
   kind?: "regular" | "semifinal" | "final";
+  /** Locked rounds cannot have their results edited until reopened. */
+  locked?: boolean;
+}
+
+/** One recorded administrative action, for the tournament's audit trail. */
+export interface AuditEntry {
+  id: string;
+  at: number;
+  actor: string;
+  action: string;
+  detail?: string;
 }
 
 export interface TeamDocument {
@@ -168,6 +179,8 @@ export interface Tournament {
   rooms?: Room[];
   /** Format settings defined during setup. */
   settings?: TournamentSettings;
+  /** Trail of important administrative actions. */
+  auditLog?: AuditEntry[];
 }
 
 export interface TournamentProtection {
