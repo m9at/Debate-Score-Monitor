@@ -797,6 +797,15 @@ interface TournamentContextType {
   finishTournament: (tournamentId: string) => void;
   reopenTournament: (tournamentId: string) => void;
   deleteRound: (tournamentId: string, roundNumber: number) => void;
+  updateTournamentInfo: (
+    tournamentId: string,
+    patch: Partial<
+      Pick<Tournament, "name" | "description" | "startDate" | "endDate" | "totalRounds">
+    >
+  ) => void;
+  setTournamentArchived: (tournamentId: string, archived: boolean) => void;
+  /** Deep-copies a tournament under a new id and name. Returns the new id. */
+  duplicateTournament: (tournamentId: string) => string | undefined;
 }
 
 const DEMO_TEAM_NAMES = [
@@ -940,6 +949,9 @@ const TournamentContext = createContext<TournamentContextType | null>(null);
 
 export function TournamentProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(reducer, { tournaments: [] });
+  /** Always-current state, so stable callbacks can read it without deps. */
+  const stateRef = useRef(state);
+  stateRef.current = state;
 
   // Tracks tournaments that have local edits not yet pushed to the server.
   const dirtyIdsRef = useRef<Set<string>>(new Set());
@@ -1176,6 +1188,43 @@ export function TournamentProvider({ children }: { children: ReactNode }) {
     },
     []
   );
+
+  const updateTournamentInfo = useCallback(
+    (
+      tournamentId: string,
+      patch: Partial<
+        Pick<Tournament, "name" | "description" | "startDate" | "endDate" | "totalRounds">
+      >
+    ) => {
+      const t = stateRef.current.tournaments.find((x) => x.id === tournamentId);
+      if (!t) return;
+      dispatch({ type: "UPDATE_TOURNAMENT", tournament: { ...t, ...patch } });
+    },
+    []
+  );
+
+  const setTournamentArchived = useCallback(
+    (tournamentId: string, archived: boolean) => {
+      const t = stateRef.current.tournaments.find((x) => x.id === tournamentId);
+      if (!t) return;
+      dispatch({ type: "UPDATE_TOURNAMENT", tournament: { ...t, archived } });
+    },
+    []
+  );
+
+  const duplicateTournament = useCallback((tournamentId: string) => {
+    const t = stateRef.current.tournaments.find((x) => x.id === tournamentId);
+    if (!t) return undefined;
+    const copy: Tournament = {
+      ...structuredClone(t),
+      id: crypto.randomUUID(),
+      name: `${t.name} (نسخة)`,
+      createdAt: Date.now(),
+      archived: false,
+    };
+    dispatch({ type: "ADD_TOURNAMENT", tournament: copy });
+    return copy.id;
+  }, []);
 
   const setProtection = useCallback(
     (tournamentId: string, protection: TournamentProtection) => {
@@ -1477,6 +1526,9 @@ export function TournamentProvider({ children }: { children: ReactNode }) {
         submitMatch,
         setRoundCase,
         setProtection,
+        updateTournamentInfo,
+        setTournamentArchived,
+        duplicateTournament,
         setMatchRoom,
         addDemoTournament,
         fillDummyData,

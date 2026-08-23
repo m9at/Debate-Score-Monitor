@@ -43,3 +43,33 @@ export const BTN = {
 export const BTN_PRIMARY_STYLE: React.CSSProperties = {
   backgroundImage: BRAND_GRADIENT,
 };
+
+/** Size modifiers, so a call-to-action can be visually heavier than a row action. */
+export const BTN_SIZE = {
+  sm: "h-8 px-3 text-[12px] rounded-lg",
+  md: "h-9 px-3.5 text-[13px] rounded-xl",
+  lg: "h-11 px-5 text-[15px] rounded-xl",
+  xl: "h-14 px-7 text-base rounded-2xl",
+} as const;
+
+/**
+ * Tournament lifecycle states, used for the badges and filters on the
+ * tournaments home screen.
+ */
+export type TournamentStatus =
+  | "running"
+  | "draft"
+  | "upcoming"
+  | "completed"
+  | "archived";
+
+export const STATUS_META: Record<
+  TournamentStatus,
+  { label: string; dot: string; color: string; bg: string }
+> = {
+  running: { label: "جارية", dot: "🟢", color: "#15803D", bg: "#22C55E1f" },
+  draft: { label: "قيد الإعداد", dot: "🟡", color: "#B45309", bg: "#F59E0B1f" },
+  upcoming: { label: "قادمة", dot: "🔵", color: "#1B87B8", bg: "#29ABE21f" },
+  completed: { label: "مكتملة", dot: "⚪", color: "#4B5563", bg: "#9CA3AF24" },
+  archived: { label: "مؤرشفة", dot: "📦", color: "#6B4E7A", bg: "#7B2D8E14" },
+};

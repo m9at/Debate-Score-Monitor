@@ -131,6 +131,12 @@ export interface Tournament {
   finalEnabled?: boolean;
   /** Access-code protection for viewing and editing this tournament. */
   protection?: TournamentProtection;
+  /** Hidden from the main list until restored. */
+  archived?: boolean;
+  /** Optional schedule — drives the "قادمة / جارية" status. */
+  startDate?: number;
+  endDate?: number;
+  description?: string;
 }
 
 export interface TournamentProtection {
