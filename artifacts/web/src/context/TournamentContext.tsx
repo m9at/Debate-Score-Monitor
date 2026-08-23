@@ -156,7 +156,11 @@ function reducer(state: TournamentState, action: Action): TournamentState {
       return {
         tournaments: state.tournaments.map((t) => {
           if (t.id !== action.tournamentId) return t;
-          return { ...t, started: true, currentRound: 1 };
+          return {
+            ...t,
+            started: true,
+            currentRound: t.rounds[0]?.roundNumber ?? 1,
+          };
         }),
       };
     }
@@ -166,12 +170,17 @@ function reducer(state: TournamentState, action: Action): TournamentState {
           if (t.id !== action.tournamentId) return t;
           const round = generateRound(t);
           if (!round) return t;
-          const newTotal = Math.max(t.totalRounds, t.rounds.length + 1);
+          // The motion entered while creating the tournament belongs to its
+          // first round, which may only exist now.
+          if (t.rounds.length === 0 && !round.caseText && t.openingCaseText) {
+            round.caseText = t.openingCaseText;
+          }
+          const newTotal = Math.max(t.totalRounds, round.roundNumber);
           return {
             ...t,
             rounds: [...t.rounds, round],
             totalRounds: newTotal,
-            currentRound: t.rounds.length + 1,
+            currentRound: round.roundNumber,
             finished: false,
           };
         }),
@@ -577,7 +586,9 @@ function pairBucket(
 }
 
 function generateRound(tournament: Tournament): Round | null {
-  const roundNumber = tournament.rounds.length + 1;
+  const isFirstRound = tournament.rounds.length === 0;
+  const roundNumber =
+    tournament.rounds.reduce((max, r) => Math.max(max, r.roundNumber), 0) + 1;
 
   const pastPairings = new Set<string>();
   const govCount = new Map<string, number>();
@@ -596,7 +607,7 @@ function generateRound(tournament: Tournament): Round | null {
   if (teams.length < 2) return null;
 
   let pairList: [Team, Team][] = [];
-  if (roundNumber === 1) {
+  if (isFirstRound) {
     for (let i = teams.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
       [teams[i], teams[j]] = [teams[j], teams[i]];
@@ -1277,9 +1288,15 @@ export function TournamentProvider({ children }: { children: ReactNode }) {
     const rounds: Round[] = [];
     const draw = setup.drawApproved ? setup.draw : null;
 
+    // The organiser may start the tournament from a later round.
+    const startRound = Math.min(
+      Math.max(1, setup.startRound || 1),
+      setup.totalRounds,
+    );
+
     if (draw && draw.length > 0) {
       rounds.push({
-        roundNumber: 1,
+        roundNumber: startRound,
         matches: draw.flatMap((p) => {
           const gov = teams.find((t) => t.id === p.govTeamId);
           const opp = teams.find((t) => t.id === p.oppTeamId);
@@ -1300,6 +1317,7 @@ export function TournamentProvider({ children }: { children: ReactNode }) {
         completed: false,
         judgesPerRoom: setup.settings.judgesPerRoom,
         kind: "regular",
+        caseText: setup.caseText?.trim() || undefined,
       });
     }
 
@@ -1311,7 +1329,7 @@ export function TournamentProvider({ children }: { children: ReactNode }) {
       teams,
       judges,
       rounds,
-      currentRound: rounds.length,
+      currentRound: rounds.length > 0 ? startRound : 0,
       started: rounds.length > 0,
       finished: false,
       description: setup.description?.trim() || undefined,
@@ -1320,6 +1338,7 @@ export function TournamentProvider({ children }: { children: ReactNode }) {
       endDate: setup.endDate,
       rooms: setup.rooms,
       settings: setup.settings,
+      openingCaseText: setup.caseText?.trim() || undefined,
       protection: setup.protection.enabled
         ? {
             enabled: true,

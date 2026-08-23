@@ -5,7 +5,9 @@ import {
   LayoutGrid,
   Lock,
   MessageSquareReply,
+  Quote,
   Repeat,
+  Folder,
   Sparkles,
   Target,
   Unlock,
@@ -18,6 +20,8 @@ import { Panel } from "./ui";
 
 interface StepReviewProps {
   setup: TournamentSetup;
+  /** Name of the folder the tournament will be filed into, if any. */
+  folderName?: string;
 }
 
 const fmtDate = (ts?: number) =>
@@ -57,7 +61,7 @@ function Row({
 }
 
 /** Step 8 — full summary before the tournament is actually created. */
-export default function StepReview({ setup }: StepReviewProps) {
+export default function StepReview({ setup, folderName }: StepReviewProps) {
   const s = setup.settings;
   const activeJudges = setup.judges.filter((j) => !j.disabled).length;
 
@@ -119,6 +123,21 @@ export default function StepReview({ setup }: StepReviewProps) {
           <Row icon={CalendarDays} label="تاريخ البداية" value={fmtDate(setup.startDate)} />
           <Row icon={CalendarDays} label="تاريخ النهاية" value={fmtDate(setup.endDate)} />
           <Row icon={Repeat} label="عدد الجولات" value={`${setup.totalRounds} جولات`} />
+          <Row
+            icon={Repeat}
+            label="الجولة الابتدائية"
+            value={`الجولة ${setup.startRound}`}
+          />
+          <Row
+            icon={Folder}
+            label="المجلد"
+            value={folderName ?? "البطولات الحالية"}
+          />
+          <Row
+            icon={Quote}
+            label="نص القضية"
+            value={setup.caseText?.trim() ? "تم إدخاله" : "لم يُدخل"}
+          />
           <Row icon={Users} label="الفرق المسجّلة" value={`${setup.teams.length} فريق`} />
           <Row icon={LayoutGrid} label="القاعات" value={`${setup.rooms.length} قاعة`} />
           <Row

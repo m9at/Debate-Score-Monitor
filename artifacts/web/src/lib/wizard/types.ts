@@ -10,6 +10,12 @@ export interface TournamentSetup {
   endDate?: number;
   totalRounds: number;
   expectedTeams: number;
+  /** Round the tournament starts from — usually 1, but may resume later. */
+  startRound: number;
+  /** Motion / case text of the opening round. */
+  caseText?: string;
+  /** Folder the tournament is filed into on creation (null = active list). */
+  folderId: string | null;
 
   protection: { enabled: boolean; code: string };
 
@@ -25,6 +31,7 @@ export interface TournamentSetup {
 
 export const WIZARD_STEPS = [
   { key: "info", label: "معلومات البطولة" },
+  { key: "organise", label: "المجلد والقضية" },
   { key: "protection", label: "الحماية" },
   { key: "rooms", label: "القاعات" },
   { key: "judges", label: "المحكمون" },
@@ -41,6 +48,8 @@ export function emptySetup(): TournamentSetup {
     name: "",
     totalRounds: 3,
     expectedTeams: 8,
+    startRound: 1,
+    folderId: null,
     protection: { enabled: false, code: "" },
     rooms: [],
     judges: [],

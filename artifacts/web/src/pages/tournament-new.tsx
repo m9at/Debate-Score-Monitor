@@ -1,10 +1,12 @@
 import { useState } from "react";
 import { useLocation } from "wouter";
 import { useTournament } from "@/context/TournamentContext";
+import { useGroups } from "@/context/GroupContext";
 import { useToast } from "@/hooks/use-toast";
 import { WIZARD_STEPS, emptySetup, type TournamentSetup } from "@/lib/wizard/types";
 import WizardShell from "@/components/wizard/WizardShell";
 import StepInfo from "@/components/wizard/StepInfo";
+import StepOrganise from "@/components/wizard/StepOrganise";
 import StepProtection from "@/components/wizard/StepProtection";
 import StepRooms from "@/components/wizard/StepRooms";
 import StepJudges from "@/components/wizard/StepJudges";
@@ -20,6 +22,10 @@ const STEP_META: Record<
   info: {
     title: "معلومات البطولة",
     hint: "البيانات الأساسية التي تُعرّف البطولة",
+  },
+  organise: {
+    title: "المجلد والقضية",
+    hint: "مكان البطولة في المجلدات، الجولة التي تبدأ منها، ونص القضية",
   },
   protection: {
     title: "حماية البطولة",
@@ -55,6 +61,7 @@ const STEP_META: Record<
 export default function TournamentNewPage() {
   const [, navigate] = useLocation();
   const { createTournamentFromSetup } = useTournament();
+  const { groups, moveTournamentToGroup } = useGroups();
   const { toast } = useToast();
 
   const [stepIndex, setStepIndex] = useState(0);
@@ -86,6 +93,7 @@ export default function TournamentNewPage() {
 
   const create = () => {
     const id = createTournamentFromSetup(setup);
+    if (setup.folderId) moveTournamentToGroup(id, setup.folderId);
     toast({
       title: "تم إنشاء البطولة",
       description: setup.drawApproved
@@ -119,6 +127,7 @@ export default function TournamentNewPage() {
       onCancel={() => navigate("/")}
     >
       {stepKey === "info" && <StepInfo setup={setup} patch={patch} />}
+      {stepKey === "organise" && <StepOrganise setup={setup} patch={patch} />}
       {stepKey === "protection" && (
         <StepProtection
           setup={setup}
@@ -132,7 +141,12 @@ export default function TournamentNewPage() {
       {stepKey === "teams" && <StepTeams setup={setup} patch={patch} />}
       {stepKey === "system" && <StepSystem setup={setup} patch={patch} />}
       {stepKey === "draw" && <StepDraw setup={setup} patch={patch} />}
-      {stepKey === "review" && <StepReview setup={setup} />}
+      {stepKey === "review" && (
+        <StepReview
+          setup={setup}
+          folderName={groups.find((g) => g.id === setup.folderId)?.name}
+        />
+      )}
     </WizardShell>
   );
 }

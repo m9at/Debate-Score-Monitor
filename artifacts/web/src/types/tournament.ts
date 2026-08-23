@@ -169,6 +169,8 @@ export interface Tournament {
   protection?: TournamentProtection;
   /** Hidden from the main list until restored. */
   archived?: boolean;
+  /** Motion entered at creation, applied to the first round once it exists. */
+  openingCaseText?: string;
   /** Optional schedule — drives the "قادمة / جارية" status. */
   startDate?: number;
   endDate?: number;
