@@ -3,8 +3,7 @@ import type {
   PendingJudgeRegistration,
   TeamDocument,
 } from "@/types/tournament";
-
-const API_BASE = "/api";
+import { entities } from "@/api/base44Client";
 
 export interface PublicTournamentInfo {
   id: string;
@@ -18,9 +17,7 @@ export interface ServerRegistration {
   id: string;
   tournamentId: string;
   kind: RegistrationKind;
-  payload:
-    | TeamRegistrationPayload
-    | JudgeRegistrationPayload;
+  payload: TeamRegistrationPayload | JudgeRegistrationPayload;
   createdAt: string;
 }
 
@@ -41,89 +38,78 @@ export interface JudgeRegistrationPayload {
   submittedAt: number;
 }
 
-async function http<T>(
-  path: string,
-  init?: RequestInit & { silent?: boolean },
-): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`, {
-    ...init,
-    headers: { "Content-Type": "application/json", ...(init?.headers ?? {}) },
+export async function publishTournament(info: PublicTournamentInfo): Promise<void> {
+  const rows = await entities.PublicTournament.filter({ tournament_id: info.id }, "-updated_date", 1);
+  const payload = {
+    tournament_id: info.id,
+    name: info.name,
+    topic: info.topic ?? "",
+    updated_at_ms: Date.now(),
+  };
+  if (rows[0]) await entities.PublicTournament.update(rows[0].id, payload);
+  else await entities.PublicTournament.create(payload);
+}
+
+export async function fetchPublicTournament(id: string): Promise<PublicTournamentInfo | null> {
+  const rows = await entities.PublicTournament.filter({ tournament_id: id }, "-updated_date", 1);
+  const row = rows[0];
+  if (!row) return null;
+  return { id: row.tournament_id, name: row.name, topic: row.topic ?? "" };
+}
+
+async function submitRegistration(
+  tournamentId: string,
+  kind: RegistrationKind,
+  payload: TeamRegistrationPayload | JudgeRegistrationPayload,
+): Promise<{ id: string }> {
+  const registrationId = crypto.randomUUID();
+  await entities.TournamentRegistration.create({
+    registration_id: registrationId,
+    tournament_id: tournamentId,
+    kind,
+    payload,
+    created_at_ms: Date.now(),
   });
-  if (!res.ok) {
-    const text = await res.text().catch(() => "");
-    throw new Error(`HTTP ${res.status}: ${text || res.statusText}`);
-  }
-  return (await res.json()) as T;
+  return { id: registrationId };
 }
 
-export async function publishTournament(
-  info: PublicTournamentInfo,
-): Promise<void> {
-  await http(`/tournaments/${encodeURIComponent(info.id)}`, {
-    method: "PUT",
-    body: JSON.stringify({ name: info.name, topic: info.topic }),
-  });
-}
-
-export async function fetchPublicTournament(
-  id: string,
-): Promise<PublicTournamentInfo | null> {
-  try {
-    return await http<PublicTournamentInfo>(
-      `/tournaments/${encodeURIComponent(id)}`,
-    );
-  } catch {
-    return null;
-  }
-}
-
-export async function submitTeamRegistration(
+export function submitTeamRegistration(
   tournamentId: string,
   payload: TeamRegistrationPayload,
 ): Promise<{ id: string }> {
-  return http<{ id: string }>(
-    `/tournaments/${encodeURIComponent(tournamentId)}/registrations`,
-    {
-      method: "POST",
-      body: JSON.stringify({ kind: "team", payload }),
-    },
-  );
+  return submitRegistration(tournamentId, "team", payload);
 }
 
-export async function submitJudgeRegistration(
+export function submitJudgeRegistration(
   tournamentId: string,
   payload: JudgeRegistrationPayload,
 ): Promise<{ id: string }> {
-  return http<{ id: string }>(
-    `/tournaments/${encodeURIComponent(tournamentId)}/registrations`,
-    {
-      method: "POST",
-      body: JSON.stringify({ kind: "judge", payload }),
-    },
-  );
+  return submitRegistration(tournamentId, "judge", payload);
 }
 
-export async function listRegistrations(
-  tournamentId: string,
-): Promise<ServerRegistration[]> {
-  return http<ServerRegistration[]>(
-    `/tournaments/${encodeURIComponent(tournamentId)}/registrations`,
-  );
+export async function listRegistrations(tournamentId: string): Promise<ServerRegistration[]> {
+  const rows = await entities.TournamentRegistration.filter({ tournament_id: tournamentId }, "-created_date", 5000);
+  return rows.map((row: any) => ({
+    id: row.registration_id,
+    tournamentId: row.tournament_id,
+    kind: row.kind,
+    payload: row.payload,
+    createdAt: row.created_date ?? new Date(row.created_at_ms ?? Date.now()).toISOString(),
+  }));
 }
 
 export async function deleteRegistration(
   tournamentId: string,
   registrationId: string,
 ): Promise<void> {
-  await http(
-    `/tournaments/${encodeURIComponent(tournamentId)}/registrations/${encodeURIComponent(registrationId)}`,
-    { method: "DELETE" },
-  );
+  const rows = await entities.TournamentRegistration.filter({
+    tournament_id: tournamentId,
+    registration_id: registrationId,
+  }, "-created_date", 1);
+  if (rows[0]) await entities.TournamentRegistration.delete(rows[0].id);
 }
 
-export function toPendingTeam(
-  reg: ServerRegistration,
-): PendingTeamRegistration | null {
+export function toPendingTeam(reg: ServerRegistration): PendingTeamRegistration | null {
   if (reg.kind !== "team") return null;
   const p = reg.payload as TeamRegistrationPayload;
   return {
@@ -137,9 +123,7 @@ export function toPendingTeam(
   };
 }
 
-export function toPendingJudge(
-  reg: ServerRegistration,
-): PendingJudgeRegistration | null {
+export function toPendingJudge(reg: ServerRegistration): PendingJudgeRegistration | null {
   if (reg.kind !== "judge") return null;
   const p = reg.payload as JudgeRegistrationPayload;
   return {

@@ -1,0 +1,39 @@
+{
+  "name": "TournamentRegistration",
+  "type": "object",
+  "properties": {
+    "registration_id": {
+      "type": "string"
+    },
+    "tournament_id": {
+      "type": "string"
+    },
+    "kind": {
+      "type": "string",
+      "enum": [
+        "team",
+        "judge"
+      ]
+    },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "created_at_ms": {
+      "type": "number"
+    }
+  },
+  "required": [
+    "registration_id",
+    "tournament_id",
+    "kind",
+    "payload",
+    "created_at_ms"
+  ],
+  "rls": {
+    "create": true,
+    "read": true,
+    "update": true,
+    "delete": true
+  }
+}
