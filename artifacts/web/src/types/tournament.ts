@@ -32,6 +32,8 @@ export interface Match {
   judgeNotes: string;
   completed: boolean;
   judgeAssignment?: MatchJudgeAssignment;
+  /** Set once the result has been shown on the public announcement screen. */
+  resultAnnounced?: boolean;
 }
 
 export interface Round {

@@ -72,6 +72,8 @@ import TournamentSidebar from "@/components/tournament/TournamentSidebar";
 import RoundBar from "@/components/tournament/RoundBar";
 import CaseCard from "@/components/tournament/CaseCard";
 import RoomCard from "@/components/tournament/RoomCard";
+import OverviewDashboard from "@/components/tournament/OverviewDashboard";
+import type { SidebarGroup } from "@/components/tournament/TournamentSidebar";
 import ProtectionSettingsDialog from "@/components/tournament/ProtectionSettingsDialog";
 import UnlockGate from "@/components/tournament/UnlockGate";
 import {
@@ -113,6 +115,7 @@ import {
   MoreHorizontal,
   GitCompare,
   Check,
+  LayoutDashboard,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import type * as XLSXType from "@/lib/excel-export";
@@ -132,7 +135,14 @@ const CYAN = "#29ABE2";
 const PURPLE = "#7B2D8E";
 const SUCCESS = "#34C759";
 
-type TabType = "teams" | "rounds" | "standings" | "speakers" | "judges" | "pending";
+type TabType =
+  | "overview"
+  | "teams"
+  | "rounds"
+  | "standings"
+  | "speakers"
+  | "judges"
+  | "pending";
 
 const GOLD = "#FFC107";
 
@@ -949,7 +959,7 @@ export default function TournamentDetail() {
   } = useTournament();
   const tournament = getTournament(params?.id || "");
 
-  const [activeTab, setActiveTab] = useState<TabType>("teams");
+  const [activeTab, setActiveTab] = useState<TabType>("overview");
   // Selected round numbers for the standings tab. Empty set = all rounds.
   const [standingsRoundFilter, setStandingsRoundFilter] = useState<Set<number>>(
     () => new Set()
@@ -1170,7 +1180,7 @@ export default function TournamentDetail() {
   // Switch default tab to "rounds" when tournament starts
   useEffect(() => {
     if (tournament?.started && activeTab === "teams") {
-      setActiveTab("rounds");
+      setActiveTab("overview");
     }
   }, [tournament?.started]);
 
@@ -2381,26 +2391,28 @@ export default function TournamentDetail() {
     (tournament.pendingJudges?.length ?? 0) +
     (tournament.pendingResults?.length ?? 0);
 
-  const tabs: {
-    key: TabType;
-    label: string;
-    icon: typeof Users;
-    badge?: number;
-  }[] = tournament.started
-    ? [
+  const navGroups: SidebarGroup<TabType>[] = [
+    {
+      title: "البطولة",
+      tabs: [{ key: "overview", label: "نظرة عامة", icon: LayoutDashboard }],
+    },
+    {
+      title: "إدارة البطولة",
+      tabs: [
         { key: "rounds", label: "الجولات", icon: Layers },
-        { key: "standings", label: "الترتيب", icon: BarChart2 },
-        { key: "speakers", label: "المتحدثين", icon: Mic },
-        { key: "judges", label: "المحكمون", icon: UserCheck },
-        { key: "pending", label: "الطلبات", icon: Inbox, badge: pendingCount },
-      ]
-    : [
         { key: "teams", label: "الفرق", icon: Users },
-        { key: "rounds", label: "الجولات", icon: Layers },
-        { key: "standings", label: "الترتيب", icon: BarChart2 },
         { key: "judges", label: "المحكمون", icon: UserCheck },
         { key: "pending", label: "الطلبات", icon: Inbox, badge: pendingCount },
-      ];
+      ],
+    },
+    {
+      title: "النتائج",
+      tabs: [
+        { key: "standings", label: "الترتيب", icon: BarChart2, restricted: true },
+        { key: "speakers", label: "المتحدثين", icon: Mic, restricted: true },
+      ],
+    },
+  ];
 
   return (
     <div
@@ -2408,7 +2420,7 @@ export default function TournamentDetail() {
       style={{ backgroundColor: BRAND.surface }}
     >
       <TournamentSidebar
-        tabs={tabs}
+        groups={navGroups}
         activeTab={activeTab}
         onTabChange={(key) => setActiveTab(key as TabType)}
         onHome={() => setLocation("/")}
@@ -2703,6 +2715,20 @@ export default function TournamentDetail() {
         )}
       {/* Content */}
       <div className="flex-1 max-w-6xl w-full mx-auto px-4 md:px-6 pb-28 pt-2">
+        {activeTab === "overview" && (
+          <OverviewDashboard
+            tournament={tournament}
+            onOpenRounds={() => setActiveTab("rounds")}
+            onFollowJudging={() => setActiveTab("rounds")}
+            onRoomDetails={(match) =>
+              setLocation(
+                `/match/${tournament.id}/${tournament.currentRound}/${match.id}`
+              )
+            }
+            onAnnounce={() => setLocation(`/results/${tournament.id}`)}
+          />
+        )}
+
         {activeTab === "teams" && (
           <div>
             <div className="flex items-center justify-between mb-4">
