@@ -79,6 +79,7 @@ import ResultsAdmin from "@/components/tournament/ResultsAdmin";
 import RoundControlCenter from "@/components/tournament/RoundControlCenter";
 import AuditLog from "@/components/tournament/AuditLog";
 import PresentationMode from "@/components/tournament/PresentationMode";
+import RegistrationLinksCenter from "@/components/tournament/RegistrationLinksCenter";
 import ShareLinkDialog from "@/components/tournament/ShareLinkDialog";
 import AutoSaveIndicator from "@/components/tournament/AutoSaveIndicator";
 import TournamentSkeleton from "@/components/tournament/TournamentSkeleton";
@@ -163,6 +164,7 @@ type TabType =
   | "pending"
   | "control"
   | "resultsAdmin"
+  | "links"
   | "audit";
 
 const GOLD = "#FFC107";
@@ -2479,6 +2481,7 @@ export default function TournamentDetail() {
           ? ([
               { key: "judges", label: "المحكمون", icon: UserCheck },
               { key: "pending", label: "الطلبات", icon: Inbox, badge: pendingCount },
+              { key: "links", label: "روابط التسجيل", icon: LinkIcon },
             ] as const)
           : []),
       ],
@@ -2913,6 +2916,20 @@ export default function TournamentDetail() {
                 `/match/${tournament.id}/${tournament.currentRound}/${match.id}`
               )
             }
+          />
+        )}
+
+        {activeTab === "links" && (
+          <RegistrationLinksCenter
+            tournamentId={tournament.id}
+            teamUrl={buildRegisterUrl({
+              tournamentId: tournament.id,
+              tournamentName: tournament.name,
+            })}
+            judgeUrl={buildJudgeRegisterUrl({
+              tournamentId: tournament.id,
+              tournamentName: tournament.name,
+            })}
           />
         )}
 

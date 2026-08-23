@@ -10,10 +10,12 @@ import {
   tournamentGroups,
 } from "@workspace/db";
 import { eq, and, sql, desc } from "drizzle-orm";
+import { profilesRouter } from "./routes/profiles";
 
 const app = express();
 app.use(cors());
 app.use(express.json({ limit: "2mb" }));
+app.use(profilesRouter);
 
 const PORT = parseInt(process.env.PORT || "5050", 10);
 
