@@ -11,41 +11,55 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { FolderPlus, Plus, SearchX, Trophy } from "lucide-react";
+import {
+  Archive,
+  ChevronDown,
+  FolderPlus,
+  Plus,
+  Search,
+  SearchX,
+  Trophy,
+} from "lucide-react";
 import { motion } from "framer-motion";
 import HomeHeader from "@/components/home/HomeHeader";
 import TournamentCard from "@/components/home/TournamentCard";
-import TournamentFilters, {
-  type StatusFilter,
-} from "@/components/home/TournamentFilters";
 import FolderStrip from "@/components/home/FolderStrip";
+import MoveToFolderDialog from "@/components/home/MoveToFolderDialog";
 import { BRAND, BTN, BTN_PRIMARY_STYLE, BTN_SIZE } from "@/lib/brand";
-import { getTournamentStatus } from "@/lib/tournamentStatus";
 
 export default function Home() {
   const {
     tournaments,
     deleteTournament,
-    duplicateTournament,
     setTournamentArchived,
     updateTournamentInfo,
   } = useTournament();
-  const { groups, addGroup, deleteGroup } = useGroups();
+  const {
+    groups,
+    addGroup,
+    deleteGroup,
+    groupOfTournament,
+    moveTournamentToGroup,
+  } = useGroups();
   const [, setLocation] = useLocation();
 
   // Create-folder dialog
   const [groupDialogOpen, setGroupDialogOpen] = useState(false);
   const [groupName, setGroupName] = useState("");
   const [groupDesc, setGroupDesc] = useState("");
+  const [groupIsArchive, setGroupIsArchive] = useState(false);
 
   // Rename dialog
   const [renameId, setRenameId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
 
-  // List controls
-  const [query, setQuery] = useState("");
-  const [filter, setFilter] = useState<StatusFilter>("all");
+  // Move-to-folder dialog
+  const [moveId, setMoveId] = useState<string | null>(null);
 
+  const [query, setQuery] = useState("");
+  const [archiveOpen, setArchiveOpen] = useState(false);
+
+  /** Tournaments that sit in no folder — the working list. */
   const ungrouped = useMemo(
     () =>
       tournaments.filter(
@@ -54,39 +68,32 @@ export default function Home() {
     [tournaments, groups]
   );
 
-  const counts = useMemo(() => {
-    const c: Record<StatusFilter, number> = {
-      all: 0,
-      running: 0,
-      draft: 0,
-      upcoming: 0,
-      completed: 0,
-      archived: 0,
-    };
-    for (const t of ungrouped) {
-      const s = getTournamentStatus(t);
-      c[s] += 1;
-      // Archived tournaments live behind their own filter, not in "الكل".
-      if (s !== "archived") c.all += 1;
-    }
-    return c;
-  }, [ungrouped]);
-
-  const visible = useMemo(() => {
+  const matchesQuery = (name: string) => {
     const q = query.trim().toLowerCase();
-    return ungrouped
-      .filter((t) => {
-        const s = getTournamentStatus(t);
-        if (filter === "all") return s !== "archived";
-        return s === filter;
-      })
-      .filter((t) => !q || t.name.toLowerCase().includes(q))
-      .sort((a, b) => b.createdAt - a.createdAt);
-  }, [ungrouped, filter, query]);
+    return !q || name.toLowerCase().includes(q);
+  };
 
-  const startRename = (id: string, current: string) => {
+  const current = useMemo(
+    () =>
+      ungrouped
+        .filter((t) => !t.archived)
+        .filter((t) => matchesQuery(t.name))
+        .sort((a, b) => b.createdAt - a.createdAt),
+    [ungrouped, query]
+  );
+
+  const archived = useMemo(
+    () =>
+      ungrouped
+        .filter((t) => t.archived)
+        .filter((t) => matchesQuery(t.name))
+        .sort((a, b) => b.createdAt - a.createdAt),
+    [ungrouped, query]
+  );
+
+  const startRename = (id: string, currentName: string) => {
     setRenameId(id);
-    setRenameValue(current);
+    setRenameValue(currentName);
   };
 
   const submitRename = () => {
@@ -94,6 +101,27 @@ export default function Home() {
     updateTournamentInfo(renameId, { name: renameValue.trim() });
     setRenameId(null);
   };
+
+  const moveTarget = tournaments.find((t) => t.id === moveId) ?? null;
+
+  const renderCard = (t: (typeof tournaments)[number], i: number) => (
+    <motion.div
+      key={t.id}
+      initial={{ opacity: 0, y: 14 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: Math.min(i * 0.04, 0.3) }}
+    >
+      <TournamentCard
+        tournament={t}
+        folderName={groupOfTournament(t.id)?.name}
+        onOpen={() => setLocation(`/tournament/${t.id}`)}
+        onRename={() => startRename(t.id, t.name)}
+        onMoveToFolder={() => setMoveId(t.id)}
+        onToggleArchive={() => setTournamentArchived(t.id, !t.archived)}
+        onDelete={() => deleteTournament(t.id)}
+      />
+    </motion.div>
+  );
 
   return (
     <div
@@ -126,12 +154,88 @@ export default function Home() {
         }
       />
 
-      <main className="flex-1 max-w-6xl w-full mx-auto px-4 md:px-6 py-5 md:py-7">
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 md:px-6 py-5 md:py-7">
+        {/* Current tournaments */}
+        <section>
+          <div className="flex items-center justify-between gap-3 mb-4 flex-wrap">
+            <div className="flex items-baseline gap-2">
+              <h2 className="text-2xl font-bold" style={{ color: BRAND.ink }}>
+                البطولات الحالية
+              </h2>
+              <span
+                className="text-[13px] font-semibold"
+                style={{ color: `${BRAND.ink}80` }}
+                data-testid="text-tournament-count"
+              >
+                {current.length} بطولة
+              </span>
+            </div>
+            <div className="relative w-full sm:w-72">
+              <Search
+                className="w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none"
+                style={{ color: `${BRAND.ink}66` }}
+              />
+              <Input
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="ابحث عن بطولة…"
+                className="pr-9 h-10 bg-white"
+                data-testid="input-search-tournaments"
+              />
+            </div>
+          </div>
+
+          {current.length === 0 ? (
+            <div
+              className="rounded-2xl bg-white border py-14 px-6 flex flex-col items-center text-center gap-2"
+              style={{ borderColor: BRAND.border }}
+              data-testid="empty-state"
+            >
+              <span
+                className="w-16 h-16 rounded-2xl flex items-center justify-center mb-1"
+                style={{ backgroundColor: `${BRAND.purple}12` }}
+              >
+                {query ? (
+                  <SearchX
+                    className="w-7 h-7"
+                    style={{ color: BRAND.purple }}
+                  />
+                ) : (
+                  <Trophy className="w-7 h-7" style={{ color: BRAND.purple }} />
+                )}
+              </span>
+              <p className="font-bold text-[16px]" style={{ color: BRAND.ink }}>
+                {query ? "لا توجد نتائج مطابقة" : "لا توجد بطولات حالية"}
+              </p>
+              <p className="text-[13px]" style={{ color: `${BRAND.ink}8c` }}>
+                {query
+                  ? "جرّب تغيير كلمة البحث"
+                  : "ابدأ بإنشاء بطولتك الأولى وأضف الفرق والقاعات والمحكمين"}
+              </p>
+              {!query && (
+                <button
+                  onClick={() => setLocation("/tournament/new")}
+                  className={`${BTN.base} ${BTN.primary} ${BTN_SIZE.lg} mt-3`}
+                  style={BTN_PRIMARY_STYLE}
+                  data-testid="button-create-first-tournament"
+                >
+                  <Plus className="w-4 h-4" strokeWidth={2.5} />
+                  إنشاء بطولة جديدة
+                </button>
+              )}
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+              {current.map(renderCard)}
+            </div>
+          )}
+        </section>
+
         {/* Folders */}
         {groups.length > 0 && (
-          <section className="mb-7">
+          <section className="mt-9">
             <h2
-              className="text-[15px] font-bold mb-3"
+              className="text-xl font-bold mb-3.5"
               style={{ color: BRAND.ink }}
             >
               المجلدات
@@ -149,93 +253,38 @@ export default function Home() {
           </section>
         )}
 
-        {/* My tournaments */}
-        <section>
-          <div className="flex items-baseline gap-2 mb-3.5">
-            <h2 className="text-xl font-bold" style={{ color: BRAND.ink }}>
-              بطولاتي
-            </h2>
-            <span
-              className="text-[13px] font-semibold"
-              style={{ color: `${BRAND.ink}80` }}
-              data-testid="text-tournament-count"
+        {/* Archive */}
+        {archived.length > 0 && (
+          <section className="mt-9">
+            <button
+              onClick={() => setArchiveOpen((v) => !v)}
+              className="flex items-center gap-2 mb-3.5"
+              data-testid="button-toggle-archive"
             >
-              {visible.length} بطولة
-            </span>
-          </div>
-
-          <div className="mb-5">
-            <TournamentFilters
-              query={query}
-              onQueryChange={setQuery}
-              filter={filter}
-              onFilterChange={setFilter}
-              counts={counts}
-            />
-          </div>
-
-          {visible.length === 0 ? (
-            <div
-              className="rounded-2xl bg-white border py-14 px-6 flex flex-col items-center text-center gap-2"
-              style={{ borderColor: BRAND.border }}
-              data-testid="empty-state"
-            >
+              <Archive className="w-5 h-5" style={{ color: BRAND.warning }} />
+              <h2 className="text-xl font-bold" style={{ color: BRAND.ink }}>
+                الأرشيف
+              </h2>
               <span
-                className="w-16 h-16 rounded-2xl flex items-center justify-center mb-1"
-                style={{ backgroundColor: `${BRAND.purple}12` }}
+                className="text-[13px] font-semibold"
+                style={{ color: `${BRAND.ink}80` }}
               >
-                {query || filter !== "all" ? (
-                  <SearchX className="w-7 h-7" style={{ color: BRAND.purple }} />
-                ) : (
-                  <Trophy className="w-7 h-7" style={{ color: BRAND.purple }} />
-                )}
+                {archived.length} بطولة
               </span>
-              <p className="font-bold text-[16px]" style={{ color: BRAND.ink }}>
-                {query || filter !== "all"
-                  ? "لا توجد نتائج مطابقة"
-                  : "لا توجد بطولات بعد"}
-              </p>
-              <p className="text-[13px]" style={{ color: `${BRAND.ink}8c` }}>
-                {query || filter !== "all"
-                  ? "جرّب تغيير البحث أو الفلتر"
-                  : "ابدأ بإنشاء بطولتك الأولى وأضف الفرق والقاعات والمحكمين"}
-              </p>
-              {!query && filter === "all" && (
-                <button
-                  onClick={() => setLocation("/tournament/new")}
-                  className={`${BTN.base} ${BTN.primary} ${BTN_SIZE.lg} mt-3`}
-                  style={BTN_PRIMARY_STYLE}
-                  data-testid="button-create-first-tournament"
-                >
-                  <Plus className="w-4 h-4" strokeWidth={2.5} />
-                  إنشاء بطولة جديدة
-                </button>
-              )}
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-              {visible.map((t, i) => (
-                <motion.div
-                  key={t.id}
-                  initial={{ opacity: 0, y: 14 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: Math.min(i * 0.04, 0.3) }}
-                >
-                  <TournamentCard
-                    tournament={t}
-                    onOpen={() => setLocation(`/tournament/${t.id}`)}
-                    onRename={() => startRename(t.id, t.name)}
-                    onDuplicate={() => duplicateTournament(t.id)}
-                    onToggleArchive={() =>
-                      setTournamentArchived(t.id, !t.archived)
-                    }
-                    onDelete={() => deleteTournament(t.id)}
-                  />
-                </motion.div>
-              ))}
-            </div>
-          )}
-        </section>
+              <ChevronDown
+                className={`w-4 h-4 transition-transform ${
+                  archiveOpen ? "rotate-180" : ""
+                }`}
+                style={{ color: `${BRAND.ink}80` }}
+              />
+            </button>
+            {archiveOpen && (
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+                {archived.map(renderCard)}
+              </div>
+            )}
+          </section>
+        )}
       </main>
 
       {/* Create folder */}
@@ -250,7 +299,7 @@ export default function Home() {
               <Input
                 value={groupName}
                 onChange={(e) => setGroupName(e.target.value)}
-                placeholder="مثال: البطولة الوطنية 2025"
+                placeholder="مثال: بطولات المدارس"
                 data-testid="input-group-name"
               />
             </div>
@@ -263,14 +312,37 @@ export default function Home() {
                 data-testid="input-group-desc"
               />
             </div>
+            <label
+              className="flex items-center gap-2.5 p-3 rounded-xl border cursor-pointer"
+              style={{ borderColor: BRAND.border }}
+            >
+              <input
+                type="checkbox"
+                checked={groupIsArchive}
+                onChange={(e) => setGroupIsArchive(e.target.checked)}
+                className="w-4 h-4 accent-[#7B2D8E]"
+                data-testid="checkbox-group-archive"
+              />
+              <span
+                className="text-[13px] font-semibold"
+                style={{ color: BRAND.ink }}
+              >
+                هذا مجلد أرشيف
+              </span>
+            </label>
             <Button
               className="w-full text-white"
               disabled={!groupName.trim()}
               onClick={() => {
                 if (!groupName.trim()) return;
-                addGroup(groupName.trim(), groupDesc.trim() || undefined);
+                addGroup(
+                  groupName.trim(),
+                  groupDesc.trim() || undefined,
+                  groupIsArchive ? "archive" : "normal"
+                );
                 setGroupName("");
                 setGroupDesc("");
+                setGroupIsArchive(false);
                 setGroupDialogOpen(false);
               }}
               style={BTN_PRIMARY_STYLE}
@@ -281,6 +353,19 @@ export default function Home() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Move to folder */}
+      {moveTarget && (
+        <MoveToFolderDialog
+          open={!!moveId}
+          onOpenChange={(o) => !o && setMoveId(null)}
+          tournamentName={moveTarget.name}
+          currentGroupId={groupOfTournament(moveTarget.id)?.id ?? null}
+          groups={groups}
+          onMove={(groupId) => moveTournamentToGroup(moveTarget.id, groupId)}
+          onCreateFolder={(name) => addGroup(name)}
+        />
+      )}
 
       {/* Rename tournament */}
       <Dialog open={!!renameId} onOpenChange={(o) => !o && setRenameId(null)}>

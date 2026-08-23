@@ -197,6 +197,8 @@ export interface TournamentGroup {
   id: string;
   name: string;
   description?: string;
+  /** "archive" folders hold tournaments taken out of the active list. */
+  kind?: "normal" | "archive";
   createdAt: number;
   tournamentIds: string[];
 }
