@@ -977,8 +977,8 @@ export default function TournamentDetail() {
     autoAssignJudges,
     setRoundLocked,
     logAction,
+    tournaments,
   } = useTournament();
-  const { tournaments } = useTournament();
   const tournament = getTournament(params?.id || "");
 
   const [activeTab, setActiveTab] = useState<TabType>("overview");
@@ -1035,7 +1035,6 @@ export default function TournamentDetail() {
   const [shareDialogOpen, setShareDialogOpen] = useState(false);
   const [shareTitle, setShareTitle] = useState("");
   const [shareUrl, setShareUrl] = useState("");
-  const [shareCopied, setShareCopied] = useState(false);
   const [importTeamOpen, setImportTeamOpen] = useState(false);
   const [importTeamCode, setImportTeamCode] = useState("");
   const [importTeamError, setImportTeamError] = useState("");
@@ -1651,12 +1650,7 @@ export default function TournamentDetail() {
   const openShareDialog = (title: string, url: string) => {
     setShareTitle(title);
     setShareUrl(url);
-    setShareCopied(false);
     setShareDialogOpen(true);
-    try {
-      navigator.clipboard.writeText(url);
-      setShareCopied(true);
-    } catch {}
   };
 
   const handleAdminLink = () => {
@@ -2532,7 +2526,7 @@ export default function TournamentDetail() {
       <div className="flex-1 flex flex-col min-w-0">
         {/* Page header */}
         <header className="px-4 md:px-6 pt-5 pb-3">
-          <div className={`${LAYOUT.page} flex items-center gap-2.5 px-0 md:px-0`}>
+          <div className={`${LAYOUT.page} flex flex-wrap items-center gap-2.5 px-0 md:px-0`}>
             <div className="flex-1 min-w-0 text-right animate-in fade-in slide-in-from-top-2 duration-500">
               <h1
                 className="text-xl md:text-2xl font-bold truncate leading-tight"
@@ -2561,12 +2555,13 @@ export default function TournamentDetail() {
               </div>
             </div>
 
+            <div className="flex items-center gap-2 flex-wrap justify-end w-full sm:w-auto">
             <button
               onClick={() => setHideScores((v) => !v)}
               aria-label={hideScores ? "إظهار الدرجات" : "إخفاء الدرجات"}
               title={hideScores ? "إظهار الدرجات" : "إخفاء الدرجات"}
               aria-pressed={hideScores}
-              className={`w-9 h-9 rounded-xl border flex items-center justify-center shrink-0 transition-all active:scale-95 ${
+              className={`w-10 h-10 rounded-xl border flex items-center justify-center shrink-0 transition-all active:scale-95 ${
                 hideScores ? "text-white" : "bg-white hover:bg-[#7B2D8E]/[0.06]"
               }`}
               style={
@@ -2587,7 +2582,7 @@ export default function TournamentDetail() {
               onClick={() => window.location.reload()}
               aria-label="تحديث الصفحة"
               title="تحديث الصفحة"
-              className="w-9 h-9 rounded-xl border bg-white hover:bg-[#7B2D8E]/[0.06] flex items-center justify-center shrink-0 transition-all active:scale-95"
+              className="w-10 h-10 rounded-xl border bg-white hover:bg-[#7B2D8E]/[0.06] flex items-center justify-center shrink-0 transition-all active:scale-95"
               style={{ borderColor: BRAND.border, color: BRAND.ink }}
               data-testid="button-refresh-page"
             >
@@ -2598,7 +2593,7 @@ export default function TournamentDetail() {
 
             <button
               onClick={() => setPresentMode(true)}
-              className={`${BTN.base} ${BTN.secondary} h-11 px-4 shrink-0`}
+              className={`${BTN.base} ${BTN.secondary} h-10 px-4 shrink-0`}
               data-testid="button-presentation-mode"
             >
               <Projector className="w-4 h-4" />
@@ -2608,7 +2603,7 @@ export default function TournamentDetail() {
             {can("announceResults") && (
             <button
               onClick={() => setAnnounceOpen(true)}
-              className={`${BTN.base} ${BTN.primary} h-11 px-5 shrink-0 shadow-lg`}
+              className={`${BTN.base} ${BTN.primary} h-10 px-5 shrink-0 shadow-lg`}
               style={BTN_PRIMARY_STYLE}
               data-testid="button-announce-results"
             >
@@ -2616,6 +2611,7 @@ export default function TournamentDetail() {
               إعلان النتائج
             </button>
             )}
+            </div>
           </div>
         {/* Quick actions toolbar */}
         <div

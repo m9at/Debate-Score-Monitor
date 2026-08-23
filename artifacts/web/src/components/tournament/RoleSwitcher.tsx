@@ -8,7 +8,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ROLE_META, useRole, type Role } from "@/context/RoleContext";
-import { BRAND, BTN, BTN_SIZE } from "@/lib/brand";
+import { BRAND, BTN } from "@/lib/brand";
 
 /** Lets the operator switch the active role — the UI adapts to its permissions. */
 export default function RoleSwitcher() {
@@ -19,7 +19,7 @@ export default function RoleSwitcher() {
       <DropdownMenuTrigger asChild>
         <button
           type="button"
-          className={`${BTN.base} ${BTN.secondary} ${BTN_SIZE.md} shrink-0`}
+          className={`${BTN.base} ${BTN.secondary} shrink-0 h-10 px-3.5`}
           data-testid="button-role-switcher"
         >
           <ShieldCheck className="w-4 h-4" style={{ color: BRAND.purple }} />

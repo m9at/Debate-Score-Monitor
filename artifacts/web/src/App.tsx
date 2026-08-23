@@ -239,7 +239,7 @@ function App() {
     <ThemeProvider>
       <TournamentProvider>
         <RoleProvider>
-        <GroupProvider>
+          <GroupProvider>
           <TooltipProvider>
             <WouterRouter base={basePath}>
               <ClerkProviderWithRoutes />

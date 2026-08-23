@@ -9,6 +9,7 @@ import {
   Users,
 } from "lucide-react";
 import type { Match, Tournament } from "@/types/tournament";
+import { useRole } from "@/context/RoleContext";
 import { BRAND, BRAND_GRADIENT, BTN, BTN_PRIMARY_STYLE, BTN_SIZE } from "@/lib/brand";
 import { getRoomStatus, roomStatusMeta, type RoomStatus } from "@/lib/roomStatus";
 import PublicRoomCard from "./PublicRoomCard";
@@ -103,6 +104,7 @@ export default function OverviewDashboard({
       ? Math.min(100, (tournament.currentRound / tournament.totalRounds) * 100)
       : 0;
 
+  const { can } = useRole();
   const readyToAnnounce = statuses.filter((s) => s.status === "ready").length;
 
   return (
@@ -136,6 +138,7 @@ export default function OverviewDashboard({
             </p>
           </div>
 
+          {can("announceResults") && (
           <button
             type="button"
             onClick={onAnnounce}
@@ -155,6 +158,7 @@ export default function OverviewDashboard({
               </span>
             )}
           </button>
+          )}
         </div>
 
         {/* Progress bar */}
