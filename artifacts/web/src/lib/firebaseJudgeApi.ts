@@ -1,4 +1,5 @@
 import type { JudgeMatchInfo, JudgeScores, RoundData } from "./judgeCodec";
+import { entities } from "@/api/base44Client";
 
 export interface MatchSession {
   tournamentId: string;
@@ -17,43 +18,41 @@ export interface RoundSession {
   results?: { [roomNumber: string]: RoundResultEntry };
 }
 
-const API_BASE = "/api/judge";
-
-async function http<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`, {
-    ...init,
-    headers: {
-      "Content-Type": "application/json",
-      ...(init?.headers || {}),
-    },
-  });
-  if (!res.ok) {
-    let body = "";
-    try { body = await res.text(); } catch {}
-    throw new Error(`HTTP ${res.status}: ${body || res.statusText}`);
-  }
-  if (res.status === 204) return undefined as T;
-  return (await res.json()) as T;
+async function findSession(sessionId: string) {
+  const rows = await entities.JudgeSession.filter({ session_id: sessionId }, "-updated_date", 1);
+  return rows[0] ?? null;
 }
 
 export async function createMatchSession(matchInfo: JudgeMatchInfo): Promise<string> {
   const tid = matchInfo.tournamentId;
   if (!tid) throw new Error("tournamentId is required");
-  const r = await http<{ id: string }>("/sessions", {
-    method: "POST",
-    body: JSON.stringify({ tournamentId: tid, matchInfo }),
+  const sessionId = crypto.randomUUID();
+  await entities.JudgeSession.create({
+    session_id: sessionId,
+    tournament_id: tid,
+    kind: "match",
+    info: matchInfo,
+    results: {},
+    created_at_ms: Date.now(),
+    updated_at_ms: Date.now(),
   });
-  return r.id;
+  return sessionId;
 }
 
 export async function createRoundSession(roundData: RoundData): Promise<string> {
   const tid = roundData.tournamentId;
   if (!tid) throw new Error("tournamentId is required");
-  const r = await http<{ id: string }>("/round-sessions", {
-    method: "POST",
-    body: JSON.stringify({ tournamentId: tid, roundData }),
+  const sessionId = crypto.randomUUID();
+  await entities.JudgeSession.create({
+    session_id: sessionId,
+    tournament_id: tid,
+    kind: "round",
+    info: roundData,
+    results: {},
+    created_at_ms: Date.now(),
+    updated_at_ms: Date.now(),
   });
-  return r.id;
+  return sessionId;
 }
 
 export async function syncRoundSessionsForRound(
@@ -61,38 +60,42 @@ export async function syncRoundSessionsForRound(
   roundNumber: number,
   roundData: RoundData,
 ): Promise<{ updated: number }> {
-  const r = await http<{ ok: boolean; updated: number }>(
-    `/round-sessions/by-tournament/${encodeURIComponent(tournamentId)}/round/${roundNumber}/info`,
-    {
-      method: "PUT",
-      body: JSON.stringify(roundData),
-    },
-  );
-  return { updated: r.updated };
+  const rows = await entities.JudgeSession.filter({ tournament_id: tournamentId, kind: "round" }, "-updated_date", 5000);
+  const matched = rows.filter((row: any) => Number(row.info?.roundNumber) === roundNumber);
+  await Promise.all(matched.map((row: any) => entities.JudgeSession.update(row.id, {
+    info: roundData,
+    updated_at_ms: Date.now(),
+  })));
+  return { updated: matched.length };
 }
 
 export async function getMatchSession(sessionId: string): Promise<MatchSession | null> {
-  try {
-    return await http<MatchSession>(`/sessions/${encodeURIComponent(sessionId)}`);
-  } catch (e) {
-    if (e instanceof Error && /^HTTP 404/.test(e.message)) return null;
-    throw e;
-  }
+  const row = await findSession(sessionId);
+  if (!row || row.kind !== "match") return null;
+  return {
+    tournamentId: row.tournament_id,
+    matchInfo: row.info as JudgeMatchInfo,
+    result: row.results?.result as JudgeScores | undefined,
+    submittedAt: row.results?.submittedAt as number | undefined,
+  };
 }
 
 export async function getRoundSession(sessionId: string): Promise<RoundSession | null> {
-  try {
-    return await http<RoundSession>(`/round-sessions/${encodeURIComponent(sessionId)}`);
-  } catch (e) {
-    if (e instanceof Error && /^HTTP 404/.test(e.message)) return null;
-    throw e;
-  }
+  const row = await findSession(sessionId);
+  if (!row || row.kind !== "round") return null;
+  return {
+    tournamentId: row.tournament_id,
+    roundData: row.info as RoundData,
+    results: (row.results ?? {}) as { [roomNumber: string]: RoundResultEntry },
+  };
 }
 
 export async function submitMatchResult(sessionId: string, scores: JudgeScores): Promise<void> {
-  await http<{ ok: boolean }>(`/sessions/${encodeURIComponent(sessionId)}/result`, {
-    method: "PUT",
-    body: JSON.stringify(scores),
+  const row = await findSession(sessionId);
+  if (!row || row.kind !== "match") throw new Error("session not found");
+  await entities.JudgeSession.update(row.id, {
+    results: { result: scores, submittedAt: Date.now() },
+    updated_at_ms: Date.now(),
   });
 }
 
@@ -101,23 +104,24 @@ export async function submitRoomResult(
   roomNumber: number,
   scores: JudgeScores,
 ): Promise<void> {
-  await http<{ ok: boolean }>(
-    `/round-sessions/${encodeURIComponent(sessionId)}/results/${roomNumber}`,
-    { method: "PUT", body: JSON.stringify(scores) },
-  );
+  const row = await findSession(sessionId);
+  if (!row || row.kind !== "round") throw new Error("session not found");
+  const results = { ...(row.results ?? {}) };
+  results[String(roomNumber)] = { ...scores, submittedAt: Date.now() };
+  await entities.JudgeSession.update(row.id, { results, updated_at_ms: Date.now() });
 }
 
 export async function deleteMatchSession(sessionId: string): Promise<void> {
-  await http<{ ok: boolean }>(`/sessions/${encodeURIComponent(sessionId)}`, {
-    method: "DELETE",
-  });
+  const row = await findSession(sessionId);
+  if (row) await entities.JudgeSession.delete(row.id);
 }
 
 export async function deleteRoundResult(sessionId: string, roomNumber: number): Promise<void> {
-  await http<{ ok: boolean }>(
-    `/round-sessions/${encodeURIComponent(sessionId)}/results/${roomNumber}`,
-    { method: "DELETE" },
-  );
+  const row = await findSession(sessionId);
+  if (!row || row.kind !== "round") return;
+  const results = { ...(row.results ?? {}) };
+  delete results[String(roomNumber)];
+  await entities.JudgeSession.update(row.id, { results, updated_at_ms: Date.now() });
 }
 
 export interface SessionUpdate {
@@ -140,14 +144,6 @@ export interface RoundResultUpdate {
 }
 
 type Unsubscribe = () => void;
-
-interface AggregatedRow {
-  sessionId: string;
-  kind: "match" | "round";
-  info: JudgeMatchInfo | RoundData;
-  results: Record<string, unknown>;
-}
-
 const POLL_INTERVAL_MS = 4000;
 
 function startPoll(
@@ -157,36 +153,38 @@ function startPoll(
 ): Unsubscribe {
   let cancelled = false;
   let inFlight = false;
+  const seen = new Map<string, number>();
   const tick = async () => {
     if (cancelled || inFlight) return;
     inFlight = true;
     try {
-      const rows = await http<AggregatedRow[]>(
-        `/tournaments/${encodeURIComponent(tournamentId)}/results`,
-      );
+      const rows = await entities.JudgeSession.filter({ tournament_id: tournamentId }, "-updated_date", 5000);
       if (cancelled) return;
       for (const row of rows) {
-        if (row.kind === "match" && onMatch) {
-          const r = row.results as { result?: JudgeScores; submittedAt?: number };
-          if (r && r.result) {
-            const info = row.info as JudgeMatchInfo;
-            onMatch({
-              sessionId: row.sessionId,
-              tournamentId,
-              matchInfo: info,
-              result: r.result,
-              submittedAt: r.submittedAt ?? Date.now(),
-            });
-          }
+        if (row.kind === "match" && onMatch && row.results?.result) {
+          const stamp = Number(row.results?.submittedAt ?? row.updated_at_ms ?? 0);
+          if (seen.get(row.session_id) === stamp) continue;
+          seen.set(row.session_id, stamp);
+          onMatch({
+            sessionId: row.session_id,
+            tournamentId,
+            matchInfo: row.info as JudgeMatchInfo,
+            result: row.results.result as JudgeScores,
+            submittedAt: stamp || Date.now(),
+          });
         } else if (row.kind === "round" && onRound) {
           const roundData = row.info as RoundData;
-          const results = (row.results as Record<string, RoundResultEntry>) || {};
+          const results = (row.results ?? {}) as Record<string, RoundResultEntry>;
           for (const [roomKey, entry] of Object.entries(results)) {
+            const key = `${row.session_id}:${roomKey}`;
+            const stamp = Number(entry.submittedAt ?? row.updated_at_ms ?? 0);
+            if (seen.get(key) === stamp) continue;
+            seen.set(key, stamp);
             const room = roundData.rooms.find((r) => String(r.roomNumber) === roomKey);
             if (!room) continue;
             const { submittedAt, ...scoresOnly } = entry;
             onRound({
-              sessionId: row.sessionId,
+              sessionId: row.session_id,
               tournamentId,
               roomNumber: Number(roomKey),
               matchId: room.matchId,
@@ -199,16 +197,16 @@ function startPoll(
         }
       }
     } catch {
-      // transient; will retry next tick
+      // transient; retry next tick
     } finally {
       inFlight = false;
     }
   };
   void tick();
-  const id = setInterval(tick, POLL_INTERVAL_MS);
+  const id = window.setInterval(tick, POLL_INTERVAL_MS);
   return () => {
     cancelled = true;
-    clearInterval(id);
+    window.clearInterval(id);
   };
 }
 
