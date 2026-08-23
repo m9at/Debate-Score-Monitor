@@ -75,6 +75,7 @@
     "zod": "catalog:"
   },
   "dependencies": {
+    "@base44/sdk": "0.8.43",
     "@clerk/react": "^6.4.2",
     "@clerk/themes": "^2.4.57",
     "exceljs": "^4.4.0",
