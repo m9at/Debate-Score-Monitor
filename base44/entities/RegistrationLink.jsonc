@@ -1,0 +1,42 @@
+{
+  "name": "RegistrationLink",
+  "type": "object",
+  "properties": {
+    "link_id": {
+      "type": "string"
+    },
+    "tournament_id": {
+      "type": "string"
+    },
+    "kind": {
+      "type": "string",
+      "enum": [
+        "team",
+        "judge"
+      ]
+    },
+    "state": {
+      "type": "string",
+      "enum": [
+        "open",
+        "closed",
+        "archived"
+      ]
+    },
+    "updated_at_ms": {
+      "type": "number"
+    }
+  },
+  "required": [
+    "link_id",
+    "tournament_id",
+    "kind",
+    "state"
+  ],
+  "rls": {
+    "create": true,
+    "read": true,
+    "update": true,
+    "delete": true
+  }
+}

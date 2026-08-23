@@ -1,0 +1,66 @@
+{
+  "name": "ParticipantProfile",
+  "type": "object",
+  "properties": {
+    "profile_id": {
+      "type": "string"
+    },
+    "role": {
+      "type": "string",
+      "enum": [
+        "judge",
+        "team"
+      ]
+    },
+    "name": {
+      "type": "string"
+    },
+    "contact": {
+      "type": "string"
+    },
+    "contact_kind": {
+      "type": "string",
+      "enum": [
+        "phone",
+        "email"
+      ]
+    },
+    "photo_url": {
+      "type": "string"
+    },
+    "logo_url": {
+      "type": "string"
+    },
+    "institution": {
+      "type": "string"
+    },
+    "experience": {
+      "type": "string"
+    },
+    "last_members": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "details": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "updated_at_ms": {
+      "type": "number"
+    }
+  },
+  "required": [
+    "profile_id",
+    "role",
+    "name",
+    "contact"
+  ],
+  "rls": {
+    "create": true,
+    "read": true,
+    "update": true,
+    "delete": true
+  }
+}

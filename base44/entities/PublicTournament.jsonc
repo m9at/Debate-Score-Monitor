@@ -1,0 +1,28 @@
+{
+  "name": "PublicTournament",
+  "type": "object",
+  "properties": {
+    "tournament_id": {
+      "type": "string"
+    },
+    "name": {
+      "type": "string"
+    },
+    "topic": {
+      "type": "string"
+    },
+    "updated_at_ms": {
+      "type": "number"
+    }
+  },
+  "required": [
+    "tournament_id",
+    "name"
+  ],
+  "rls": {
+    "create": true,
+    "read": true,
+    "update": true,
+    "delete": true
+  }
+}

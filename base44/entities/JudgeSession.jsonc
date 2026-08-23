@@ -1,0 +1,46 @@
+{
+  "name": "JudgeSession",
+  "type": "object",
+  "properties": {
+    "session_id": {
+      "type": "string"
+    },
+    "tournament_id": {
+      "type": "string"
+    },
+    "kind": {
+      "type": "string",
+      "enum": [
+        "match",
+        "round"
+      ]
+    },
+    "info": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "results": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "created_at_ms": {
+      "type": "number"
+    },
+    "updated_at_ms": {
+      "type": "number"
+    }
+  },
+  "required": [
+    "session_id",
+    "tournament_id",
+    "kind",
+    "info",
+    "results"
+  ],
+  "rls": {
+    "create": true,
+    "read": true,
+    "update": true,
+    "delete": true
+  }
+}

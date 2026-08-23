@@ -1,0 +1,54 @@
+{
+  "name": "TournamentParticipation",
+  "type": "object",
+  "properties": {
+    "participation_id": {
+      "type": "string"
+    },
+    "tournament_id": {
+      "type": "string"
+    },
+    "role": {
+      "type": "string",
+      "enum": [
+        "judge",
+        "team"
+      ]
+    },
+    "profile_id": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "approved",
+        "withdrawn"
+      ]
+    },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "created_at_ms": {
+      "type": "number"
+    },
+    "updated_at_ms": {
+      "type": "number"
+    }
+  },
+  "required": [
+    "participation_id",
+    "tournament_id",
+    "role",
+    "profile_id",
+    "status",
+    "payload"
+  ],
+  "rls": {
+    "create": true,
+    "read": true,
+    "update": true,
+    "delete": true
+  }
+}
