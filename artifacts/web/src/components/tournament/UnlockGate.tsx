@@ -82,8 +82,9 @@ export default function UnlockGate({
           onKeyDown={(e) => {
             if (e.key === "Enter") submit();
           }}
+          type="password"
           inputMode="numeric"
-          autoComplete="off"
+          autoComplete="new-password"
           placeholder={"•".repeat(codeLength)}
           dir="ltr"
           className="w-full h-14 rounded-2xl border text-center text-2xl font-bold tracking-[0.5em]

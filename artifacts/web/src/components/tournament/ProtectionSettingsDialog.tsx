@@ -164,8 +164,9 @@ export default function ProtectionSettingsDialog({
                     setDraft((d) => ({ ...d, code: digits }));
                     setError("");
                   }}
+                  type="password"
                   inputMode="numeric"
-                  autoComplete="off"
+                  autoComplete="new-password"
                   placeholder={"•".repeat(MIN_PIN)}
                   dir="ltr"
                   className="w-full h-12 rounded-xl border text-center text-2xl font-bold tracking-[0.5em]

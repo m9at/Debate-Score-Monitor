@@ -8,6 +8,7 @@ import {
   Link2,
   Lock,
   QrCode,
+  Share2,
   Unlock,
   Users,
   UserCheck,
@@ -144,6 +145,19 @@ function LinkCard({
     window.setTimeout(() => setCopied(false), 1800);
   };
 
+  // Native share sheet on phones; falls back to copying on desktop browsers.
+  const share = async () => {
+    if (navigator.share) {
+      try {
+        await navigator.share({ title, url });
+        return;
+      } catch {
+        return;
+      }
+    }
+    await copy();
+  };
+
   return (
     <div
       className="rounded-2xl border bg-white p-4 space-y-3"
@@ -220,6 +234,15 @@ function LinkCard({
         >
           {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
           {copied ? "تم النسخ" : "نسخ الرابط"}
+        </button>
+        <button
+          type="button"
+          onClick={share}
+          className={`${BTN.base} ${BTN.secondary} h-9 px-3 text-[12.5px]`}
+          data-testid="button-share-link"
+        >
+          <Share2 className="w-4 h-4" />
+          مشاركة
         </button>
         <button
           type="button"
