@@ -71,6 +71,8 @@ export interface Judge {
   canChair: boolean;
   conflictTeamIds: string[];
   registeredAt?: number;
+  /** Temporarily unavailable — kept in the list but skipped by the draw. */
+  disabled?: boolean;
 }
 
 export interface PendingJudgeRegistration {
@@ -113,6 +115,27 @@ export interface PendingMatchResult {
   submittedAt: number;
 }
 
+/** A physical debate room. The number is stable; only the label is editable. */
+export interface Room {
+  id: string;
+  number: number;
+  label: string;
+}
+
+/** Format rules chosen while creating the tournament. */
+export interface TournamentSettings {
+  /** Reply speeches enabled — only speaker 1 or 2 may deliver one. */
+  replySpeech: boolean;
+  /** Government / opposition sides (always true for BP-style debates). */
+  sides: boolean;
+  scoreMin: number;
+  scoreMax: number;
+  judgesPerRoom: number;
+  rules?: string;
+  /** Show team scores on the public announcement screen. */
+  showScoresOnAnnounce: boolean;
+}
+
 export interface Tournament {
   id: string;
   name: string;
@@ -137,6 +160,12 @@ export interface Tournament {
   startDate?: number;
   endDate?: number;
   description?: string;
+  /** Optional tournament logo (data URL), shown next to the brand logo. */
+  logoDataUrl?: string;
+  /** Rooms defined during setup. */
+  rooms?: Room[];
+  /** Format settings defined during setup. */
+  settings?: TournamentSettings;
 }
 
 export interface TournamentProtection {

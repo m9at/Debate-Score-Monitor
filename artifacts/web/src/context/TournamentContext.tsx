@@ -13,6 +13,7 @@ import type {
   MatchJudgeAssignment,
   TournamentProtection,
 } from "@/types/tournament";
+import type { TournamentSetup } from "@/lib/wizard/types";
 import {
   fetchAllShared,
   pushShared,
@@ -806,6 +807,8 @@ interface TournamentContextType {
   setTournamentArchived: (tournamentId: string, archived: boolean) => void;
   /** Deep-copies a tournament under a new id and name. Returns the new id. */
   duplicateTournament: (tournamentId: string) => string | undefined;
+  /** Creates a fully configured tournament from the setup wizard. Returns its id. */
+  createTournamentFromSetup: (setup: TournamentSetup) => string;
 }
 
 const DEMO_TEAM_NAMES = [
@@ -1226,6 +1229,70 @@ export function TournamentProvider({ children }: { children: ReactNode }) {
     return copy.id;
   }, []);
 
+  const createTournamentFromSetup = useCallback((setup: TournamentSetup) => {
+    const teams = setup.teams.filter((t) => t.name.trim());
+    const judges = setup.judges.filter((j) => j.name.trim());
+
+    const rounds: Round[] = [];
+    const draw = setup.drawApproved ? setup.draw : null;
+
+    if (draw && draw.length > 0) {
+      rounds.push({
+        roundNumber: 1,
+        matches: draw.flatMap((p) => {
+          const gov = teams.find((t) => t.id === p.govTeamId);
+          const opp = teams.find((t) => t.id === p.oppTeamId);
+          if (!gov || !opp) return [];
+          const match = createMatch(gov, opp, p.roomNumber);
+          match.roomLabel = p.roomLabel;
+          match.judgeAssignment = {
+            chairJudgeId: p.chairJudgeId,
+            panelistJudgeIds: p.panelistJudgeIds,
+          };
+          const chair = judges.find((j) => j.id === p.chairJudgeId);
+          if (chair) match.chairName = chair.name;
+          match.judgeNames = p.panelistJudgeIds
+            .map((id) => judges.find((j) => j.id === id)?.name)
+            .filter((n): n is string => !!n);
+          return [match];
+        }),
+        completed: false,
+        judgesPerRoom: setup.settings.judgesPerRoom,
+        kind: "regular",
+      });
+    }
+
+    const tournament: Tournament = {
+      id: crypto.randomUUID(),
+      name: setup.name.trim(),
+      createdAt: Date.now(),
+      totalRounds: setup.totalRounds,
+      teams,
+      judges,
+      rounds,
+      currentRound: rounds.length,
+      started: rounds.length > 0,
+      finished: false,
+      description: setup.description?.trim() || undefined,
+      logoDataUrl: setup.logoDataUrl,
+      startDate: setup.startDate,
+      endDate: setup.endDate,
+      rooms: setup.rooms,
+      settings: setup.settings,
+      protection: setup.protection.enabled
+        ? {
+            enabled: true,
+            code: setup.protection.code,
+            protectView: false,
+            protectEdit: true,
+          }
+        : undefined,
+    };
+
+    dispatch({ type: "ADD_TOURNAMENT", tournament });
+    return tournament.id;
+  }, []);
+
   const setProtection = useCallback(
     (tournamentId: string, protection: TournamentProtection) => {
       dispatch({ type: "SET_PROTECTION", tournamentId, protection });
@@ -1529,6 +1596,7 @@ export function TournamentProvider({ children }: { children: ReactNode }) {
         updateTournamentInfo,
         setTournamentArchived,
         duplicateTournament,
+        createTournamentFromSetup,
         setMatchRoom,
         addDemoTournament,
         fillDummyData,

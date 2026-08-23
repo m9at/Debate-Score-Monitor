@@ -25,7 +25,6 @@ import { getTournamentStatus } from "@/lib/tournamentStatus";
 export default function Home() {
   const {
     tournaments,
-    addTournament,
     deleteTournament,
     duplicateTournament,
     setTournamentArchived,
@@ -33,13 +32,6 @@ export default function Home() {
   } = useTournament();
   const { groups, addGroup, deleteGroup } = useGroups();
   const [, setLocation] = useLocation();
-
-  // Create-tournament dialog
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [newName, setNewName] = useState("");
-  const [newRounds, setNewRounds] = useState("3");
-  const [enableSemifinal, setEnableSemifinal] = useState(false);
-  const [enableFinal, setEnableFinal] = useState(false);
 
   // Create-folder dialog
   const [groupDialogOpen, setGroupDialogOpen] = useState(false);
@@ -92,20 +84,6 @@ export default function Home() {
       .sort((a, b) => b.createdAt - a.createdAt);
   }, [ungrouped, filter, query]);
 
-  const handleCreate = () => {
-    if (!newName.trim()) return;
-    const id = addTournament(newName.trim(), parseInt(newRounds) || 3, {
-      semifinal: enableSemifinal,
-      final: enableFinal,
-    });
-    setNewName("");
-    setNewRounds("3");
-    setEnableSemifinal(false);
-    setEnableFinal(false);
-    setDialogOpen(false);
-    if (id) setLocation(`/tournament/${id}`);
-  };
-
   const startRename = (id: string, current: string) => {
     setRenameId(id);
     setRenameValue(current);
@@ -136,7 +114,7 @@ export default function Home() {
               <span className="hidden sm:inline">مجلد جديد</span>
             </button>
             <button
-              onClick={() => setDialogOpen(true)}
+              onClick={() => setLocation("/tournament/new")}
               className={`${BTN.base} ${BTN.primary} ${BTN_SIZE.md} shadow-lg`}
               style={BTN_PRIMARY_STYLE}
               data-testid="button-create-tournament"
@@ -224,7 +202,7 @@ export default function Home() {
               </p>
               {!query && filter === "all" && (
                 <button
-                  onClick={() => setDialogOpen(true)}
+                  onClick={() => setLocation("/tournament/new")}
                   className={`${BTN.base} ${BTN.primary} ${BTN_SIZE.lg} mt-3`}
                   style={BTN_PRIMARY_STYLE}
                   data-testid="button-create-first-tournament"
@@ -259,84 +237,6 @@ export default function Home() {
           )}
         </section>
       </main>
-
-      {/* Create tournament */}
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent dir="rtl">
-          <DialogHeader>
-            <DialogTitle>إنشاء بطولة جديدة</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 mt-2">
-            <div className="space-y-1.5">
-              <Label htmlFor="name">اسم البطولة</Label>
-              <Input
-                id="name"
-                value={newName}
-                onChange={(e) => setNewName(e.target.value)}
-                placeholder="مثال: بطولة المناظرات الأولى"
-                data-testid="input-tournament-name"
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="rounds">عدد الجولات</Label>
-              <Input
-                id="rounds"
-                type="number"
-                min="1"
-                value={newRounds}
-                onChange={(e) => setNewRounds(e.target.value)}
-                data-testid="input-tournament-rounds"
-              />
-            </div>
-            <div
-              className="border rounded-xl p-3 space-y-3"
-              style={{ borderColor: BRAND.border }}
-            >
-              <div className="font-bold text-sm">جولات الإقصاء (اختياري)</div>
-              <label className="flex items-center justify-between gap-3 cursor-pointer">
-                <div className="flex-1">
-                  <div className="text-sm font-semibold">تفعيل نصف النهائي</div>
-                  <div className="text-xs text-muted-foreground mt-0.5">
-                    أفضل 4 فرق: 1×4 و 2×3 بعد إكمال جميع الجولات.
-                  </div>
-                </div>
-                <input
-                  type="checkbox"
-                  checked={enableSemifinal}
-                  onChange={(e) => setEnableSemifinal(e.target.checked)}
-                  className="w-5 h-5"
-                  data-testid="toggle-semifinal"
-                />
-              </label>
-              <label className="flex items-center justify-between gap-3 cursor-pointer">
-                <div className="flex-1">
-                  <div className="text-sm font-semibold">تفعيل النهائي</div>
-                  <div className="text-xs text-muted-foreground mt-0.5">
-                    الفائزان من نصف النهائي، أو أفضل فريقين إن لم يُفعَّل نصف
-                    النهائي.
-                  </div>
-                </div>
-                <input
-                  type="checkbox"
-                  checked={enableFinal}
-                  onChange={(e) => setEnableFinal(e.target.checked)}
-                  className="w-5 h-5"
-                  data-testid="toggle-final"
-                />
-              </label>
-            </div>
-            <button
-              onClick={handleCreate}
-              disabled={!newName.trim()}
-              className={`${BTN.base} ${BTN.primary} ${BTN_SIZE.lg} w-full`}
-              style={BTN_PRIMARY_STYLE}
-              data-testid="button-submit-tournament"
-            >
-              إنشاء البطولة
-            </button>
-          </div>
-        </DialogContent>
-      </Dialog>
 
       {/* Create folder */}
       <Dialog open={groupDialogOpen} onOpenChange={setGroupDialogOpen}>

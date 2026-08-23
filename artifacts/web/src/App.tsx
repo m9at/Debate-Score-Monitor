@@ -10,6 +10,7 @@ import { GroupProvider } from "@/context/GroupContext";
 import Home from "@/pages/home";
 import GroupDetail from "@/pages/group-detail";
 import TournamentDetail from "@/pages/tournament-detail";
+import TournamentNewPage from "@/pages/tournament-new";
 import MatchScoring from "@/pages/match-scoring";
 import Leaderboard from "@/pages/leaderboard";
 import TeamHistory from "@/pages/team-history";
@@ -179,6 +180,7 @@ function Router() {
 
       <Route path="/" component={Home} />
       <Route path="/group/:id" component={GroupDetail} />
+      <Route path="/tournament/new" component={TournamentNewPage} />
       <Route path="/tournament/:id" component={TournamentDetail} />
       <Route
         path="/match/:tournamentId/:roundNumber/:matchId"
