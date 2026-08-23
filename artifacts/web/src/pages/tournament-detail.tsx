@@ -67,7 +67,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { BRAND, BTN, BTN_PRIMARY_STYLE } from "@/lib/brand";
+import { BRAND, BTN, BTN_PRIMARY_STYLE, BTN_SIZE, LAYOUT } from "@/lib/brand";
 import TournamentSidebar from "@/components/tournament/TournamentSidebar";
 import RoundBar from "@/components/tournament/RoundBar";
 import CaseCard from "@/components/tournament/CaseCard";
@@ -77,6 +77,11 @@ import ResultsAdmin from "@/components/tournament/ResultsAdmin";
 import RoundControlCenter from "@/components/tournament/RoundControlCenter";
 import AuditLog from "@/components/tournament/AuditLog";
 import PresentationMode from "@/components/tournament/PresentationMode";
+import ShareLinkDialog from "@/components/tournament/ShareLinkDialog";
+import AutoSaveIndicator from "@/components/tournament/AutoSaveIndicator";
+import TournamentSkeleton from "@/components/tournament/TournamentSkeleton";
+import RoleSwitcher from "@/components/tournament/RoleSwitcher";
+import { useRole } from "@/context/RoleContext";
 import AnnouncePickerDialog from "@/components/announce/AnnouncePickerDialog";
 import type { SidebarGroup } from "@/components/tournament/TournamentSidebar";
 import ProtectionSettingsDialog from "@/components/tournament/ProtectionSettingsDialog";
@@ -110,6 +115,7 @@ import {
   Flag,
   Megaphone,
   ShieldCheck,
+  Trophy,
   UserPlus,
   Activity,
   Building2,
@@ -972,12 +978,14 @@ export default function TournamentDetail() {
     setRoundLocked,
     logAction,
   } = useTournament();
+  const { tournaments } = useTournament();
   const tournament = getTournament(params?.id || "");
 
   const [activeTab, setActiveTab] = useState<TabType>("overview");
   const [announceOpen, setAnnounceOpen] = useState(false);
   const [presentMode, setPresentMode] = useState(false);
   const { toast } = useToast();
+  const { can } = useRole();
   // Selected round numbers for the standings tab. Empty set = all rounds.
   const [standingsRoundFilter, setStandingsRoundFilter] = useState<Set<number>>(
     () => new Set()
@@ -1201,6 +1209,17 @@ export default function TournamentDetail() {
       setActiveTab("overview");
     }
   }, [tournament?.started]);
+
+  // A role change can remove the current destination — fall back to the overview.
+  useEffect(() => {
+    const blocked =
+      (!can("viewScores") &&
+        ["resultsAdmin", "standings", "speakers"].includes(activeTab)) ||
+      (!can("viewAudit") && activeTab === "audit") ||
+      (!can("manageTeams") && activeTab === "teams") ||
+      (!can("manageJudges") && ["judges", "pending"].includes(activeTab));
+    if (blocked) setActiveTab("overview");
+  }, [activeTab, can]);
 
   // Compute the public-facing topic: prefer the active round's case text,
   // else fall back to the most recent non-empty caseText.
@@ -1441,9 +1460,36 @@ export default function TournamentDetail() {
   }, [allRoomsComplete, currentRoundNum, tournamentCurrentRound]);
 
   if (!tournament) {
+    // Still loading the shared store — show the dashboard's shape, not a blank page.
+    if (tournaments.length === 0) return <TournamentSkeleton />;
+
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <p className="text-muted-foreground">البطولة غير موجودة</p>
+      <div
+        className="min-h-screen flex flex-col items-center justify-center gap-3 px-6 text-center"
+        style={{ backgroundColor: BRAND.surface }}
+        data-testid="tournament-not-found"
+      >
+        <span
+          className="w-16 h-16 rounded-2xl flex items-center justify-center"
+          style={{ backgroundColor: `${BRAND.purple}12` }}
+        >
+          <Trophy className="w-7 h-7" style={{ color: BRAND.purple }} />
+        </span>
+        <p className="font-bold text-[16px]" style={{ color: BRAND.ink }}>
+          البطولة غير موجودة
+        </p>
+        <p className="text-[13px] max-w-sm" style={{ color: `${BRAND.ink}8c` }}>
+          قد يكون الرابط قديماً أو حُذفت البطولة. يمكنك العودة إلى قائمة البطولات.
+        </p>
+        <button
+          type="button"
+          onClick={() => setLocation("/")}
+          className={`${BTN.base} ${BTN.primary} ${BTN_SIZE.lg} mt-1`}
+          style={BTN_PRIMARY_STYLE}
+          data-testid="button-back-home"
+        >
+          العودة إلى البطولات
+        </button>
       </div>
     );
   }
@@ -1594,11 +1640,7 @@ export default function TournamentDetail() {
       };
       const sid = await createRoundSession(roundData);
       const url = buildSessionUrl("round", sid);
-      window.open(url, "_blank");
-      try {
-        navigator.clipboard.writeText(url);
-      } catch {}
-      window.prompt("رابط المحكمين - انسخه وشاركه:", url);
+      openShareDialog("رابط المحكمين", url);
     } catch {
       window.alert("حدث خطأ أثناء إنشاء رابط المحكمين");
     } finally {
@@ -2418,27 +2460,41 @@ export default function TournamentDetail() {
       title: "إدارة البطولة",
       tabs: [
         { key: "rounds", label: "الجولات", icon: Layers },
-        { key: "teams", label: "الفرق", icon: Users },
-        { key: "judges", label: "المحكمون", icon: UserCheck },
-        { key: "pending", label: "الطلبات", icon: Inbox, badge: pendingCount },
+        ...(can("manageTeams")
+          ? ([{ key: "teams", label: "الفرق", icon: Users }] as const)
+          : []),
+        ...(can("manageJudges")
+          ? ([
+              { key: "judges", label: "المحكمون", icon: UserCheck },
+              { key: "pending", label: "الطلبات", icon: Inbox, badge: pendingCount },
+            ] as const)
+          : []),
       ],
     },
     {
       title: "التحكيم",
       tabs: [{ key: "control", label: "مركز تحكم الجولة", icon: ListChecks }],
     },
-    {
-      title: "النتائج",
-      tabs: [
-        { key: "resultsAdmin", label: "إدارة النتائج", icon: ClipboardList, restricted: true },
-        { key: "standings", label: "الترتيب", icon: BarChart2, restricted: true },
-        { key: "speakers", label: "المتحدثين", icon: Mic, restricted: true },
-      ],
-    },
-    {
-      title: "النظام",
-      tabs: [{ key: "audit", label: "سجل العمليات", icon: History }],
-    },
+    ...(can("viewScores")
+      ? [
+          {
+            title: "النتائج",
+            tabs: [
+              { key: "resultsAdmin" as TabType, label: "إدارة النتائج", icon: ClipboardList, restricted: true },
+              { key: "standings" as TabType, label: "الترتيب", icon: BarChart2, restricted: true },
+              { key: "speakers" as TabType, label: "المتحدثين", icon: Mic, restricted: true },
+            ],
+          },
+        ]
+      : []),
+    ...(can("viewAudit")
+      ? [
+          {
+            title: "النظام",
+            tabs: [{ key: "audit" as TabType, label: "سجل العمليات", icon: History }],
+          },
+        ]
+      : []),
   ];
 
   if (presentMode) {
@@ -2476,7 +2532,7 @@ export default function TournamentDetail() {
       <div className="flex-1 flex flex-col min-w-0">
         {/* Page header */}
         <header className="px-4 md:px-6 pt-5 pb-3">
-          <div className="max-w-6xl mx-auto flex items-center gap-2.5">
+          <div className={`${LAYOUT.page} flex items-center gap-2.5 px-0 md:px-0`}>
             <div className="flex-1 min-w-0 text-right animate-in fade-in slide-in-from-top-2 duration-500">
               <h1
                 className="text-xl md:text-2xl font-bold truncate leading-tight"
@@ -2500,6 +2556,9 @@ export default function TournamentDetail() {
                   : ""}
                 {tournament.finished ? " · منتهية" : ""}
               </p>
+              <div className="mt-1.5 flex items-center gap-2 flex-wrap">
+                <AutoSaveIndicator />
+              </div>
             </div>
 
             <button
@@ -2535,6 +2594,8 @@ export default function TournamentDetail() {
               <span className="text-base leading-none">↻</span>
             </button>
 
+            <RoleSwitcher />
+
             <button
               onClick={() => setPresentMode(true)}
               className={`${BTN.base} ${BTN.secondary} h-11 px-4 shrink-0`}
@@ -2544,6 +2605,7 @@ export default function TournamentDetail() {
               وضع العرض 🎥
             </button>
 
+            {can("announceResults") && (
             <button
               onClick={() => setAnnounceOpen(true)}
               className={`${BTN.base} ${BTN.primary} h-11 px-5 shrink-0 shadow-lg`}
@@ -2553,6 +2615,7 @@ export default function TournamentDetail() {
               <Megaphone className="w-4 h-4" />
               إعلان النتائج
             </button>
+            )}
           </div>
         {/* Quick actions toolbar */}
         <div
@@ -2770,7 +2833,7 @@ export default function TournamentDetail() {
           </div>
         )}
       {/* Content */}
-      <div className="flex-1 max-w-6xl w-full mx-auto px-4 md:px-6 pb-28 pt-2">
+      <div className={`flex-1 ${LAYOUT.page} pb-28 pt-2`}>
         {activeTab === "overview" && (
           <OverviewDashboard
             tournament={tournament}
@@ -3944,43 +4007,20 @@ export default function TournamentDetail() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Share link dialog (admin/registration) */}
-      <Dialog open={shareDialogOpen} onOpenChange={setShareDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{shareTitle}</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-3 mt-2">
-            <p className="text-sm text-muted-foreground">
-              {shareTitle.includes("الإدارة")
-                ? "يمنح هذا الرابط من يفتحه نسخة كاملة من البطولة وصلاحية تحريرها على جهازه."
-                : "أرسل هذا الرابط للفرق ليقوموا بتعبئة بياناتهم وإرفاق المستندات. سيرسلون إليك رمزاً لاستيرادهم."}
-            </p>
-            <textarea
-              readOnly
-              value={shareUrl}
-              dir="ltr"
-              className="w-full p-3 rounded-xl bg-muted text-xs font-mono outline-none resize-none"
-              style={{ minHeight: 100, wordBreak: "break-all" }}
-              onClick={(e) => (e.target as HTMLTextAreaElement).select()}
-            />
-            <Button
-              onClick={() => {
-                try {
-                  navigator.clipboard.writeText(shareUrl);
-                  setShareCopied(true);
-                } catch {}
-              }}
-              className="w-full text-white"
-              style={{ backgroundColor: shareCopied ? SUCCESS : PURPLE }}
-              data-testid="button-copy-share"
-            >
-              <LinkIcon className="w-4 h-4 ml-2" />
-              {shareCopied ? "تم النسخ" : "نسخ الرابط"}
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+      {/* Share link dialog — link + QR + labelled actions */}
+      <ShareLinkDialog
+        open={shareDialogOpen}
+        onOpenChange={setShareDialogOpen}
+        title={shareTitle}
+        url={shareUrl}
+        description={
+          shareTitle.includes("الإدارة")
+            ? "يمنح هذا الرابط من يفتحه نسخة كاملة من البطولة وصلاحية تحريرها على جهازه."
+            : shareTitle.includes("المحكمين")
+              ? "أرسل هذا الرابط للمحكمين لإدخال نتائج قاعاتهم، أو اعرض رمز QR ليمسحوه من هواتفهم."
+              : "أرسل هذا الرابط للفرق ليقوموا بتعبئة بياناتهم وإرفاق المستندات."
+        }
+      />
 
       {/* Import team registration code */}
       <Dialog open={importTeamOpen} onOpenChange={setImportTeamOpen}>

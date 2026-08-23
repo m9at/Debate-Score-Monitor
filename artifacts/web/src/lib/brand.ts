@@ -53,6 +53,21 @@ export const BTN_SIZE = {
 } as const;
 
 /**
+ * Shared spacing / layout rhythm, so every screen breathes the same way:
+ * one page container, one gap between sections, one card padding.
+ */
+export const LAYOUT = {
+  /** Page content container — same max width and gutters everywhere. */
+  page: "w-full max-w-6xl mx-auto px-4 md:px-6",
+  /** Vertical gap between major sections of a page. */
+  stack: "space-y-5",
+  /** Standard card padding. */
+  card: "p-4 md:p-5",
+  /** Grid gap for card grids. */
+  grid: "gap-3.5",
+} as const;
+
+/**
  * Tournament lifecycle states, used for the badges and filters on the
  * tournaments home screen.
  */

@@ -5,6 +5,7 @@ import type { ReactNode, ComponentType } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { TournamentProvider } from "@/context/TournamentContext";
+import { RoleProvider } from "@/context/RoleContext";
 import { ThemeProvider } from "@/context/ThemeContext";
 import { GroupProvider } from "@/context/GroupContext";
 import Home from "@/pages/home";
@@ -237,6 +238,7 @@ function App() {
   return (
     <ThemeProvider>
       <TournamentProvider>
+        <RoleProvider>
         <GroupProvider>
           <TooltipProvider>
             <WouterRouter base={basePath}>
@@ -245,6 +247,7 @@ function App() {
             <Toaster />
           </TooltipProvider>
         </GroupProvider>
+        </RoleProvider>
       </TournamentProvider>
     </ThemeProvider>
   );

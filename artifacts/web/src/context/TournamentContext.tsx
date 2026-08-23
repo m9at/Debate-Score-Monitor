@@ -1,4 +1,4 @@
-import { createContext, useContext, useReducer, useEffect, useCallback, useRef, type ReactNode } from "react";
+import { createContext, useContext, useReducer, useEffect, useCallback, useRef, useState, type ReactNode } from "react";
 import type {
   Tournament,
   Team,
@@ -831,7 +831,14 @@ interface TournamentContextType {
     detail?: string,
     actor?: string
   ) => void;
+  /** Live state of the automatic save/sync, for the UI indicator. */
+  saveState: SaveState;
+  /** Timestamp of the last successful save, if any. */
+  lastSavedAt: number | null;
 }
+
+/** What the autosave indicator should show. */
+export type SaveState = "idle" | "saving" | "saved" | "error";
 
 const DEMO_TEAM_NAMES = [
   "نزوى", "مسقط", "صلالة", "صحار", "البريمي", "الرستاق",
@@ -1023,6 +1030,9 @@ export function TournamentProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
+  const [saveState, setSaveState] = useState<SaveState>("idle");
+  const [lastSavedAt, setLastSavedAt] = useState<number | null>(null);
+
   // Local cache mirror (offline fallback).
   useEffect(() => {
     if (state.tournaments.length > 0 || localStorage.getItem(STORAGE_KEY)) {
@@ -1044,10 +1054,12 @@ export function TournamentProvider({ children }: { children: ReactNode }) {
       }
     }
     if (queued) {
+      setSaveState("saving");
       if (pushTimerRef.current) clearTimeout(pushTimerRef.current);
       pushTimerRef.current = setTimeout(async () => {
         const ids = Array.from(dirtyIdsRef.current);
         dirtyIdsRef.current.clear();
+        let failed = false;
         for (const id of ids) {
           const t = state.tournaments.find((x) => x.id === id);
           if (!t) continue;
@@ -1055,7 +1067,14 @@ export function TournamentProvider({ children }: { children: ReactNode }) {
             await pushShared(t);
           } catch {
             dirtyIdsRef.current.add(id);
+            failed = true;
           }
+        }
+        if (failed) {
+          setSaveState("error");
+        } else {
+          setLastSavedAt(Date.now());
+          setSaveState("saved");
         }
       }, SYNC_DEBOUNCE_MS);
     }
@@ -1707,6 +1726,8 @@ export function TournamentProvider({ children }: { children: ReactNode }) {
         markResultAnnounced,
         setRoundLocked,
         logAction,
+        saveState,
+        lastSavedAt,
         setMatchRoom,
         addDemoTournament,
         fillDummyData,
