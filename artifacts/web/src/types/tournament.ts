@@ -32,6 +32,8 @@ export interface Match {
   judgeNotes: string;
   completed: boolean;
   judgeAssignment?: MatchJudgeAssignment;
+  /** Set once the result has been shown on the public announcement screen. */
+  resultAnnounced?: boolean;
 }
 
 export interface Round {
@@ -41,6 +43,17 @@ export interface Round {
   caseText?: string;
   judgesPerRoom?: number;
   kind?: "regular" | "semifinal" | "final";
+  /** Locked rounds cannot have their results edited until reopened. */
+  locked?: boolean;
+}
+
+/** One recorded administrative action, for the tournament's audit trail. */
+export interface AuditEntry {
+  id: string;
+  at: number;
+  actor: string;
+  action: string;
+  detail?: string;
 }
 
 export interface TeamDocument {
@@ -71,6 +84,8 @@ export interface Judge {
   canChair: boolean;
   conflictTeamIds: string[];
   registeredAt?: number;
+  /** Temporarily unavailable — kept in the list but skipped by the draw. */
+  disabled?: boolean;
 }
 
 export interface PendingJudgeRegistration {
@@ -113,6 +128,27 @@ export interface PendingMatchResult {
   submittedAt: number;
 }
 
+/** A physical debate room. The number is stable; only the label is editable. */
+export interface Room {
+  id: string;
+  number: number;
+  label: string;
+}
+
+/** Format rules chosen while creating the tournament. */
+export interface TournamentSettings {
+  /** Reply speeches enabled — only speaker 1 or 2 may deliver one. */
+  replySpeech: boolean;
+  /** Government / opposition sides (always true for BP-style debates). */
+  sides: boolean;
+  scoreMin: number;
+  scoreMax: number;
+  judgesPerRoom: number;
+  rules?: string;
+  /** Show team scores on the public announcement screen. */
+  showScoresOnAnnounce: boolean;
+}
+
 export interface Tournament {
   id: string;
   name: string;
@@ -120,7 +156,14 @@ export interface Tournament {
   totalRounds: number;
   teams: Team[];
   rounds: Round[];
+  /** The round the tournament is actually working on right now. */
   currentRound: number;
+  /**
+   * The round the audience screen shows. Chosen by the organiser and kept
+   * separate from `currentRound`, so browsing the admin panel or advancing the
+   * tournament never changes what the projector displays.
+   */
+  presentedRound?: number;
   started: boolean;
   finished: boolean;
   judges?: Judge[];
@@ -129,12 +172,42 @@ export interface Tournament {
   pendingResults?: PendingMatchResult[];
   semifinalEnabled?: boolean;
   finalEnabled?: boolean;
+  /** Access-code protection for viewing and editing this tournament. */
+  protection?: TournamentProtection;
+  /** Hidden from the main list until restored. */
+  archived?: boolean;
+  /** Motion entered at creation, applied to the first round once it exists. */
+  openingCaseText?: string;
+  /** Optional schedule — drives the "قادمة / جارية" status. */
+  startDate?: number;
+  endDate?: number;
+  description?: string;
+  /** Optional tournament logo (data URL), shown next to the brand logo. */
+  logoDataUrl?: string;
+  /** Rooms defined during setup. */
+  rooms?: Room[];
+  /** Format settings defined during setup. */
+  settings?: TournamentSettings;
+  /** Trail of important administrative actions. */
+  auditLog?: AuditEntry[];
+}
+
+export interface TournamentProtection {
+  enabled: boolean;
+  /** 4 or 6 digits. */
+  code: string;
+  /** Ask for the code before the tournament can be viewed at all. */
+  protectView: boolean;
+  /** Ask for the code before rounds, scores and settings can be changed. */
+  protectEdit: boolean;
 }
 
 export interface TournamentGroup {
   id: string;
   name: string;
   description?: string;
+  /** "archive" folders hold tournaments taken out of the active list. */
+  kind?: "normal" | "archive";
   createdAt: number;
   tournamentIds: string[];
 }

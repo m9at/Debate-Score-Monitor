@@ -1,4 +1,4 @@
-import { createContext, useContext, useReducer, useEffect, useCallback, useRef, type ReactNode } from "react";
+import { createContext, useContext, useReducer, useEffect, useCallback, useRef, useState, type ReactNode } from "react";
 import type {
   Tournament,
   Team,
@@ -11,7 +11,10 @@ import type {
   PendingJudgeRegistration,
   PendingMatchResult,
   MatchJudgeAssignment,
+  TournamentProtection,
+  AuditEntry,
 } from "@/types/tournament";
+import type { TournamentSetup } from "@/lib/wizard/types";
 import {
   fetchAllShared,
   pushShared,
@@ -42,6 +45,8 @@ type Action =
   | { type: "SET_ELIMINATION_MODE"; tournamentId: string; semifinal: boolean; final: boolean }
   | { type: "SUBMIT_MATCH"; tournamentId: string; roundNumber: number; match: Match }
   | { type: "SET_ROUND_CASE"; tournamentId: string; roundNumber: number; caseText: string }
+  | { type: "SET_CURRENT_ROUND"; tournamentId: string; roundNumber: number }
+  | { type: "SET_PRESENTED_ROUND"; tournamentId: string; roundNumber: number }
   | { type: "SET_MATCH_ROOM"; tournamentId: string; roundNumber: number; matchId: string; roomNumber?: number; roomLabel?: string }
   | { type: "ADD_JUDGE"; tournamentId: string; judge: Judge }
   | { type: "UPDATE_JUDGE"; tournamentId: string; judge: Judge }
@@ -56,7 +61,8 @@ type Action =
   | { type: "SET_MATCH_JUDGES"; tournamentId: string; roundNumber: number; matchId: string; assignment: MatchJudgeAssignment }
   | { type: "FINISH_TOURNAMENT"; tournamentId: string }
   | { type: "REOPEN_TOURNAMENT"; tournamentId: string }
-  | { type: "DELETE_ROUND"; tournamentId: string; roundNumber: number };
+  | { type: "DELETE_ROUND"; tournamentId: string; roundNumber: number }
+  | { type: "SET_PROTECTION"; tournamentId: string; protection: TournamentProtection };
 
 function reducer(state: TournamentState, action: Action): TournamentState {
   switch (action.type) {
@@ -152,7 +158,11 @@ function reducer(state: TournamentState, action: Action): TournamentState {
       return {
         tournaments: state.tournaments.map((t) => {
           if (t.id !== action.tournamentId) return t;
-          return { ...t, started: true, currentRound: 1 };
+          return {
+            ...t,
+            started: true,
+            currentRound: t.rounds[0]?.roundNumber ?? 1,
+          };
         }),
       };
     }
@@ -162,12 +172,30 @@ function reducer(state: TournamentState, action: Action): TournamentState {
           if (t.id !== action.tournamentId) return t;
           const round = generateRound(t);
           if (!round) return t;
-          const newTotal = Math.max(t.totalRounds, t.rounds.length + 1);
+          // The motion entered while creating the tournament belongs to its
+          // first round, which may only exist now.
+          if (t.rounds.length === 0 && !round.caseText && t.openingCaseText) {
+            round.caseText = t.openingCaseText;
+          }
+          // Rounds are created empty at setup time, so a draw fills the first
+          // empty slot instead of being appended after it.
+          const slot = t.rounds
+            .filter((r) => r.matches.length === 0)
+            .sort((a, b) => a.roundNumber - b.roundNumber)[0];
+          if (slot) {
+            round.roundNumber = slot.roundNumber;
+            round.caseText = slot.caseText ?? round.caseText;
+            round.judgesPerRoom = slot.judgesPerRoom ?? round.judgesPerRoom;
+            round.kind = slot.kind ?? round.kind;
+          }
+          const rounds = slot
+            ? t.rounds.map((r) => (r.roundNumber === slot.roundNumber ? round : r))
+            : [...t.rounds, round];
           return {
             ...t,
-            rounds: [...t.rounds, round],
-            totalRounds: newTotal,
-            currentRound: t.rounds.length + 1,
+            rounds,
+            totalRounds: Math.max(t.totalRounds, round.roundNumber),
+            currentRound: round.roundNumber,
             finished: false,
           };
         }),
@@ -218,6 +246,13 @@ function reducer(state: TournamentState, action: Action): TournamentState {
         }),
       };
     }
+    case "SET_PROTECTION": {
+      return {
+        tournaments: state.tournaments.map((t) =>
+          t.id === action.tournamentId ? { ...t, protection: action.protection } : t
+        ),
+      };
+    }
     case "SET_ROUND_CASE": {
       return {
         tournaments: state.tournaments.map((t) => {
@@ -230,6 +265,25 @@ function reducer(state: TournamentState, action: Action): TournamentState {
                 : r
             ),
           };
+        }),
+      };
+    }
+    case "SET_CURRENT_ROUND": {
+      // Only the round the tournament works on — never what the audience sees.
+      return {
+        tournaments: state.tournaments.map((t) => {
+          if (t.id !== action.tournamentId) return t;
+          if (!t.rounds.some((r) => r.roundNumber === action.roundNumber)) return t;
+          return { ...t, currentRound: action.roundNumber, started: true };
+        }),
+      };
+    }
+    case "SET_PRESENTED_ROUND": {
+      return {
+        tournaments: state.tournaments.map((t) => {
+          if (t.id !== action.tournamentId) return t;
+          if (!t.rounds.some((r) => r.roundNumber === action.roundNumber)) return t;
+          return { ...t, presentedRound: action.roundNumber };
         }),
       };
     }
@@ -566,7 +620,9 @@ function pairBucket(
 }
 
 function generateRound(tournament: Tournament): Round | null {
-  const roundNumber = tournament.rounds.length + 1;
+  const isFirstRound = tournament.rounds.length === 0;
+  const roundNumber =
+    tournament.rounds.reduce((max, r) => Math.max(max, r.roundNumber), 0) + 1;
 
   const pastPairings = new Set<string>();
   const govCount = new Map<string, number>();
@@ -585,7 +641,7 @@ function generateRound(tournament: Tournament): Round | null {
   if (teams.length < 2) return null;
 
   let pairList: [Team, Team][] = [];
-  if (roundNumber === 1) {
+  if (isFirstRound) {
     for (let i = teams.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
       [teams[i], teams[j]] = [teams[j], teams[i]];
@@ -762,6 +818,11 @@ interface TournamentContextType {
   setEliminationMode: (tournamentId: string, semifinal: boolean, final: boolean) => void;
   submitMatch: (tournamentId: string, roundNumber: number, match: Match) => void;
   setRoundCase: (tournamentId: string, roundNumber: number, caseText: string) => void;
+  /** Makes a round the one the tournament works on (organiser decision). */
+  setCurrentRound: (tournamentId: string, roundNumber: number) => void;
+  /** Chooses the round the audience screen shows. */
+  setPresentedRound: (tournamentId: string, roundNumber: number) => void;
+  setProtection: (tournamentId: string, protection: TournamentProtection) => void;
   setMatchRoom: (
     tournamentId: string,
     roundNumber: number,
@@ -787,7 +848,46 @@ interface TournamentContextType {
   finishTournament: (tournamentId: string) => void;
   reopenTournament: (tournamentId: string) => void;
   deleteRound: (tournamentId: string, roundNumber: number) => void;
+  updateTournamentInfo: (
+    tournamentId: string,
+    patch: Partial<
+      Pick<Tournament, "name" | "description" | "startDate" | "endDate" | "totalRounds">
+    >
+  ) => void;
+  setTournamentArchived: (tournamentId: string, archived: boolean) => void;
+  /** Deep-copies a tournament under a new id and name. Returns the new id. */
+  duplicateTournament: (tournamentId: string) => string | undefined;
+  /** Creates a fully configured tournament from the setup wizard. Returns its id. */
+  createTournamentFromSetup: (setup: TournamentSetup) => string;
+  /** Flags a room's result as publicly announced (idempotent). */
+  markResultAnnounced: (
+    tournamentId: string,
+    roundNumber: number,
+    matchId: string,
+    actor?: string
+  ) => void;
+  /** Locks or reopens a round for result editing. */
+  setRoundLocked: (
+    tournamentId: string,
+    roundNumber: number,
+    locked: boolean,
+    actor?: string
+  ) => void;
+  /** Appends an entry to the tournament's audit trail. */
+  logAction: (
+    tournamentId: string,
+    action: string,
+    detail?: string,
+    actor?: string
+  ) => void;
+  /** Live state of the automatic save/sync, for the UI indicator. */
+  saveState: SaveState;
+  /** Timestamp of the last successful save, if any. */
+  lastSavedAt: number | null;
 }
+
+/** What the autosave indicator should show. */
+export type SaveState = "idle" | "saving" | "saved" | "error";
 
 const DEMO_TEAM_NAMES = [
   "نزوى", "مسقط", "صلالة", "صحار", "البريمي", "الرستاق",
@@ -930,6 +1030,9 @@ const TournamentContext = createContext<TournamentContextType | null>(null);
 
 export function TournamentProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(reducer, { tournaments: [] });
+  /** Always-current state, so stable callbacks can read it without deps. */
+  const stateRef = useRef(state);
+  stateRef.current = state;
 
   // Tracks tournaments that have local edits not yet pushed to the server.
   const dirtyIdsRef = useRef<Set<string>>(new Set());
@@ -976,6 +1079,9 @@ export function TournamentProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
+  const [saveState, setSaveState] = useState<SaveState>("idle");
+  const [lastSavedAt, setLastSavedAt] = useState<number | null>(null);
+
   // Local cache mirror (offline fallback).
   useEffect(() => {
     if (state.tournaments.length > 0 || localStorage.getItem(STORAGE_KEY)) {
@@ -997,10 +1103,12 @@ export function TournamentProvider({ children }: { children: ReactNode }) {
       }
     }
     if (queued) {
+      setSaveState("saving");
       if (pushTimerRef.current) clearTimeout(pushTimerRef.current);
       pushTimerRef.current = setTimeout(async () => {
         const ids = Array.from(dirtyIdsRef.current);
         dirtyIdsRef.current.clear();
+        let failed = false;
         for (const id of ids) {
           const t = state.tournaments.find((x) => x.id === id);
           if (!t) continue;
@@ -1008,7 +1116,14 @@ export function TournamentProvider({ children }: { children: ReactNode }) {
             await pushShared(t);
           } catch {
             dirtyIdsRef.current.add(id);
+            failed = true;
           }
+        }
+        if (failed) {
+          setSaveState("error");
+        } else {
+          setLastSavedAt(Date.now());
+          setSaveState("saved");
         }
       }, SYNC_DEBOUNCE_MS);
     }
@@ -1167,9 +1282,156 @@ export function TournamentProvider({ children }: { children: ReactNode }) {
     []
   );
 
+  const updateTournamentInfo = useCallback(
+    (
+      tournamentId: string,
+      patch: Partial<
+        Pick<Tournament, "name" | "description" | "startDate" | "endDate" | "totalRounds">
+      >
+    ) => {
+      const t = stateRef.current.tournaments.find((x) => x.id === tournamentId);
+      if (!t) return;
+      dispatch({ type: "UPDATE_TOURNAMENT", tournament: { ...t, ...patch } });
+    },
+    []
+  );
+
+  const setTournamentArchived = useCallback(
+    (tournamentId: string, archived: boolean) => {
+      const t = stateRef.current.tournaments.find((x) => x.id === tournamentId);
+      if (!t) return;
+      dispatch({ type: "UPDATE_TOURNAMENT", tournament: { ...t, archived } });
+    },
+    []
+  );
+
+  const duplicateTournament = useCallback((tournamentId: string) => {
+    const t = stateRef.current.tournaments.find((x) => x.id === tournamentId);
+    if (!t) return undefined;
+    const copy: Tournament = {
+      ...structuredClone(t),
+      id: crypto.randomUUID(),
+      name: `${t.name} (نسخة)`,
+      createdAt: Date.now(),
+      archived: false,
+    };
+    dispatch({ type: "ADD_TOURNAMENT", tournament: copy });
+    return copy.id;
+  }, []);
+
+  const createTournamentFromSetup = useCallback((setup: TournamentSetup) => {
+    const teams = setup.teams.filter((t) => t.name.trim());
+    const judges = setup.judges.filter((j) => j.name.trim());
+
+    const rounds: Round[] = [];
+    const draw = setup.drawApproved ? setup.draw : null;
+
+    // The organiser may start the tournament from a later round.
+    const startRound = Math.min(
+      Math.max(1, setup.startRound || 1),
+      setup.totalRounds,
+    );
+
+    if (draw && draw.length > 0) {
+      rounds.push({
+        roundNumber: startRound,
+        matches: draw.flatMap((p) => {
+          const gov = teams.find((t) => t.id === p.govTeamId);
+          const opp = teams.find((t) => t.id === p.oppTeamId);
+          if (!gov || !opp) return [];
+          const match = createMatch(gov, opp, p.roomNumber);
+          match.roomLabel = p.roomLabel;
+          match.judgeAssignment = {
+            chairJudgeId: p.chairJudgeId,
+            panelistJudgeIds: p.panelistJudgeIds,
+          };
+          const chair = judges.find((j) => j.id === p.chairJudgeId);
+          if (chair) match.chairName = chair.name;
+          match.judgeNames = p.panelistJudgeIds
+            .map((id) => judges.find((j) => j.id === id)?.name)
+            .filter((n): n is string => !!n);
+          return [match];
+        }),
+        completed: false,
+        judgesPerRoom: setup.settings.judgesPerRoom,
+        kind: "regular",
+        caseText: setup.caseText?.trim() || undefined,
+      });
+    }
+
+    // The whole round structure exists from the start: the drawn round plus an
+    // empty round per remaining one, each ready to hold its own motion.
+    for (let n = startRound; n <= setup.totalRounds; n++) {
+      if (rounds.some((r) => r.roundNumber === n)) continue;
+      rounds.push({
+        roundNumber: n,
+        matches: [],
+        completed: false,
+        judgesPerRoom: setup.settings.judgesPerRoom,
+        kind: "regular",
+        caseText: n === startRound ? setup.caseText?.trim() || undefined : undefined,
+      });
+    }
+    rounds.sort((a, b) => a.roundNumber - b.roundNumber);
+
+    const tournament: Tournament = {
+      // Keep the draft id so links shared during the wizard stay valid.
+      id: setup.draftId || crypto.randomUUID(),
+      name: setup.name.trim(),
+      createdAt: Date.now(),
+      totalRounds: setup.totalRounds,
+      teams,
+      judges,
+      rounds,
+      currentRound: startRound,
+      presentedRound: startRound,
+      started: rounds.some((r) => r.matches.length > 0),
+      finished: false,
+      description: setup.description?.trim() || undefined,
+      logoDataUrl: setup.logoDataUrl,
+      startDate: setup.startDate,
+      endDate: setup.endDate,
+      rooms: setup.rooms,
+      settings: setup.settings,
+      openingCaseText: setup.caseText?.trim() || undefined,
+      protection: setup.protection.enabled
+        ? {
+            enabled: true,
+            code: setup.protection.code,
+            protectView: false,
+            protectEdit: true,
+          }
+        : undefined,
+    };
+
+    dispatch({ type: "ADD_TOURNAMENT", tournament });
+    return tournament.id;
+  }, []);
+
+  const setProtection = useCallback(
+    (tournamentId: string, protection: TournamentProtection) => {
+      dispatch({ type: "SET_PROTECTION", tournamentId, protection });
+    },
+    []
+  );
+
   const setRoundCase = useCallback(
     (tournamentId: string, roundNumber: number, caseText: string) => {
       dispatch({ type: "SET_ROUND_CASE", tournamentId, roundNumber, caseText });
+    },
+    []
+  );
+
+  const setCurrentRound = useCallback(
+    (tournamentId: string, roundNumber: number) => {
+      dispatch({ type: "SET_CURRENT_ROUND", tournamentId, roundNumber });
+    },
+    []
+  );
+
+  const setPresentedRound = useCallback(
+    (tournamentId: string, roundNumber: number) => {
+      dispatch({ type: "SET_PRESENTED_ROUND", tournamentId, roundNumber });
     },
     []
   );
@@ -1442,6 +1704,91 @@ export function TournamentProvider({ children }: { children: ReactNode }) {
     []
   );
 
+  /** Appends an audit entry, keeping the most recent 300. */
+  const logAction = useCallback(
+    (tournamentId: string, action: string, detail?: string, actor = "مدير البطولة") => {
+      const t = stateRef.current.tournaments.find((x) => x.id === tournamentId);
+      if (!t) return;
+      const entry: AuditEntry = {
+        id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        at: Date.now(),
+        actor,
+        action,
+        detail,
+      };
+      dispatch({
+        type: "UPDATE_TOURNAMENT",
+        tournament: { ...t, auditLog: [entry, ...(t.auditLog ?? [])].slice(0, 300) },
+      });
+    },
+    []
+  );
+
+  const markResultAnnounced = useCallback(
+    (tournamentId: string, roundNumber: number, matchId: string, actor = "مدير البطولة") => {
+      const t = stateRef.current.tournaments.find((x) => x.id === tournamentId);
+      if (!t) return;
+      const round = t.rounds.find((r) => r.roundNumber === roundNumber);
+      const match = round?.matches.find((m) => m.id === matchId);
+      // Idempotent: announcing twice must not duplicate work or log entries.
+      if (!match || match.resultAnnounced) return;
+
+      const entry: AuditEntry = {
+        id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        at: Date.now(),
+        actor,
+        action: "إعلان نتيجة",
+        detail: `الجولة ${roundNumber} — ${
+          match.roomLabel?.trim() || `القاعة ${match.roomNumber}`
+        }`,
+      };
+
+      dispatch({
+        type: "UPDATE_TOURNAMENT",
+        tournament: {
+          ...t,
+          rounds: t.rounds.map((r) =>
+            r.roundNumber === roundNumber
+              ? {
+                  ...r,
+                  matches: r.matches.map((m) =>
+                    m.id === matchId ? { ...m, resultAnnounced: true } : m
+                  ),
+                }
+              : r
+          ),
+          auditLog: [entry, ...(t.auditLog ?? [])].slice(0, 300),
+        },
+      });
+    },
+    []
+  );
+
+  const setRoundLocked = useCallback(
+    (tournamentId: string, roundNumber: number, locked: boolean, actor = "مدير البطولة") => {
+      const t = stateRef.current.tournaments.find((x) => x.id === tournamentId);
+      if (!t) return;
+      const entry: AuditEntry = {
+        id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        at: Date.now(),
+        actor,
+        action: locked ? "إغلاق الجولة" : "فتح الجولة للتعديل",
+        detail: `الجولة ${roundNumber}`,
+      };
+      dispatch({
+        type: "UPDATE_TOURNAMENT",
+        tournament: {
+          ...t,
+          rounds: t.rounds.map((r) =>
+            r.roundNumber === roundNumber ? { ...r, locked } : r
+          ),
+          auditLog: [entry, ...(t.auditLog ?? [])].slice(0, 300),
+        },
+      });
+    },
+    []
+  );
+
   return (
     <TournamentContext.Provider
       value={{
@@ -1459,6 +1806,18 @@ export function TournamentProvider({ children }: { children: ReactNode }) {
         setEliminationMode,
         submitMatch,
         setRoundCase,
+        setCurrentRound,
+        setPresentedRound,
+        setProtection,
+        updateTournamentInfo,
+        setTournamentArchived,
+        duplicateTournament,
+        createTournamentFromSetup,
+        markResultAnnounced,
+        setRoundLocked,
+        logAction,
+        saveState,
+        lastSavedAt,
         setMatchRoom,
         addDemoTournament,
         fillDummyData,

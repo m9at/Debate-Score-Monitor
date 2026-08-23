@@ -4,8 +4,8 @@ import { useTournament } from "@/context/TournamentContext";
 import { ArrowRight, Award, Mic } from "lucide-react";
 import { motion } from "framer-motion";
 
-const CYAN = "#4ECDC4";
-const PURPLE = "#7B5EA7";
+const CYAN = "#29ABE2";
+const PURPLE = "#7B2D8E";
 
 interface SpeakerEntry {
   name: string;

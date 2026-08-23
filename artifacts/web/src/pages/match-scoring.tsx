@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { useRoute, useLocation } from "wouter";
 import { useTournament } from "@/context/TournamentContext";
+import { useRole } from "@/context/RoleContext";
 import { Button } from "@/components/ui/button";
 import {
   AlertDialog,
@@ -40,8 +41,8 @@ import {
   REPLY_RANGE_MESSAGE,
 } from "@/lib/scoreValidation";
 
-const CYAN = "#4ECDC4";
-const PURPLE = "#7B5EA7";
+const CYAN = "#29ABE2";
+const PURPLE = "#7B2D8E";
 
 interface TeamSectionProps {
   side: "gov" | "opp";
@@ -290,6 +291,7 @@ export default function MatchScoring() {
   const [, params] = useRoute("/match/:tournamentId/:roundNumber/:matchId");
   const [, setLocation] = useLocation();
   const { getTournament, submitMatch } = useTournament();
+  const { can } = useRole();
 
   const tournament = getTournament(params?.tournamentId || "");
   const roundNumber = parseInt(params?.roundNumber || "0");
@@ -376,6 +378,19 @@ export default function MatchScoring() {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <p className="text-muted-foreground">المباراة غير موجودة</p>
+      </div>
+    );
+  }
+
+  // Roles without result-entry rights must not reach the scoring sheet.
+  if (!can("editResults")) {
+    return (
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center gap-3 px-6 text-center">
+        <p className="font-bold text-[16px]">لا تملك صلاحية إدخال النتائج</p>
+        <p className="text-sm text-muted-foreground max-w-sm">
+          هذه الشاشة متاحة لمدير البطولة ومشرف القاعة والمحكم فقط. يمكنك تغيير
+          الدور من أعلى صفحة البطولة.
+        </p>
       </div>
     );
   }

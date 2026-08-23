@@ -64,16 +64,34 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
   DropdownMenuSeparator,
-  DropdownMenuSub,
-  DropdownMenuSubContent,
-  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { useTheme } from "@/context/ThemeContext";
+import { BRAND, BTN, BTN_PRIMARY_STYLE, BTN_SIZE, LAYOUT } from "@/lib/brand";
+import TournamentSidebar from "@/components/tournament/TournamentSidebar";
+import RoundBar from "@/components/tournament/RoundBar";
+import CaseCard from "@/components/tournament/CaseCard";
+import RoomCard from "@/components/tournament/RoomCard";
+import { getRoomStatus } from "@/lib/roomStatus";
+import RegistrationLinksCard from "@/components/tournament/RegistrationLinksCard";
+import OverviewDashboard from "@/components/tournament/OverviewDashboard";
+import ResultsAdmin from "@/components/tournament/ResultsAdmin";
+import RoundControlCenter from "@/components/tournament/RoundControlCenter";
+import AuditLog from "@/components/tournament/AuditLog";
+import PresentationMode from "@/components/tournament/PresentationMode";
+import RegistrationLinksCenter from "@/components/tournament/RegistrationLinksCenter";
+import RoundsManager from "@/components/tournament/RoundsManager";
+import ReportsPanel from "@/components/tournament/ReportsPanel";
+import SettingsPanel from "@/components/tournament/SettingsPanel";
+import ShareLinkDialog from "@/components/tournament/ShareLinkDialog";
+import AutoSaveIndicator from "@/components/tournament/AutoSaveIndicator";
+import TournamentSkeleton from "@/components/tournament/TournamentSkeleton";
+import RoleSwitcher from "@/components/tournament/RoleSwitcher";
+import { useRole } from "@/context/RoleContext";
+import AnnouncePickerDialog from "@/components/announce/AnnouncePickerDialog";
+import type { SidebarGroup } from "@/components/tournament/TournamentSidebar";
+import ProtectionSettingsDialog from "@/components/tournament/ProtectionSettingsDialog";
+import UnlockGate from "@/components/tournament/UnlockGate";
 import {
   Home,
   Plus,
@@ -87,6 +105,7 @@ import {
   ChevronRight,
   Link as LinkIcon,
   FileText,
+  Settings,
   FileSpreadsheet,
   SkipForward,
   Award,
@@ -101,24 +120,27 @@ import {
   X,
   Pencil,
   Flag,
-  Sun,
-  Moon,
-  Monitor,
   Megaphone,
-  Palette,
   ShieldCheck,
+  Trophy,
   UserPlus,
   Activity,
   Building2,
   FileBox,
   Download,
+  Projector,
   Eye,
+  ListChecks,
+  ClipboardList,
+  History,
   EyeOff,
   MoreHorizontal,
   GitCompare,
   Check,
+  LayoutDashboard,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useToast } from "@/hooks/use-toast";
 import type * as XLSXType from "@/lib/excel-export";
 import type {
   Tournament,
@@ -132,11 +154,24 @@ import type {
   PendingMatchResult,
 } from "@/types/tournament";
 
-const CYAN = "#4ECDC4";
-const PURPLE = "#7B5EA7";
+const CYAN = "#29ABE2";
+const PURPLE = "#7B2D8E";
 const SUCCESS = "#34C759";
 
-type TabType = "teams" | "rounds" | "standings" | "speakers" | "judges" | "pending";
+type TabType =
+  | "overview"
+  | "teams"
+  | "rounds"
+  | "standings"
+  | "speakers"
+  | "judges"
+  | "pending"
+  | "control"
+  | "resultsAdmin"
+  | "links"
+  | "reports"
+  | "settings"
+  | "audit";
 
 const GOLD = "#FFC107";
 
@@ -197,14 +232,14 @@ function buildPdfHtml(tournament: Tournament): string {
       return `
     <tr style="${i % 2 === 0 ? "background:#F8F8FF" : ""}">
       <td style="padding:10px 14px;text-align:center;font-weight:700;color:${
-        i === 0 ? "#7B5EA7" : i === 1 ? "#4ECDC4" : "#666"
+        i === 0 ? "#7B2D8E" : i === 1 ? "#29ABE2" : "#666"
       }">${medal}</td>
       <td style="padding:10px 14px;text-align:right;font-weight:600">${escHtml(t.name)}</td>
       <td style="padding:10px 14px;text-align:center;color:#34C759;font-weight:700">${t.wins}</td>
       <td style="padding:10px 14px;text-align:center;color:#FF3B30;font-weight:700">${t.losses}</td>
       <td style="padding:10px 14px;text-align:center;font-weight:600">${t.matchesPlayed}</td>
       <td style="padding:10px 14px;text-align:center;font-weight:600">${winPct}%</td>
-      <td style="padding:10px 14px;text-align:center;color:#4ECDC4;font-weight:700">${t.totalPoints}</td>
+      <td style="padding:10px 14px;text-align:center;color:#29ABE2;font-weight:700">${t.totalPoints}</td>
       <td style="padding:10px 14px;text-align:center;font-weight:600">${avg}</td>
     </tr>`;
     })
@@ -216,13 +251,13 @@ function buildPdfHtml(tournament: Tournament): string {
       const speakerChips = t.speakerNames
         .map(
           (sp, i) =>
-            `<span style="display:inline-block;padding:4px 10px;margin:2px;border-radius:999px;background:#7B5EA714;color:#7B5EA7;font-size:11px;font-weight:600">
+            `<span style="display:inline-block;padding:4px 10px;margin:2px;border-radius:999px;background:#7B2D8E14;color:#7B2D8E;font-size:11px;font-weight:600">
               ${i + 1}. ${escHtml(sp || `متحدث ${i + 1}`)}
             </span>`
         )
         .join("");
       return `
-      <div style="margin-bottom:10px;padding:12px 14px;border:1px solid #E5E5EA;border-radius:10px;border-right:4px solid #4ECDC4">
+      <div style="margin-bottom:10px;padding:12px 14px;border:1px solid #E5E5EA;border-radius:10px;border-right:4px solid #29ABE2">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
           <div style="font-weight:700;font-size:14px;color:#1A1A2E">${escHtml(t.name)}</div>
           <div style="font-size:11px;color:#888">${t.speakersPerTeam} متحدثين</div>
@@ -300,14 +335,14 @@ function buildPdfHtml(tournament: Tournament): string {
             i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : `${i + 1}`;
           return `<tr style="${i % 2 === 0 ? "background:#F8F8FF" : ""}">
         <td style="padding:8px 12px;text-align:center;font-weight:700;color:${
-          i === 0 ? "#7B5EA7" : i === 1 ? "#4ECDC4" : "#666"
+          i === 0 ? "#7B2D8E" : i === 1 ? "#29ABE2" : "#666"
         }">${medal}</td>
         <td style="padding:8px 12px;text-align:right;font-weight:600">${escHtml(a.speaker)}</td>
         <td style="padding:8px 12px;text-align:right;color:#666;font-size:11px">${escHtml(a.team)}</td>
         <td style="padding:8px 12px;text-align:center">${a.speeches}</td>
-        <td style="padding:8px 12px;text-align:center;color:#4ECDC4;font-weight:700">${a.speechPoints}</td>
+        <td style="padding:8px 12px;text-align:center;color:#29ABE2;font-weight:700">${a.speechPoints}</td>
         <td style="padding:8px 12px;text-align:center">${avg}</td>
-        <td style="padding:8px 12px;text-align:center;color:#7B5EA7;font-weight:600">${a.replyPoints}</td>
+        <td style="padding:8px 12px;text-align:center;color:#7B2D8E;font-weight:600">${a.replyPoints}</td>
         <td style="padding:8px 12px;text-align:center;color:#FFC107;font-weight:700">${a.bestSpeakerCount}</td>
         <td style="padding:8px 12px;text-align:center;font-weight:700">${total}</td>
       </tr>`;
@@ -348,7 +383,7 @@ function buildPdfHtml(tournament: Tournament): string {
               (sp) =>
                 `<span style="display:inline-block;margin:1px 3px;font-size:11px;color:#666">${escHtml(
                   sp.name
-                )}: <b style="color:#4ECDC4">${sp.score}</b></span>`
+                )}: <b style="color:#29ABE2">${sp.score}</b></span>`
             )
             .join("");
           const oppBreakdown = m.team2.speakers
@@ -356,13 +391,13 @@ function buildPdfHtml(tournament: Tournament): string {
               (sp) =>
                 `<span style="display:inline-block;margin:1px 3px;font-size:11px;color:#666">${escHtml(
                   sp.name
-                )}: <b style="color:#7B5EA7">${sp.score}</b></span>`
+                )}: <b style="color:#7B2D8E">${sp.score}</b></span>`
             )
             .join("");
           const judgeBadges = (m.judgeNames || [])
             .map(
               (n) =>
-                `<span style="display:inline-block;padding:3px 8px;margin:2px;border-radius:6px;background:#4ECDC414;color:#4ECDC4;font-size:11px;font-weight:600">${escHtml(
+                `<span style="display:inline-block;padding:3px 8px;margin:2px;border-radius:6px;background:#29ABE214;color:#29ABE2;font-size:11px;font-weight:600">${escHtml(
                   n
                 )}</span>`
             )
@@ -384,36 +419,36 @@ function buildPdfHtml(tournament: Tournament): string {
             <div style="padding:10px 12px">
               <table style="width:100%;border-collapse:collapse">
                 <tr>
-                  <td style="padding:6px 8px;border-right:3px solid #4ECDC4;width:42%">
-                    <div style="font-size:10px;color:#4ECDC4;font-weight:700;margin-bottom:2px">موالاة${
+                  <td style="padding:6px 8px;border-right:3px solid #29ABE2;width:42%">
+                    <div style="font-size:10px;color:#29ABE2;font-weight:700;margin-bottom:2px">موالاة${
                       isGovWin ? " · فائز" : ""
                     }</div>
                     <div style="font-size:13px;font-weight:${isGovWin ? 700 : 600}">${escHtml(govTeam?.name ?? "-")}</div>
                     ${govBreakdown ? `<div style="margin-top:4px">${govBreakdown}</div>` : ""}
                     ${
                       m.completed
-                        ? `<div style="margin-top:3px;font-size:11px;color:#888">رد: ${escHtml(govReplyName)} (<b style="color:#4ECDC4">${m.team1.replyScore}</b>)</div>`
+                        ? `<div style="margin-top:3px;font-size:11px;color:#888">رد: ${escHtml(govReplyName)} (<b style="color:#29ABE2">${m.team1.replyScore}</b>)</div>`
                         : ""
                     }
                   </td>
                   <td style="padding:6px 8px;text-align:center;width:16%">
                     ${
                       m.completed
-                        ? `<div style="font-size:18px;font-weight:900;color:#4ECDC4">${m.team1.totalScore}</div>
+                        ? `<div style="font-size:18px;font-weight:900;color:#29ABE2">${m.team1.totalScore}</div>
                            <div style="font-size:10px;color:#aaa;margin:2px 0">VS</div>
-                           <div style="font-size:18px;font-weight:900;color:#7B5EA7">${m.team2.totalScore}</div>`
+                           <div style="font-size:18px;font-weight:900;color:#7B2D8E">${m.team2.totalScore}</div>`
                         : `<div style="font-size:11px;color:#aaa">VS</div>`
                     }
                   </td>
-                  <td style="padding:6px 8px;border-right:3px solid #7B5EA7;width:42%">
-                    <div style="font-size:10px;color:#7B5EA7;font-weight:700;margin-bottom:2px">معارضة${
+                  <td style="padding:6px 8px;border-right:3px solid #7B2D8E;width:42%">
+                    <div style="font-size:10px;color:#7B2D8E;font-weight:700;margin-bottom:2px">معارضة${
                       isOppWin ? " · فائز" : ""
                     }</div>
                     <div style="font-size:13px;font-weight:${isOppWin ? 700 : 600}">${escHtml(oppTeam?.name ?? "-")}</div>
                     ${oppBreakdown ? `<div style="margin-top:4px">${oppBreakdown}</div>` : ""}
                     ${
                       m.completed
-                        ? `<div style="margin-top:3px;font-size:11px;color:#888">رد: ${escHtml(oppReplyName)} (<b style="color:#7B5EA7">${m.team2.replyScore}</b>)</div>`
+                        ? `<div style="margin-top:3px;font-size:11px;color:#888">رد: ${escHtml(oppReplyName)} (<b style="color:#7B2D8E">${m.team2.replyScore}</b>)</div>`
                         : ""
                     }
                   </td>
@@ -449,7 +484,7 @@ function buildPdfHtml(tournament: Tournament): string {
         .join("");
       const roundDone = round.matches.filter((m) => m.completed).length;
       return `<div style="margin-bottom:24px;page-break-inside:avoid">
-      <h3 style="font-size:17px;font-weight:700;color:#7B5EA7;margin:0 0 12px 0;border-right:4px solid #7B5EA7;padding-right:12px">
+      <h3 style="font-size:17px;font-weight:700;color:#7B2D8E;margin:0 0 12px 0;border-right:4px solid #7B2D8E;padding-right:12px">
         ${escHtml(roundLabel(round))}
         <span style="font-size:12px;color:#888;font-weight:500">· ${roundDone}/${round.matches.length} مكتملة</span>
       </h3>
@@ -546,7 +581,7 @@ function buildPdfHtml(tournament: Tournament): string {
 <head><meta charset="UTF-8"><title>${escHtml(tournament.name)}</title><style>
   *{box-sizing:border-box}
   body{font-family:'Cairo',-apple-system,BlinkMacSystemFont,'Segoe UI',Tahoma,sans-serif;margin:0;padding:0;color:#1A1A2E;direction:rtl;background:#fff}
-  .cover{background:linear-gradient(135deg,#4ECDC4 0%,#7B5EA7 100%);padding:40px 32px;color:#fff;text-align:center}
+  .cover{background:linear-gradient(135deg,#29ABE2 0%,#7B2D8E 100%);padding:40px 32px;color:#fff;text-align:center}
   .logo-text{font-size:26px;font-weight:700;letter-spacing:1px;margin-bottom:4px}
   .logo-sub{font-size:14px;opacity:.8;margin-bottom:24px}
   .t-name{font-size:32px;font-weight:900;margin-bottom:8px}
@@ -558,7 +593,7 @@ function buildPdfHtml(tournament: Tournament): string {
   .section{padding:24px 32px;page-break-inside:avoid}
   h2{font-size:20px;font-weight:700;color:#1A1A2E;margin-bottom:16px;padding-bottom:8px;border-bottom:2px solid #E5E5EA}
   table{width:100%;border-collapse:collapse}
-  th{font-size:12px;padding:10px 14px;text-align:right;background:linear-gradient(135deg,#4ECDC4,#7B5EA7);color:#fff}
+  th{font-size:12px;padding:10px 14px;text-align:right;background:linear-gradient(135deg,#29ABE2,#7B2D8E);color:#fff}
   td{padding:10px 14px;border-bottom:1px solid #F0F0F0;font-size:13px}
   .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
   .footer{text-align:center;padding:20px;color:#aaa;font-size:11px;border-top:1px solid #F0F0F0}
@@ -653,8 +688,14 @@ interface MatchCardProps {
 function MatchCard({ match, teamMap, onClick, onEditRoom, hideScores }: MatchCardProps) {
   const govName = teamMap.get(match.team1.teamId)?.name ?? "-";
   const oppName = teamMap.get(match.team2.teamId)?.name ?? "-";
-  const isGovWinner = match.winnerId === match.team1.teamId;
-  const isOppWinner = match.winnerId === match.team2.teamId;
+  /**
+   * Hiding results hides the RESULT, not just the numbers: until the room's
+   * result has been announced nothing here may reveal the winner or the best
+   * speaker — no highlight, no trophy icon, no score.
+   */
+  const resultHidden = !!hideScores && !match.resultAnnounced;
+  const isGovWinner = !resultHidden && match.winnerId === match.team1.teamId;
+  const isOppWinner = !resultHidden && match.winnerId === match.team2.teamId;
   const roomText = match.roomLabel?.trim()
     ? match.roomLabel
     : `القاعة ${match.roomNumber}`;
@@ -702,11 +743,18 @@ function MatchCard({ match, teamMap, onClick, onEditRoom, hideScores }: MatchCar
         {match.completed ? (
           <div
             className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg"
-            style={{ backgroundColor: SUCCESS + "26" }}
+            style={{ backgroundColor: (resultHidden ? GOLD : SUCCESS) + "26" }}
           >
-            <CheckCircle className="w-3.5 h-3.5" style={{ color: SUCCESS }} />
-            <span className="text-[11px] font-semibold" style={{ color: SUCCESS }}>
-              مكتمل
+            <CheckCircle
+              className="w-3.5 h-3.5"
+              style={{ color: resultHidden ? GOLD : SUCCESS }}
+            />
+            <span
+              className="text-[11px] font-semibold"
+              style={{ color: resultHidden ? "#8A5A00" : SUCCESS }}
+              data-testid={`match-status-${match.id}`}
+            >
+              {resultHidden ? "النتيجة جاهزة — بانتظار الإعلان" : "مكتمل"}
             </span>
           </div>
         ) : (
@@ -741,7 +789,7 @@ function MatchCard({ match, teamMap, onClick, onEditRoom, hideScores }: MatchCar
           >
             {govName}
           </span>
-          {match.completed && (
+          {match.completed && !resultHidden && (
             <span className="text-lg font-bold mr-2" style={{ color: CYAN }}>
               {hideScores ? HIDDEN_SCORE : match.team1.totalScore}
             </span>
@@ -779,7 +827,7 @@ function MatchCard({ match, teamMap, onClick, onEditRoom, hideScores }: MatchCar
           >
             {oppName}
           </span>
-          {match.completed && (
+          {match.completed && !resultHidden && (
             <span className="text-lg font-bold mr-2" style={{ color: PURPLE }}>
               {hideScores ? HIDDEN_SCORE : match.team2.totalScore}
             </span>
@@ -790,7 +838,7 @@ function MatchCard({ match, teamMap, onClick, onEditRoom, hideScores }: MatchCar
         </div>
       </div>
 
-      {match.completed && match.bestSpeaker && (
+      {match.completed && match.bestSpeaker && !resultHidden && (
         <div
           className="flex items-center gap-1.5 pt-2.5 mt-2.5 border-t border-border"
           style={{ backgroundColor: CYAN + "0F", marginInline: -14, marginBottom: -14, padding: "10px 14px", borderBottomLeftRadius: 16, borderBottomRightRadius: 16 }}
@@ -935,6 +983,9 @@ export default function TournamentDetail() {
     setEliminationMode,
     addRegisteredTeam,
     setRoundCase,
+    setCurrentRound,
+    setPresentedRound,
+    setProtection,
     setMatchRoom,
     submitMatch,
     addJudge,
@@ -949,11 +1000,18 @@ export default function TournamentDetail() {
     setRoundJudgesPerRoom,
     setMatchJudges,
     autoAssignJudges,
+    setRoundLocked,
+    markResultAnnounced,
+    logAction,
+    tournaments,
   } = useTournament();
-  const { themeMode, setThemeMode } = useTheme();
   const tournament = getTournament(params?.id || "");
 
-  const [activeTab, setActiveTab] = useState<TabType>("teams");
+  const [activeTab, setActiveTab] = useState<TabType>("overview");
+  const [announceOpen, setAnnounceOpen] = useState(false);
+  const [presentMode, setPresentMode] = useState(false);
+  const { toast } = useToast();
+  const { can } = useRole();
   // Selected round numbers for the standings tab. Empty set = all rounds.
   const [standingsRoundFilter, setStandingsRoundFilter] = useState<Set<number>>(
     () => new Set()
@@ -1003,7 +1061,6 @@ export default function TournamentDetail() {
   const [shareDialogOpen, setShareDialogOpen] = useState(false);
   const [shareTitle, setShareTitle] = useState("");
   const [shareUrl, setShareUrl] = useState("");
-  const [shareCopied, setShareCopied] = useState(false);
   const [importTeamOpen, setImportTeamOpen] = useState(false);
   const [importTeamCode, setImportTeamCode] = useState("");
   const [importTeamError, setImportTeamError] = useState("");
@@ -1026,6 +1083,8 @@ export default function TournamentDetail() {
     roomLabel: string;
   } | null>(null);
   const [roundNotification, setRoundNotification] = useState(false);
+  const [protectionOpen, setProtectionOpen] = useState(false);
+  const [unlocked, setUnlocked] = useState(false);
   const prevCompletedRef = useRef<boolean | null>(null);
   const consumedRef = useRef<Set<string>>(new Set());
   const tournamentRef = useRef(tournament);
@@ -1172,9 +1231,20 @@ export default function TournamentDetail() {
   // Switch default tab to "rounds" when tournament starts
   useEffect(() => {
     if (tournament?.started && activeTab === "teams") {
-      setActiveTab("rounds");
+      setActiveTab("overview");
     }
   }, [tournament?.started]);
+
+  // A role change can remove the current destination — fall back to the overview.
+  useEffect(() => {
+    const blocked =
+      (!can("viewScores") &&
+        ["resultsAdmin", "standings", "speakers"].includes(activeTab)) ||
+      (!can("viewAudit") && activeTab === "audit") ||
+      (!can("manageTeams") && activeTab === "teams") ||
+      (!can("manageJudges") && ["judges", "pending"].includes(activeTab));
+    if (blocked) setActiveTab("overview");
+  }, [activeTab, can]);
 
   // Compute the public-facing topic: prefer the active round's case text,
   // else fall back to the most recent non-empty caseText.
@@ -1397,6 +1467,21 @@ export default function TournamentDetail() {
   const currentRound = tournament?.rounds.find(
     (r) => r.roundNumber === currentRoundNum
   );
+  // Navigation follows the rounds that actually exist, since a tournament may
+  // start from a later round and its numbers need not begin at 1.
+  const roundNumbers = useMemo(
+    () =>
+      (tournament?.rounds ?? [])
+        .map((r) => r.roundNumber)
+        .sort((a, b) => a - b),
+    [tournament?.rounds]
+  );
+  const viewedIndex = roundNumbers.indexOf(currentRoundNum);
+  const prevRoundNum = viewedIndex > 0 ? roundNumbers[viewedIndex - 1] : null;
+  const nextRoundNum =
+    viewedIndex >= 0 && viewedIndex < roundNumbers.length - 1
+      ? roundNumbers[viewedIndex + 1]
+      : null;
   const completedCount =
     currentRound?.matches.filter((m) => m.completed).length ?? 0;
   const totalMatches = currentRound?.matches.length ?? 0;
@@ -1415,10 +1500,63 @@ export default function TournamentDetail() {
   }, [allRoomsComplete, currentRoundNum, tournamentCurrentRound]);
 
   if (!tournament) {
+    // Still loading the shared store — show the dashboard's shape, not a blank page.
+    if (tournaments.length === 0) return <TournamentSkeleton />;
+
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <p className="text-muted-foreground">البطولة غير موجودة</p>
+      <div
+        className="min-h-screen flex flex-col items-center justify-center gap-3 px-6 text-center"
+        style={{ backgroundColor: BRAND.surface }}
+        data-testid="tournament-not-found"
+      >
+        <span
+          className="w-16 h-16 rounded-2xl flex items-center justify-center"
+          style={{ backgroundColor: `${BRAND.purple}12` }}
+        >
+          <Trophy className="w-7 h-7" style={{ color: BRAND.purple }} />
+        </span>
+        <p className="font-bold text-[16px]" style={{ color: BRAND.ink }}>
+          البطولة غير موجودة
+        </p>
+        <p className="text-[13px] max-w-sm" style={{ color: `${BRAND.ink}8c` }}>
+          قد يكون الرابط قديماً أو حُذفت البطولة. يمكنك العودة إلى قائمة البطولات.
+        </p>
+        <button
+          type="button"
+          onClick={() => setLocation("/")}
+          className={`${BTN.base} ${BTN.primary} ${BTN_SIZE.lg} mt-1`}
+          style={BTN_PRIMARY_STYLE}
+          data-testid="button-back-home"
+        >
+          العودة إلى البطولات
+        </button>
       </div>
+    );
+  }
+
+  // ── Access-code protection ────────────────────────────────────────────────
+  const protection = tournament.protection;
+  const unlockKey = `tournament_unlocked_${tournament.id}`;
+  const needsUnlock =
+    !!protection?.enabled &&
+    !!protection.code &&
+    (protection.protectView || protection.protectEdit) &&
+    !unlocked &&
+    sessionStorage.getItem(unlockKey) !== protection.code;
+
+  if (needsUnlock) {
+    return (
+      <UnlockGate
+        tournamentName={tournament.name}
+        codeLength={protection!.code.length}
+        onSubmit={(code) => {
+          if (code !== protection!.code) return false;
+          sessionStorage.setItem(unlockKey, code);
+          setUnlocked(true);
+          return true;
+        }}
+        onBack={() => setLocation("/")}
+      />
     );
   }
 
@@ -1542,11 +1680,7 @@ export default function TournamentDetail() {
       };
       const sid = await createRoundSession(roundData);
       const url = buildSessionUrl("round", sid);
-      window.open(url, "_blank");
-      try {
-        navigator.clipboard.writeText(url);
-      } catch {}
-      window.prompt("رابط المحكمين - انسخه وشاركه:", url);
+      openShareDialog("رابط المحكمين", url);
     } catch {
       window.alert("حدث خطأ أثناء إنشاء رابط المحكمين");
     } finally {
@@ -1557,12 +1691,7 @@ export default function TournamentDetail() {
   const openShareDialog = (title: string, url: string) => {
     setShareTitle(title);
     setShareUrl(url);
-    setShareCopied(false);
     setShareDialogOpen(true);
-    try {
-      navigator.clipboard.writeText(url);
-      setShareCopied(true);
-    } catch {}
   };
 
   const handleAdminLink = () => {
@@ -2357,58 +2486,124 @@ export default function TournamentDetail() {
     (tournament.pendingJudges?.length ?? 0) +
     (tournament.pendingResults?.length ?? 0);
 
-  const tabs: {
-    key: TabType;
-    label: string;
-    icon: typeof Users;
-    badge?: number;
-  }[] = tournament.started
-    ? [
+  const navGroups: SidebarGroup<TabType>[] = [
+    {
+      title: "البطولة",
+      tabs: [{ key: "overview", label: "نظرة عامة", icon: LayoutDashboard }],
+    },
+    {
+      title: "التشغيل",
+      tabs: [
         { key: "rounds", label: "الجولات", icon: Layers },
-        { key: "standings", label: "الترتيب", icon: BarChart2 },
-        { key: "speakers", label: "المتحدثين", icon: Mic },
-        { key: "judges", label: "المحكمون", icon: UserCheck },
-        { key: "pending", label: "الطلبات", icon: Inbox, badge: pendingCount },
-      ]
-    : [
-        { key: "teams", label: "الفرق", icon: Users },
-        { key: "rounds", label: "الجولات", icon: Layers },
-        { key: "standings", label: "الترتيب", icon: BarChart2 },
-        { key: "judges", label: "المحكمون", icon: UserCheck },
-        { key: "pending", label: "الطلبات", icon: Inbox, badge: pendingCount },
-      ];
+        { key: "control", label: "القاعات", icon: ListChecks },
+      ],
+    },
+    {
+      title: "المشاركون",
+      tabs: [
+        ...(can("manageTeams")
+          ? ([{ key: "teams" as TabType, label: "الفرق", icon: Users }] as const)
+          : []),
+        ...(can("manageJudges")
+          ? ([
+              { key: "judges" as TabType, label: "المحكمون", icon: UserCheck },
+            ] as const)
+          : []),
+      ],
+    },
+    {
+      title: "التسجيل",
+      tabs: [
+        { key: "links", label: "روابط التسجيل", icon: LinkIcon },
+        ...(can("manageJudges")
+          ? ([
+              {
+                key: "pending" as TabType,
+                label: "الطلبات",
+                icon: Inbox,
+                badge: pendingCount,
+              },
+            ] as const)
+          : []),
+      ],
+    },
+    ...(can("viewScores")
+      ? [
+          {
+            title: "النتائج",
+            tabs: [
+              { key: "resultsAdmin" as TabType, label: "إدارة النتائج", icon: ClipboardList, restricted: true },
+              { key: "standings" as TabType, label: "الترتيب", icon: BarChart2, restricted: true },
+              { key: "speakers" as TabType, label: "المتحدثين", icon: Mic, restricted: true },
+            ],
+          },
+        ]
+      : []),
+    {
+      title: "التقارير والإعدادات",
+      tabs: [
+        { key: "reports", label: "التقارير", icon: FileText },
+        { key: "settings", label: "الإعدادات", icon: Settings },
+        ...(can("viewAudit")
+          ? ([{ key: "audit" as TabType, label: "سجل العمليات", icon: History }] as const)
+          : []),
+      ],
+    },
+  ];
+
+  if (presentMode) {
+    return (
+      <PresentationMode
+        tournament={tournament}
+        canAnnounce={can("announceResults")}
+        onMarkRevealed={(roundNumber, matchId) =>
+          markResultAnnounced(tournament.id, roundNumber, matchId)
+        }
+        onExit={() => setPresentMode(false)}
+      />
+    );
+  }
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
-      {/* Hero Header */}
-      <div className="relative pt-6 pb-6 overflow-hidden">
-        <div
-          className="absolute top-0 bottom-0 left-0"
-          style={{ right: "35%", backgroundColor: CYAN }}
-        />
-        <div
-          className="absolute top-0 bottom-0 right-0"
-          style={{ left: "65%", backgroundColor: PURPLE }}
-        />
+    <div
+      className="min-h-screen flex flex-col md:flex-row"
+      style={{ backgroundColor: BRAND.surface }}
+    >
+      <AnnouncePickerDialog
+        tournament={tournament}
+        open={announceOpen}
+        onOpenChange={setAnnounceOpen}
+        onAnnounce={(match) =>
+          setLocation(
+            `/announce/${tournament.id}/${tournament.currentRound}/${match.id}`
+          )
+        }
+      />
 
-        <div className="relative max-w-5xl mx-auto px-4">
-          <div className="flex items-center gap-3 mb-5">
-            <button
-              onClick={() => setLocation("/")}
-              aria-label="الرئيسية"
-              className="w-10 h-10 rounded-xl bg-white/15 hover:bg-white/25 backdrop-blur-sm flex items-center justify-center transition-colors flex-shrink-0"
-              data-testid="button-back-home"
-            >
-              <Home className="w-4 h-4 text-white" />
-            </button>
-            <div className="flex-1 min-w-0">
+      <TournamentSidebar
+        groups={navGroups}
+        activeTab={activeTab}
+        onTabChange={(key) => setActiveTab(key as TabType)}
+        onHome={() => setLocation("/")}
+      />
+
+      <div className="flex-1 flex flex-col min-w-0">
+        {/* Page header */}
+        <header className="px-4 md:px-6 pt-5 pb-3">
+          <div className={`${LAYOUT.page} flex flex-wrap items-center gap-2.5 px-0 md:px-0`}>
+            <div className="flex-1 min-w-0 text-right animate-in fade-in slide-in-from-top-2 duration-500">
               <h1
-                className="text-white font-bold text-lg truncate leading-tight"
+                className="text-xl md:text-2xl font-bold truncate leading-tight"
+                style={{ color: BRAND.ink }}
                 data-testid="text-tournament-name"
               >
                 {tournament.name}
               </h1>
-              <p className="text-white/75 text-xs mt-0.5">
+              <p
+                className="text-xs mt-1 font-medium"
+                style={{ color: BRAND.ink + "99" }}
+                data-testid="text-tournament-meta"
+              >
                 {tournament.teams.length} فريق
                 {tournament.started
                   ? ` · الجولة ${tournament.currentRound}${
@@ -2419,17 +2614,25 @@ export default function TournamentDetail() {
                   : ""}
                 {tournament.finished ? " · منتهية" : ""}
               </p>
+              <div className="mt-1.5 flex items-center gap-2 flex-wrap">
+                <AutoSaveIndicator />
+              </div>
             </div>
+
+            <div className="flex items-center gap-2 flex-wrap justify-end w-full sm:w-auto">
             <button
               onClick={() => setHideScores((v) => !v)}
               aria-label={hideScores ? "إظهار الدرجات" : "إخفاء الدرجات"}
               title={hideScores ? "إظهار الدرجات" : "إخفاء الدرجات"}
               aria-pressed={hideScores}
-              className={`w-10 h-10 rounded-xl backdrop-blur-sm flex items-center justify-center transition-colors flex-shrink-0 ${
-                hideScores
-                  ? "bg-white/90 hover:bg-white text-purple-700"
-                  : "bg-white/15 hover:bg-white/25 text-white"
+              className={`w-10 h-10 rounded-xl border flex items-center justify-center shrink-0 transition-all active:scale-95 ${
+                hideScores ? "text-white" : "bg-white hover:bg-[#7B2D8E]/[0.06]"
               }`}
+              style={
+                hideScores
+                  ? { backgroundColor: BRAND.purple, borderColor: BRAND.purple }
+                  : { borderColor: BRAND.border, color: BRAND.ink }
+              }
               data-testid="button-toggle-hide-scores"
             >
               {hideScores ? (
@@ -2438,262 +2641,211 @@ export default function TournamentDetail() {
                 <Eye className="w-4 h-4" />
               )}
             </button>
+
             <button
               onClick={() => window.location.reload()}
               aria-label="تحديث الصفحة"
               title="تحديث الصفحة"
-              className="w-10 h-10 rounded-xl bg-white/15 hover:bg-white/25 backdrop-blur-sm flex items-center justify-center transition-colors flex-shrink-0"
+              className="w-10 h-10 rounded-xl border bg-white hover:bg-[#7B2D8E]/[0.06] flex items-center justify-center shrink-0 transition-all active:scale-95"
+              style={{ borderColor: BRAND.border, color: BRAND.ink }}
               data-testid="button-refresh-page"
             >
-              <span className="text-white text-base">↻</span>
+              <span className="text-base leading-none">↻</span>
             </button>
+
+            <RoleSwitcher />
+
+            <button
+              onClick={() => setPresentMode(true)}
+              className={`${BTN.base} ${BTN.secondary} h-10 px-4 shrink-0`}
+              data-testid="button-presentation-mode"
+            >
+              <Projector className="w-4 h-4" />
+              وضع العرض 🎥
+            </button>
+
+            {can("announceResults") && (
+            <button
+              onClick={() => setAnnounceOpen(true)}
+              className={`${BTN.base} ${BTN.primary} h-10 px-5 shrink-0 shadow-lg`}
+              style={BTN_PRIMARY_STYLE}
+              data-testid="button-announce-results"
+            >
+              <Megaphone className="w-4 h-4" />
+              إعلان النتائج
+            </button>
+            )}
+            </div>
           </div>
-
-          {/* Action chips row */}
-          <div className="flex gap-2">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button
-                  className="flex-1 h-11 rounded-xl bg-white/[0.14] hover:bg-white/25 border border-white/20 backdrop-blur-sm flex items-center justify-center gap-2 text-white text-[13px] font-semibold transition-all shadow-sm"
-                  data-testid="chip-stats"
-                >
-                  <Activity className="w-3.5 h-3.5" />
-                  إحصاءات
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56">
-                <DropdownMenuItem
-                  onClick={() => setLocation(`/stats/${tournament.id}`)}
-                  data-testid="menu-statistics"
-                >
-                  <Activity className="w-4 h-4 ml-2" style={{ color: CYAN }} />
-                  إحصائيات شاملة
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => setLocation(`/results/${tournament.id}`)}
-                  data-testid="menu-announce-results"
-                >
-                  <Megaphone className="w-4 h-4 ml-2" style={{ color: PURPLE }} />
-                  إعلان النتائج
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => setActiveTab("teams")}
-                  data-testid="menu-manage-teams"
-                >
-                  <Users className="w-4 h-4 ml-2" style={{ color: CYAN }} />
-                  إدارة الفرق
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button
-                  className="flex-1 h-11 rounded-xl bg-white/[0.14] hover:bg-white/25 border border-white/20 backdrop-blur-sm flex items-center justify-center gap-2 text-white text-[13px] font-semibold transition-all shadow-sm"
-                  data-testid="chip-reports"
-                >
-                  {pdfLoading || excelLoading ? (
-                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                  ) : (
-                    <FileText className="w-3.5 h-3.5" />
-                  )}
-                  تقارير
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56">
-                <DropdownMenuItem
-                  onClick={handleExportPdf}
-                  disabled={pdfLoading}
-                  data-testid="menu-export-pdf"
-                >
-                  <FileText className="w-4 h-4 ml-2" style={{ color: PURPLE }} />
-                  تنزيل تقرير PDF
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={handleExportExcel}
-                  disabled={excelLoading}
-                  data-testid="menu-export-excel"
-                >
-                  <FileSpreadsheet className="w-4 h-4 ml-2" style={{ color: SUCCESS }} />
-                  تنزيل ملف Excel
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button
-                  className="flex-1 h-11 rounded-xl bg-white/[0.14] hover:bg-white/25 border border-white/20 backdrop-blur-sm flex items-center justify-center gap-2 text-white text-[13px] font-semibold transition-all shadow-sm"
-                  data-testid="chip-links"
-                >
-                  <ShieldCheck className="w-3.5 h-3.5" />
-                  روابط
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56">
-                <DropdownMenuItem
-                  onClick={handleRegistrationLink}
-                  data-testid="menu-registration-link"
-                >
-                  <UserPlus className="w-4 h-4 ml-2" style={{ color: CYAN }} />
-                  رابط تسجيل الفرق
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => setImportTeamOpen(true)}
-                  data-testid="menu-import-team-code"
-                >
-                  <Download className="w-4 h-4 ml-2" style={{ color: PURPLE }} />
-                  استلام تسجيل فريق (رمز)
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={handleAdminLink}
-                  data-testid="menu-admin-link"
-                >
-                  <ShieldCheck className="w-4 h-4 ml-2" style={{ color: PURPLE }} />
-                  رابط الإدارة (تحكم كامل)
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button
-                  aria-label="المزيد"
-                  title="المزيد"
-                  className="w-11 h-11 rounded-xl bg-white/[0.14] hover:bg-white/25 border border-white/20 backdrop-blur-sm flex items-center justify-center text-white transition-all shadow-sm flex-shrink-0"
-                  data-testid="chip-more"
-                >
-                  <MoreHorizontal className="w-4 h-4" />
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56">
-                <DropdownMenuSub>
-                  <DropdownMenuSubTrigger data-testid="menu-theme-trigger">
-                    <Palette className="w-4 h-4 ml-2" style={{ color: CYAN }} />
-                    المظهر
-                  </DropdownMenuSubTrigger>
-                  <DropdownMenuSubContent>
-                    <DropdownMenuLabel>وضع الألوان</DropdownMenuLabel>
-                    <DropdownMenuRadioGroup
-                      value={themeMode}
-                      onValueChange={(v) =>
-                        setThemeMode(v as "light" | "dark" | "system")
-                      }
-                    >
-                      <DropdownMenuRadioItem value="light" data-testid="menu-theme-light">
-                        <Sun className="w-4 h-4 ml-2" />
-                        فاتح
-                      </DropdownMenuRadioItem>
-                      <DropdownMenuRadioItem value="dark" data-testid="menu-theme-dark">
-                        <Moon className="w-4 h-4 ml-2" />
-                        داكن
-                      </DropdownMenuRadioItem>
-                      <DropdownMenuRadioItem value="system" data-testid="menu-theme-system">
-                        <Monitor className="w-4 h-4 ml-2" />
-                        حسب النظام
-                      </DropdownMenuRadioItem>
-                    </DropdownMenuRadioGroup>
-                  </DropdownMenuSubContent>
-                </DropdownMenuSub>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  onClick={() => {
-                    const next = !tournament.semifinalEnabled;
-                    setEliminationMode(
-                      tournament.id,
-                      next,
-                      next ? true : (tournament.finalEnabled ?? false)
-                    );
-                  }}
-                  data-testid="menu-toggle-semifinal"
-                >
-                  <span className="ml-2 text-base">{tournament.semifinalEnabled ? "✓" : "○"}</span>
-                  نصف النهائي
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => {
-                    const next = !tournament.finalEnabled;
-                    setEliminationMode(
-                      tournament.id,
-                      next ? (tournament.semifinalEnabled ?? false) : false,
-                      next
-                    );
-                  }}
-                  data-testid="menu-toggle-final"
-                >
-                  <span className="ml-2 text-base">{tournament.finalEnabled ? "✓" : "○"}</span>
-                  النهائي
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                {tournament.finished ? (
-                  <DropdownMenuItem
-                    onClick={() => setConfirmReopenOpen(true)}
-                    data-testid="menu-reopen-tournament"
-                  >
-                    <Flag className="w-4 h-4 ml-2" />
-                    إعادة فتح البطولة
-                  </DropdownMenuItem>
-                ) : (
-                  <DropdownMenuItem
-                    onClick={() => setConfirmFinishOpen(true)}
-                    data-testid="menu-finish-tournament"
-                  >
-                    <Flag className="w-4 h-4 ml-2" />
-                    إنهاء البطولة
-                  </DropdownMenuItem>
-                )}
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  onClick={() => setConfirmDeleteOpen(true)}
-                  className="text-destructive focus:text-destructive"
-                  data-testid="menu-delete-tournament"
-                >
-                  <Trash2 className="w-4 h-4 ml-2" />
-                  حذف البطولة
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-
-          {tournament.finished && (
+        </header>
+        {tournament.finished && (
+          <div className="px-4 md:px-6 pb-1">
             <div
-              className="flex items-center gap-2 mt-3 px-3 py-2 rounded-xl text-sm font-bold text-white"
-              style={{ background: "linear-gradient(135deg, #FFD70033, #FFD70011)", border: "1px solid #FFD70066" }}
+              className="max-w-6xl mx-auto flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-bold"
+              style={{
+                backgroundColor: BRAND.gold + "1f",
+                border: `1px solid ${BRAND.gold}59`,
+                color: "#8A5A00",
+              }}
               data-testid="banner-finished"
             >
               <Flag className="w-4 h-4" />
               <span>تم إنهاء البطولة — العرض للقراءة فقط (يمكن إعادة فتحها من الإعدادات)</span>
             </div>
-          )}
-
-          {/* Tabs */}
-          <div className="flex bg-white/15 rounded-xl p-1 gap-1 mt-5 border border-white/15">
-            {tabs.map((tab) => {
-              const Icon = tab.icon;
-              const active = activeTab === tab.key;
-              return (
-                <button
-                  key={tab.key}
-                  onClick={() => setActiveTab(tab.key)}
-                  className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg transition-colors ${
-                    active ? "bg-white" : "hover:bg-white/10"
-                  }`}
-                  style={{
-                    color: active ? PURPLE : "rgba(255,255,255,0.85)",
-                  }}
-                  data-testid={`tab-${tab.key}`}
-                >
-                  <Icon className="w-4 h-4" />
-                  <span className="text-sm font-semibold">{tab.label}</span>
-                </button>
-              );
-            })}
           </div>
-        </div>
-      </div>
-
+        )}
       {/* Content */}
-      <div className="flex-1 max-w-5xl w-full mx-auto px-4 pb-32 pt-4">
+      <div className={`flex-1 ${LAYOUT.page} pb-28 pt-2`}>
+        {/* إدارة الجولات — always visible, never hidden in a menu */}
+        {tournament.rounds.length > 0 && activeTab !== "settings" && activeTab !== "reports" && (
+          <div className="mb-4">
+            <RoundsManager
+              tournament={tournament}
+              viewedRound={currentRoundNum}
+              onViewRound={(n) => {
+                setViewingRound(n);
+                setRoundNotification(false);
+              }}
+              onSetCurrent={(n) => {
+                setCurrentRound(tournament.id, n);
+                logAction(tournament.id, "تعيين الجولة الحالية", `الجولة ${n}`);
+                toast({ title: `الجولة الحالية الآن: الجولة ${n}` });
+              }}
+              onSetPresented={(n) => {
+                setPresentedRound(tournament.id, n);
+                toast({ title: `وضع العرض يعرض الجولة ${n}` });
+              }}
+              onDraw={
+                (currentRound?.matches.length ?? 0) === 0
+                  ? () => generateRound(tournament.id)
+                  : undefined
+              }
+            />
+          </div>
+        )}
+
+        {activeTab === "overview" && can("manageTeams") && (
+          <div className="mb-3">
+            <RegistrationLinksCard
+              pendingTeams={tournament.pendingTeams?.length ?? 0}
+              pendingJudges={tournament.pendingJudges?.length ?? 0}
+              onTeamLink={handleRegistrationLink}
+              onJudgeLink={handleJudgeRegistrationLink}
+            />
+          </div>
+        )}
+        {activeTab === "overview" && (
+          <OverviewDashboard
+            tournament={tournament}
+            onOpenRounds={() => setActiveTab("rounds")}
+            onFollowJudging={() => setActiveTab("control")}
+            onRoomDetails={(match) =>
+              setLocation(
+                `/match/${tournament.id}/${tournament.currentRound}/${match.id}`
+              )
+            }
+            onAnnounce={() => setAnnounceOpen(true)}
+          />
+        )}
+
+        {activeTab === "control" && (
+          <RoundControlCenter
+            tournament={tournament}
+            onOpenMatch={(match) =>
+              setLocation(
+                `/match/${tournament.id}/${tournament.currentRound}/${match.id}`
+              )
+            }
+            onAnnounce={() => setAnnounceOpen(true)}
+            onToggleLock={(locked) => {
+              setRoundLocked(tournament.id, tournament.currentRound, locked);
+              toast({
+                title: locked ? "تم إغلاق الجولة" : "تم فتح الجولة للتعديل",
+              });
+            }}
+            onRemindJudge={(judgeName, match) => {
+              logAction(
+                tournament.id,
+                "إرسال تذكير لمحكم",
+                `${judgeName} — ${match.roomLabel?.trim() || `القاعة ${match.roomNumber}`}`
+              );
+              toast({
+                title: "تم إرسال التذكير",
+                description: `تذكير للمحكم ${judgeName}`,
+              });
+            }}
+          />
+        )}
+
+        {activeTab === "resultsAdmin" && (
+          <ResultsAdmin
+            tournament={tournament}
+            onOpenMatch={(match) =>
+              setLocation(
+                `/match/${tournament.id}/${tournament.currentRound}/${match.id}`
+              )
+            }
+          />
+        )}
+
+        {activeTab === "links" && (
+          <RegistrationLinksCenter
+            tournamentId={tournament.id}
+            teamUrl={buildRegisterUrl({
+              tournamentId: tournament.id,
+              tournamentName: tournament.name,
+            })}
+            judgeUrl={buildJudgeRegisterUrl({
+              tournamentId: tournament.id,
+              tournamentName: tournament.name,
+            })}
+            onViewRegistrants={() => setActiveTab("pending")}
+          />
+        )}
+
+        {activeTab === "reports" && (
+          <ReportsPanel
+            tournament={tournament}
+            pdfLoading={pdfLoading}
+            excelLoading={excelLoading}
+            onExportPdf={handleExportPdf}
+            onExportExcel={handleExportExcel}
+            onPrint={() => window.print()}
+            onOpenStats={() => setLocation(`/stats/${tournament.id}`)}
+            onGoTo={(tab) => setActiveTab(tab)}
+          />
+        )}
+
+        {activeTab === "settings" && (
+          <SettingsPanel
+            tournament={tournament}
+            hideScores={hideScores}
+            onToggleHideScores={() => setHideScores((v) => !v)}
+            onOpenProtection={() => setProtectionOpen(true)}
+            onToggleSemifinal={() => {
+              const next = !tournament.semifinalEnabled;
+              setEliminationMode(
+                tournament.id,
+                next,
+                next ? true : (tournament.finalEnabled ?? false)
+              );
+            }}
+            onToggleFinal={() => {
+              const next = !tournament.finalEnabled;
+              setEliminationMode(
+                tournament.id,
+                next ? (tournament.semifinalEnabled ?? false) : false,
+                next
+              );
+            }}
+            onFinish={() => setConfirmFinishOpen(true)}
+            onReopen={() => setConfirmReopenOpen(true)}
+            onDelete={() => setConfirmDeleteOpen(true)}
+          />
+        )}
+
+        {activeTab === "audit" && <AuditLog entries={tournament.auditLog ?? []} />}
+
         {activeTab === "teams" && (
           <div>
             <div className="flex items-center justify-between mb-4">
@@ -2984,7 +3136,7 @@ export default function TournamentDetail() {
 
         {activeTab === "rounds" && (
           <>
-            {!tournament.started ? (
+            {!tournament.started && tournament.rounds.length === 0 ? (
               <div className="text-center py-16">
                 <Layers className="w-12 h-12 mx-auto text-muted-foreground/30 mb-3" />
                 <p className="text-muted-foreground">
@@ -3006,84 +3158,32 @@ export default function TournamentDetail() {
               </div>
             ) : (
               <>
-                {/* Round Navigation */}
-                <div className="flex items-center justify-between py-3 border-b border-border mb-3 -mx-4 px-4">
-                  <button
-                    disabled={currentRoundNum <= 1}
-                    onClick={() => {
-                      setViewingRound(currentRoundNum - 1);
+                {/* Round header */}
+                <div className="mb-3">
+                  <RoundBar
+                    roundNumber={currentRoundNum}
+                    completedCount={completedCount}
+                    totalMatches={totalMatches}
+                    allComplete={allRoomsComplete}
+                    canPrev={prevRoundNum !== null}
+                    canNext={nextRoundNum !== null}
+                    liveRoundNumber={tournament.currentRound || undefined}
+                    onSelectRound={(n) => {
+                      setViewingRound(n);
                       setRoundNotification(false);
                     }}
-                    aria-label="الجولة السابقة"
-                    className="w-10 h-10 rounded-lg flex items-center justify-center disabled:opacity-30 transition-colors"
-                    style={{
-                      backgroundColor:
-                        currentRoundNum > 1 ? CYAN + "26" : "transparent",
-                    }}
-                  >
-                    <ChevronRight
-                      className="w-5 h-5"
-                      style={{
-                        color: currentRoundNum <= 1 ? "var(--border)" : CYAN,
-                      }}
-                    />
-                  </button>
-
-                  <div className="flex-1 mx-3 text-center">
-                    <div className="font-bold text-base mb-1.5">
-                      الجولة {currentRoundNum}
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
-                        <div
-                          className="h-full rounded-full transition-all"
-                          style={{
-                            width:
-                              totalMatches > 0
-                                ? `${(completedCount / totalMatches) * 100}%`
-                                : "0%",
-                            backgroundColor: allRoomsComplete ? SUCCESS : CYAN,
-                          }}
-                        />
-                      </div>
-                      <span
-                        className="text-xs font-semibold"
-                        style={{
-                          color: allRoomsComplete ? SUCCESS : "var(--muted-foreground)",
-                        }}
-                      >
-                        {completedCount}/{totalMatches}
-                      </span>
-                    </div>
-                  </div>
-
-                  <button
-                    disabled={currentRoundNum >= tournament.rounds.length}
-                    onClick={() => {
-                      setViewingRound(currentRoundNum + 1);
+                    onPrev={() => {
+                      if (prevRoundNum === null) return;
+                      setViewingRound(prevRoundNum);
                       setRoundNotification(false);
                     }}
-                    aria-label="الجولة التالية"
-                    className="w-10 h-10 rounded-lg flex items-center justify-center disabled:opacity-30 transition-colors"
-                    style={{
-                      backgroundColor:
-                        currentRoundNum < tournament.rounds.length
-                          ? CYAN + "26"
-                          : "transparent",
+                    onNext={() => {
+                      if (nextRoundNum === null) return;
+                      setViewingRound(nextRoundNum);
+                      setRoundNotification(false);
                     }}
-                  >
-                    <ChevronLeft
-                      className="w-5 h-5"
-                      style={{
-                        color:
-                          currentRoundNum >= tournament.rounds.length
-                            ? "var(--border)"
-                            : CYAN,
-                      }}
-                    />
-                  </button>
+                  />
                 </div>
-
                 {/* Delete round — only if no data recorded yet */}
                 {currentRound && completedCount === 0 && !currentRound.completed && !tournament.finished && (
                   <div className="flex justify-end mb-2">
@@ -3124,39 +3224,17 @@ export default function TournamentDetail() {
 
                 {/* Case / motion editor */}
                 {currentRound && (
-                  <div
-                    className="mb-3 rounded-xl p-3 border"
-                    style={{
-                      backgroundColor: PURPLE + "0d",
-                      borderColor: PURPLE + "33",
-                    }}
-                  >
-                    <Label
-                      htmlFor={`case-${currentRoundNum}`}
-                      className="text-xs font-bold mb-1.5 block"
-                      style={{ color: PURPLE }}
-                    >
-                      نص القضية للجولة {currentRoundNum}
-                    </Label>
-                    <textarea
-                      id={`case-${currentRoundNum}`}
+                  <div className="mb-3">
+                    <CaseCard
+                      roundNumber={currentRoundNum}
                       value={currentRound.caseText ?? ""}
-                      onChange={(e) =>
-                        setRoundCase(
-                          tournament.id,
-                          currentRoundNum,
-                          e.target.value
-                        )
-                      }
                       readOnly={
                         tournament.finished ||
                         currentRoundNum !== tournament.currentRound
                       }
-                      placeholder="اكتب نص القضية هنا (سيظهر للمحكمين والفرق)..."
-                      className="w-full text-base rounded-lg p-3 bg-background border border-border resize-y min-h-[80px] text-right leading-relaxed"
-                      style={{ fontSize: "1.05rem" }}
-                      dir="rtl"
-                      data-testid={`textarea-case-${currentRoundNum}`}
+                      onChange={(v) =>
+                        setRoundCase(tournament.id, currentRoundNum, v)
+                      }
                     />
                   </div>
                 )}
@@ -3193,19 +3271,19 @@ export default function TournamentDetail() {
                     )}
                 </AnimatePresence>
 
-                {/* Judge link + PDF buttons */}
+                {/* Round actions */}
                 {currentRoundNum === tournament.currentRound &&
                   !tournament.finished && (
-                    <div className="flex gap-2 mb-3">
+                    <div
+                      className="mb-3 rounded-2xl bg-white border shadow-sm p-2 flex flex-wrap items-center gap-2"
+                      style={{ borderColor: BRAND.border }}
+                      data-testid="round-actions"
+                    >
                       <button
                         onClick={handleRoundJudgeLink}
                         disabled={linkLoading}
-                        className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border transition-colors disabled:opacity-60"
-                        style={{
-                          backgroundColor: PURPLE + "1f",
-                          borderColor: PURPLE + "66",
-                          color: PURPLE,
-                        }}
+                        className={`${BTN.base} ${BTN.primary} flex-1 min-w-[150px]`}
+                        style={BTN_PRIMARY_STYLE}
                         data-testid="button-judge-link"
                       >
                         {linkLoading ? (
@@ -3213,46 +3291,36 @@ export default function TournamentDetail() {
                         ) : (
                           <LinkIcon className="w-4 h-4" />
                         )}
-                        <span className="text-sm font-semibold">
-                          {linkLoading ? "جارٍ الإنشاء..." : "رابط المحكمين"}
-                        </span>
+                        {linkLoading ? "جارٍ الإنشاء..." : "رابط المحكمين"}
                       </button>
+
                       <button
-                        onClick={() => { setPasteResultsReport(""); setPasteResultsOpen(true); }}
-                        className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border transition-colors"
-                        style={{
-                          backgroundColor: SUCCESS + "1f",
-                          borderColor: SUCCESS + "66",
-                          color: SUCCESS,
+                        onClick={() => {
+                          setPasteResultsReport("");
+                          setPasteResultsOpen(true);
                         }}
+                        className={`${BTN.base} ${BTN.secondary} flex-1 min-w-[150px]`}
                         data-testid="button-paste-results"
                       >
-                        <Download className="w-4 h-4" />
-                        <span className="text-sm font-semibold">لصق نتائج المحكم</span>
+                        <Download className="w-4 h-4" style={{ color: BRAND.blue }} />
+                        لصق نتائج المحكم
                       </button>
+
                       <button
                         onClick={handleExportPdf}
                         disabled={pdfLoading}
-                        className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border transition-colors disabled:opacity-60"
-                        style={{
-                          backgroundColor: CYAN + "1f",
-                          borderColor: CYAN + "66",
-                          color: CYAN,
-                        }}
+                        className={`${BTN.base} ${BTN.secondary} flex-1 min-w-[150px]`}
                         data-testid="button-export-pdf"
                       >
                         {pdfLoading ? (
                           <Loader2 className="w-4 h-4 animate-spin" />
                         ) : (
-                          <FileText className="w-4 h-4" />
+                          <FileText className="w-4 h-4" style={{ color: BRAND.purple }} />
                         )}
-                        <span className="text-sm font-semibold">
-                          {pdfLoading ? "جارٍ التصدير..." : "تصدير PDF"}
-                        </span>
+                        {pdfLoading ? "جارٍ التصدير..." : "تصدير PDF"}
                       </button>
                     </div>
                   )}
-
                 {/* Match list */}
                 {currentRound?.matches.length === 0 ? (
                   <div className="text-center py-12">
@@ -3260,14 +3328,22 @@ export default function TournamentDetail() {
                     <p className="text-muted-foreground">لا توجد مباريات</p>
                   </div>
                 ) : (
-                  <div>
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
                     {currentRound?.matches.map((match) => (
-                      <MatchCard
+                      <RoomCard
                         key={match.id}
                         match={match}
                         teamMap={teamMap}
                         hideScores={hideScores}
-                        onClick={() =>
+                        status={getRoomStatus({
+                          match,
+                          pending: tournament.pendingResults ?? [],
+                          expectedJudges:
+                            currentRound?.judgesPerRoom ??
+                            tournament.settings?.judgesPerRoom ??
+                            0,
+                        })}
+                        onOpen={() =>
                           setLocation(
                             `/match/${tournament.id}/${currentRoundNum}/${match.id}`
                           )
@@ -3902,43 +3978,20 @@ export default function TournamentDetail() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Share link dialog (admin/registration) */}
-      <Dialog open={shareDialogOpen} onOpenChange={setShareDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{shareTitle}</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-3 mt-2">
-            <p className="text-sm text-muted-foreground">
-              {shareTitle.includes("الإدارة")
-                ? "يمنح هذا الرابط من يفتحه نسخة كاملة من البطولة وصلاحية تحريرها على جهازه."
-                : "أرسل هذا الرابط للفرق ليقوموا بتعبئة بياناتهم وإرفاق المستندات. سيرسلون إليك رمزاً لاستيرادهم."}
-            </p>
-            <textarea
-              readOnly
-              value={shareUrl}
-              dir="ltr"
-              className="w-full p-3 rounded-xl bg-muted text-xs font-mono outline-none resize-none"
-              style={{ minHeight: 100, wordBreak: "break-all" }}
-              onClick={(e) => (e.target as HTMLTextAreaElement).select()}
-            />
-            <Button
-              onClick={() => {
-                try {
-                  navigator.clipboard.writeText(shareUrl);
-                  setShareCopied(true);
-                } catch {}
-              }}
-              className="w-full text-white"
-              style={{ backgroundColor: shareCopied ? SUCCESS : PURPLE }}
-              data-testid="button-copy-share"
-            >
-              <LinkIcon className="w-4 h-4 ml-2" />
-              {shareCopied ? "تم النسخ" : "نسخ الرابط"}
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+      {/* Share link dialog — link + QR + labelled actions */}
+      <ShareLinkDialog
+        open={shareDialogOpen}
+        onOpenChange={setShareDialogOpen}
+        title={shareTitle}
+        url={shareUrl}
+        description={
+          shareTitle.includes("الإدارة")
+            ? "يمنح هذا الرابط من يفتحه نسخة كاملة من البطولة وصلاحية تحريرها على جهازه."
+            : shareTitle.includes("المحكمين")
+              ? "أرسل هذا الرابط للمحكمين لإدخال نتائج قاعاتهم، أو اعرض رمز QR ليمسحوه من هواتفهم."
+              : "أرسل هذا الرابط للفرق ليقوموا بتعبئة بياناتهم وإرفاق المستندات."
+        }
+      />
 
       {/* Import team registration code */}
       <Dialog open={importTeamOpen} onOpenChange={setImportTeamOpen}>
@@ -4936,6 +4989,22 @@ export default function TournamentDetail() {
             })()}
         </DialogContent>
       </Dialog>
+      </div>
+
+      <ProtectionSettingsDialog
+        open={protectionOpen}
+        onOpenChange={setProtectionOpen}
+        value={tournament.protection}
+        onSave={(p) => {
+          setProtection(tournament.id, p);
+          if (p.enabled && p.code) {
+            sessionStorage.setItem(unlockKey, p.code);
+            setUnlocked(true);
+          } else {
+            sessionStorage.removeItem(unlockKey);
+          }
+        }}
+      />
     </div>
   );
 }

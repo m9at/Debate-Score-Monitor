@@ -5,11 +5,14 @@ import type { ReactNode, ComponentType } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { TournamentProvider } from "@/context/TournamentContext";
+import { RoleProvider } from "@/context/RoleContext";
 import { ThemeProvider } from "@/context/ThemeContext";
 import { GroupProvider } from "@/context/GroupContext";
 import Home from "@/pages/home";
 import GroupDetail from "@/pages/group-detail";
 import TournamentDetail from "@/pages/tournament-detail";
+import TournamentNewPage from "@/pages/tournament-new";
+import AnnouncePage from "@/pages/announce";
 import MatchScoring from "@/pages/match-scoring";
 import Leaderboard from "@/pages/leaderboard";
 import TeamHistory from "@/pages/team-history";
@@ -43,10 +46,10 @@ const clerkAppearance = {
   options: {
     logoPlacement: "inside" as const,
     logoLinkUrl: basePath || "/",
-    logoImageUrl: `${typeof window !== "undefined" ? window.location.origin : ""}${basePath}/logo.jpg`,
+    logoImageUrl: `${typeof window !== "undefined" ? window.location.origin : ""}${basePath}/logo-mark.png`,
   },
   variables: {
-    colorPrimary: "#7B5EA7",
+    colorPrimary: "#7B2D8E",
     colorForeground: "#1a1a1a",
     colorMutedForeground: "#666666",
     colorDanger: "#FF3B30",
@@ -68,18 +71,18 @@ const clerkAppearance = {
     headerSubtitle: "text-[#666666]",
     socialButtonsBlockButtonText: "text-[#1a1a1a] font-medium",
     formFieldLabel: "text-[#1a1a1a] font-medium",
-    footerActionLink: "text-[#7B5EA7] font-semibold hover:text-[#5d3f8a]",
+    footerActionLink: "text-[#7B2D8E] font-semibold hover:text-[#5D1F6D]",
     footerActionText: "text-[#666666]",
     dividerText: "text-[#666666]",
-    identityPreviewEditButton: "text-[#7B5EA7]",
-    formFieldSuccessText: "text-[#4ECDC4]",
+    identityPreviewEditButton: "text-[#7B2D8E]",
+    formFieldSuccessText: "text-[#29ABE2]",
     alertText: "text-[#1a1a1a]",
     logoBox: "flex justify-center mb-2",
     logoImage: "h-14 w-auto rounded-xl",
     socialButtonsBlockButton:
       "border border-[#e5e5e5] hover:bg-[#f7f7f9] rounded-xl",
     formButtonPrimary:
-      "bg-[#7B5EA7] hover:bg-[#5d3f8a] rounded-xl font-bold text-white",
+      "bg-[#7B2D8E] hover:bg-[#5D1F6D] rounded-xl font-bold text-white",
     formFieldInput:
       "bg-[#f7f7f9] border border-[#e5e5e5] rounded-xl text-[#1a1a1a]",
     footerAction: "py-3",
@@ -173,12 +176,14 @@ function Router() {
       <Route path="/judge-register" component={JudgeRegisterPage} />
       <Route path="/judges-public" component={JudgesPublicPage} />
       <Route path="/results/:id" component={ResultsPage} />
+      <Route path="/announce/:id/:round/:matchId" component={AnnouncePage} />
       <Route path="/import" component={ImportPage} />
       <Route path="/judge/round/:sessionId" component={JudgeRoundPage} />
       <Route path="/judge/:sessionId" component={JudgePage} />
 
       <Route path="/" component={Home} />
       <Route path="/group/:id" component={GroupDetail} />
+      <Route path="/tournament/new" component={TournamentNewPage} />
       <Route path="/tournament/:id" component={TournamentDetail} />
       <Route
         path="/match/:tournamentId/:roundNumber/:matchId"
@@ -233,7 +238,8 @@ function App() {
   return (
     <ThemeProvider>
       <TournamentProvider>
-        <GroupProvider>
+        <RoleProvider>
+          <GroupProvider>
           <TooltipProvider>
             <WouterRouter base={basePath}>
               <ClerkProviderWithRoutes />
@@ -241,6 +247,7 @@ function App() {
             <Toaster />
           </TooltipProvider>
         </GroupProvider>
+        </RoleProvider>
       </TournamentProvider>
     </ThemeProvider>
   );

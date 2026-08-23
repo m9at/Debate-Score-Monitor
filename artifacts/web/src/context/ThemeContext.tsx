@@ -1,58 +1,33 @@
-import { createContext, useContext, useState, useEffect, type ReactNode } from "react";
+import { createContext, useContext, useEffect, type ReactNode } from "react";
 
-type ThemeMode = "light" | "dark" | "system";
+/**
+ * The app is light-only (Oman Debates brand identity).
+ * The context is kept so existing consumers keep compiling, but the mode is fixed.
+ */
+type ThemeMode = "light";
 
 interface ThemeContextType {
   themeMode: ThemeMode;
   setThemeMode: (mode: ThemeMode) => void;
-  isDark: boolean;
+  isDark: false;
 }
+
+const VALUE: ThemeContextType = {
+  themeMode: "light",
+  setThemeMode: () => {},
+  isDark: false,
+};
 
 const ThemeContext = createContext<ThemeContextType | null>(null);
 
-function getSystemDark() {
-  return window.matchMedia("(prefers-color-scheme: dark)").matches;
-}
-
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [themeMode, setThemeMode] = useState<ThemeMode>(() => {
-    const stored = localStorage.getItem("theme_mode");
-    return (stored as ThemeMode) || "system";
-  });
-
-  const isDark = themeMode === "system" ? getSystemDark() : themeMode === "dark";
-
   useEffect(() => {
-    localStorage.setItem("theme_mode", themeMode);
-  }, [themeMode]);
+    // Make sure no previously stored preference can bring the dark theme back.
+    document.documentElement.classList.remove("dark");
+    localStorage.removeItem("theme_mode");
+  }, []);
 
-  useEffect(() => {
-    if (isDark) {
-      document.documentElement.classList.add("dark");
-    } else {
-      document.documentElement.classList.remove("dark");
-    }
-  }, [isDark]);
-
-  useEffect(() => {
-    if (themeMode !== "system") return;
-    const mq = window.matchMedia("(prefers-color-scheme: dark)");
-    const handler = () => {
-      if (mq.matches) {
-        document.documentElement.classList.add("dark");
-      } else {
-        document.documentElement.classList.remove("dark");
-      }
-    };
-    mq.addEventListener("change", handler);
-    return () => mq.removeEventListener("change", handler);
-  }, [themeMode]);
-
-  return (
-    <ThemeContext.Provider value={{ themeMode, setThemeMode, isDark }}>
-      {children}
-    </ThemeContext.Provider>
-  );
+  return <ThemeContext.Provider value={VALUE}>{children}</ThemeContext.Provider>;
 }
 
 export function useTheme() {

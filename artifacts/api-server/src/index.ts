@@ -7,12 +7,15 @@ import {
   publicTournaments,
   tournamentRegistrations,
   sharedTournaments,
+  tournamentGroups,
 } from "@workspace/db";
 import { eq, and, sql, desc } from "drizzle-orm";
+import { profilesRouter } from "./routes/profiles";
 
 const app = express();
 app.use(cors());
 app.use(express.json({ limit: "2mb" }));
+app.use(profilesRouter);
 
 const PORT = parseInt(process.env.PORT || "5050", 10);
 
@@ -29,6 +32,15 @@ const param = (req: Request, name: string): string => {
   const v = (req.params as Record<string, unknown>)[name];
   return typeof v === "string" ? v : Array.isArray(v) ? String(v[0] ?? "") : "";
 };
+
+const serializeGroup = (r: typeof tournamentGroups.$inferSelect) => ({
+  id: r.id,
+  name: r.name,
+  description: r.description ?? undefined,
+  kind: r.kind,
+  tournamentIds: (r.tournamentIds ?? []) as string[],
+  createdAt: r.createdAt,
+});
 
 app.post(
   "/api/judge/sessions",
@@ -383,6 +395,64 @@ app.delete(
     await db
       .delete(sharedTournaments)
       .where(eq(sharedTournaments.id, param(req, "id")));
+    res.json({ ok: true });
+  }),
+);
+
+/* ---------------------------------------------------------------- folders */
+
+app.get(
+  "/api/tournament-groups",
+  wrap(async (_req, res) => {
+    const rows = await db
+      .select()
+      .from(tournamentGroups)
+      .orderBy(desc(tournamentGroups.createdAt));
+    res.json(rows.map(serializeGroup));
+  }),
+);
+
+app.put(
+  "/api/tournament-groups/:id",
+  wrap(async (req, res) => {
+    const id = param(req, "id");
+    const { name, description, kind, tournamentIds, createdAt } = req.body ?? {};
+    if (typeof name !== "string" || !name.trim()) {
+      res.status(400).json({ error: "missing name" });
+      return;
+    }
+    const values = {
+      id,
+      name: name.trim(),
+      description: typeof description === "string" ? description : null,
+      kind: kind === "archive" ? "archive" : "normal",
+      tournamentIds: Array.isArray(tournamentIds) ? tournamentIds : [],
+      createdAt: typeof createdAt === "number" ? createdAt : Date.now(),
+      updatedAt: new Date(),
+    };
+    await db
+      .insert(tournamentGroups)
+      .values(values)
+      .onConflictDoUpdate({
+        target: tournamentGroups.id,
+        set: {
+          name: values.name,
+          description: values.description,
+          kind: values.kind,
+          tournamentIds: values.tournamentIds,
+          updatedAt: values.updatedAt,
+        },
+      });
+    res.json({ ok: true });
+  }),
+);
+
+app.delete(
+  "/api/tournament-groups/:id",
+  wrap(async (req, res) => {
+    await db
+      .delete(tournamentGroups)
+      .where(eq(tournamentGroups.id, param(req, "id")));
     res.json({ ok: true });
   }),
 );

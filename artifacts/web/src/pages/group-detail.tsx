@@ -37,8 +37,8 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 import { Tournament } from "@/types/tournament";
 
-const CYAN = "#4ECDC4";
-const PURPLE = "#7B5EA7";
+const CYAN = "#29ABE2";
+const PURPLE = "#7B2D8E";
 
 function formatDate(ts: number) {
   return new Date(ts).toLocaleDateString("ar-SA", {

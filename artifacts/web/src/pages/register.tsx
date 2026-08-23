@@ -9,9 +9,18 @@ import {
   submitTeamRegistration,
 } from "@/lib/registrationsApi";
 import type { TeamDocument } from "@/types/tournament";
+import {
+  lookupProfile,
+  registerForTournament,
+  type TeamProfileRecord,
+} from "@/lib/profilesApi";
+import ContactGate from "@/components/register/ContactGate";
+import ReturningProfileCard from "@/components/register/ReturningProfileCard";
 
-const CYAN = "#4ECDC4";
-const PURPLE = "#7B5EA7";
+type Step = "contact" | "returning" | "form" | "done";
+
+const CYAN = "#29ABE2";
+const PURPLE = "#7B2D8E";
 
 const MAX_FILE_SIZE = 800 * 1024;
 
@@ -19,8 +28,12 @@ export default function RegisterPage() {
   const [info, setInfo] = useState<RegistrationInfo | null>(null);
   const [topic, setTopic] = useState<string>("");
   const [error, setError] = useState(false);
-  const [submitted, setSubmitted] = useState(false);
+  const [step, setStep] = useState<Step>("contact");
   const [submitting, setSubmitting] = useState(false);
+  const [contact, setContact] = useState("");
+  const [profile, setProfile] = useState<TeamProfileRecord | null>(null);
+  const [previousCount, setPreviousCount] = useState(0);
+  const [logoUrl, setLogoUrl] = useState("");
 
   const [teamName, setTeamName] = useState("");
   const [institution, setInstitution] = useState("");
@@ -49,6 +62,35 @@ export default function RegisterPage() {
       }
     });
   }, []);
+
+  /** Identify the team first, so a returning team keeps one profile. */
+  const handleContact = async (value: string) => {
+    setContact(value);
+    setSubmitting(true);
+    try {
+      const found = await lookupProfile<TeamProfileRecord>("team", value);
+      if (found.found) {
+        setProfile(found.profile);
+        setTeamName(found.profile.name);
+        setInstitution(found.profile.institution ?? "");
+        setLogoUrl(found.profile.logoUrl ?? "");
+        // Last known members are offered as a starting point, still editable.
+        const members = found.profile.lastMembers ?? [];
+        if (members.length >= 3) {
+          setSpeakersPerTeam(members.length >= 4 ? 4 : 3);
+          setSpeakerNames(members.slice(0, 4));
+        }
+        setPreviousCount(found.participations.length);
+        setStep("returning");
+      } else {
+        setStep("form");
+      }
+    } catch {
+      setStep("form");
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   const updateCount = (n: 3 | 4) => {
     setSpeakersPerTeam(n);
@@ -97,6 +139,18 @@ export default function RegisterPage() {
     setWarning("");
     setSubmitting(true);
     try {
+      await registerForTournament<TeamProfileRecord>(info.tournamentId, "team", {
+        name: teamName.trim(),
+        contact,
+        institution: institution.trim(),
+        logoUrl: logoUrl.trim(),
+        payload: {
+          members: speakerNames.map((sp) => sp.trim()),
+          speakersPerTeam,
+          submittedAt: Date.now(),
+        },
+      });
+      // Mirror into the organiser's approval queue so their panel stays in sync.
       await submitTeamRegistration(info.tournamentId, {
         teamName: teamName.trim(),
         institution: institution.trim(),
@@ -104,10 +158,14 @@ export default function RegisterPage() {
         speakerNames: speakerNames.map((s) => s.trim()),
         documents,
         submittedAt: Date.now(),
-      });
-      setSubmitted(true);
-    } catch {
-      setWarning("تعذّر إرسال التسجيل. تحقق من اتصالك ثم حاول مجدداً.");
+      }).catch(() => {});
+      setStep("done");
+    } catch (e) {
+      setWarning(
+        String(e).includes("registration_closed")
+          ? "تسجيل الفرق مغلق حالياً في هذه البطولة."
+          : "تعذّر إرسال التسجيل. تحقق من اتصالك ثم حاول مجدداً."
+      );
     } finally {
       setSubmitting(false);
     }
@@ -133,7 +191,43 @@ export default function RegisterPage() {
     );
   }
 
-  if (submitted) {
+  if (step === "contact" || step === "returning") {
+    return (
+      <div className="min-h-screen bg-background" dir="rtl">
+        <Header info={info} topic={topic} />
+        <main className="max-w-2xl mx-auto px-4 py-6 space-y-4">
+          {step === "contact" ? (
+            <ContactGate
+              title="تسجيل الفريق"
+              hint="أدخل رقم هاتف مسؤول الفريق أو بريده — إن كان للفريق ملف سابق سنتعرّف عليه."
+              submitting={submitting}
+              onSubmit={handleContact}
+            />
+          ) : (
+            profile && (
+              <ReturningProfileCard
+                name={profile.name}
+                photoUrl={profile.logoUrl}
+                tournamentName={info.tournamentName}
+                roleLabel="كفريق"
+                previousCount={previousCount}
+                submitting={submitting}
+                onConfirm={handleSubmit}
+                onEdit={() => setStep("form")}
+              />
+            )
+          )}
+          {warning && (
+            <div className="bg-destructive/10 text-destructive text-sm font-medium p-3 rounded-xl">
+              {warning}
+            </div>
+          )}
+        </main>
+      </div>
+    );
+  }
+
+  if (step === "done") {
     return (
       <div className="min-h-screen bg-background" dir="rtl">
         <Header info={info} topic={topic} />
@@ -178,6 +272,19 @@ export default function RegisterPage() {
               placeholder="مثال: فريق الفصاحة"
               className="w-full h-11 px-3 rounded-xl bg-muted outline-none"
               data-testid="input-team-name"
+            />
+          </div>
+          <div>
+            <label className="text-sm font-bold block mb-1.5">
+              شعار الفريق (اختياري)
+            </label>
+            <input
+              value={logoUrl}
+              onChange={(e) => setLogoUrl(e.target.value)}
+              dir="ltr"
+              placeholder="https://..."
+              className="w-full h-11 px-3 rounded-xl bg-muted outline-none"
+              data-testid="input-team-logo"
             />
           </div>
           <div>
