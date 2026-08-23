@@ -978,6 +978,7 @@ export default function TournamentDetail() {
     setMatchJudges,
     autoAssignJudges,
     setRoundLocked,
+    markResultAnnounced,
     logAction,
     tournaments,
   } = useTournament();
@@ -2512,6 +2513,10 @@ export default function TournamentDetail() {
     return (
       <PresentationMode
         tournament={tournament}
+        canAnnounce={can("announceResults")}
+        onMarkRevealed={(roundNumber, matchId) =>
+          markResultAnnounced(tournament.id, roundNumber, matchId)
+        }
         onExit={() => setPresentMode(false)}
       />
     );
