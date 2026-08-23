@@ -3,6 +3,9 @@ import { BRAND } from "@/lib/brand";
 import type { TournamentSetup } from "@/lib/wizard/types";
 import { Field, Panel, Toggle, inputClass, inputStyle } from "./ui";
 
+const MIN_PIN = 4;
+const MAX_PIN = 6;
+
 interface StepProtectionProps {
   setup: TournamentSetup;
   patch: (p: Partial<TournamentSetup>) => void;
@@ -19,7 +22,8 @@ export default function StepProtection({
 }: StepProtectionProps) {
   const { enabled, code } = setup.protection;
   const length = code.length;
-  const validLength = length === 4 || length === 6;
+  // One field, digits only, any length from 4 to 6.
+  const validLength = length >= MIN_PIN && length <= MAX_PIN;
   const matches = code === confirmCode && confirmCode.length > 0;
 
   const digitsOnly = (v: string, max: number) =>
@@ -41,38 +45,10 @@ export default function StepProtection({
       </Panel>
 
       {enabled && (
-        <Panel title="رمز الدخول (PIN)" hint="اختر رمزاً من 4 أو 6 أرقام">
+        <Panel title="رمز دخول البطولة" hint="أرقام فقط، من 4 إلى 6 أرقام">
           <div className="space-y-4">
-            {/* length choice */}
-            <div className="flex gap-2">
-              {[4, 6].map((len) => {
-                const active = length > 0 && length <= len && (len === 4 ? length <= 4 : true);
-                return (
-                  <button
-                    key={len}
-                    type="button"
-                    onClick={() => {
-                      patch({
-                        protection: { enabled: true, code: code.slice(0, len) },
-                      });
-                      onConfirmCodeChange("");
-                    }}
-                    className="flex-1 h-10 rounded-xl border text-[13px] font-bold transition-colors"
-                    style={{
-                      borderColor: BRAND.border,
-                      color: BRAND.ink,
-                      backgroundColor: active ? `${BRAND.purple}0f` : "#fff",
-                    }}
-                    data-testid={`button-pin-length-${len}`}
-                  >
-                    {len} أرقام
-                  </button>
-                );
-              })}
-            </div>
-
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Field label="الرمز" required>
+              <Field label="رمز دخول البطولة" required>
                 <input
                   type="password"
                   inputMode="numeric"
@@ -80,7 +56,10 @@ export default function StepProtection({
                   value={code}
                   onChange={(e) =>
                     patch({
-                      protection: { enabled: true, code: digitsOnly(e.target.value, 6) },
+                      protection: {
+                        enabled: true,
+                        code: digitsOnly(e.target.value, MAX_PIN),
+                      },
                     })
                   }
                   placeholder="••••"
@@ -95,7 +74,7 @@ export default function StepProtection({
                   inputMode="numeric"
                   autoComplete="new-password"
                   value={confirmCode}
-                  onChange={(e) => onConfirmCodeChange(digitsOnly(e.target.value, 6))}
+                  onChange={(e) => onConfirmCodeChange(digitsOnly(e.target.value, MAX_PIN))}
                   placeholder="••••"
                   className={`${inputClass} tracking-[0.4em] text-center`}
                   style={inputStyle}
@@ -112,7 +91,7 @@ export default function StepProtection({
                   style={{ color: BRAND.warning }}
                 >
                   <AlertCircle className="w-3.5 h-3.5" />
-                  يجب أن يكون الرمز 4 أو 6 أرقام
+                  يجب أن يكون الرمز من {MIN_PIN} إلى {MAX_PIN} أرقام
                 </p>
               )}
               {validLength && !matches && confirmCode.length > 0 && (

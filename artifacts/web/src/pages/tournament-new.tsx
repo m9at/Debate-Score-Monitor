@@ -82,7 +82,7 @@ export default function TournamentNewPage() {
       case "protection": {
         const { enabled, code } = setup.protection;
         if (!enabled) return true;
-        return (code.length === 4 || code.length === 6) && code === confirmCode;
+        return code.length >= 4 && code.length <= 6 && code === confirmCode;
       }
       case "system":
         return setup.settings.scoreMax > setup.settings.scoreMin;

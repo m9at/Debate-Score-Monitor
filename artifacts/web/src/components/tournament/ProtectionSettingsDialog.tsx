@@ -9,6 +9,9 @@ import {
 import type { TournamentProtection } from "@/types/tournament";
 import { BRAND, BTN, BTN_PRIMARY_STYLE } from "@/lib/brand";
 
+const MIN_PIN = 4;
+const MAX_PIN = 6;
+
 interface ProtectionSettingsDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -95,22 +98,18 @@ export default function ProtectionSettingsDialog({
   onSave,
 }: ProtectionSettingsDialogProps) {
   const [draft, setDraft] = useState<TournamentProtection>(value ?? EMPTY);
-  const [length, setLength] = useState<4 | 6>(
-    (value?.code?.length === 6 ? 6 : 4) as 4 | 6
-  );
   const [error, setError] = useState("");
 
   useEffect(() => {
     if (!open) return;
     setDraft(value ?? EMPTY);
-    setLength((value?.code?.length === 6 ? 6 : 4) as 4 | 6);
     setError("");
   }, [open, value]);
 
   const submit = () => {
     if (draft.enabled) {
-      if (draft.code.length !== length) {
-        setError(`الرمز يجب أن يكون ${length} أرقام`);
+      if (draft.code.length < MIN_PIN || draft.code.length > MAX_PIN) {
+        setError(`الرمز يجب أن يكون من ${MIN_PIN} إلى ${MAX_PIN} أرقام`);
         return;
       }
       if (!draft.protectView && !draft.protectEdit) {
@@ -147,39 +146,6 @@ export default function ProtectionSettingsDialog({
 
           {draft.enabled && (
             <div className="space-y-3 animate-in fade-in slide-in-from-top-1 duration-200">
-              {/* Code length */}
-              <div
-                className="rounded-xl border p-3"
-                style={{ borderColor: BRAND.border }}
-              >
-                <div className="text-[13px] font-bold mb-1" style={{ color: BRAND.ink }}>
-                  طول الرمز
-                </div>
-                <p className="text-[11px] mb-2.5" style={{ color: `${BRAND.ink}99` }}>
-                  اختر رمزاً من ٤ أرقام (أسرع) أو ٦ أرقام (أكثر أماناً).
-                </p>
-                <div className="flex gap-2">
-                  {([4, 6] as const).map((n) => (
-                    <button
-                      key={n}
-                      type="button"
-                      onClick={() => {
-                        setLength(n);
-                        setDraft((d) => ({ ...d, code: d.code.slice(0, n) }));
-                        setError("");
-                      }}
-                      className={`${BTN.base} flex-1 ${
-                        length === n ? "text-white" : BTN.secondary
-                      }`}
-                      style={length === n ? BTN_PRIMARY_STYLE : undefined}
-                      data-testid={`button-code-length-${n}`}
-                    >
-                      {n} أرقام
-                    </button>
-                  ))}
-                </div>
-              </div>
-
               {/* Code */}
               <div
                 className="rounded-xl border p-3"
@@ -189,18 +155,18 @@ export default function ProtectionSettingsDialog({
                   رمز الدخول
                 </div>
                 <p className="text-[11px] mb-2.5" style={{ color: `${BRAND.ink}99` }}>
-                  شاركه فقط مع من يحق له الوصول للبطولة.
+                  أرقام فقط، من {MIN_PIN} إلى {MAX_PIN} أرقام.
                 </p>
                 <input
                   value={draft.code}
                   onChange={(e) => {
-                    const digits = e.target.value.replace(/\D/g, "").slice(0, length);
+                    const digits = e.target.value.replace(/\D/g, "").slice(0, MAX_PIN);
                     setDraft((d) => ({ ...d, code: digits }));
                     setError("");
                   }}
                   inputMode="numeric"
                   autoComplete="off"
-                  placeholder={"•".repeat(length)}
+                  placeholder={"•".repeat(MIN_PIN)}
                   dir="ltr"
                   className="w-full h-12 rounded-xl border text-center text-2xl font-bold tracking-[0.5em]
                              outline-none focus:border-[#7B2D8E]/50 transition-colors bg-[#F7F8FC]"
