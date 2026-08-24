@@ -11,6 +11,7 @@ import {
 } from "@workspace/db";
 import { eq, and, sql, desc } from "drizzle-orm";
 import { profilesRouter } from "./routes/profiles";
+import { serveWebClient } from "./static";
 
 const app = express();
 app.use(cors());
@@ -456,6 +457,10 @@ app.delete(
     res.json({ ok: true });
   }),
 );
+
+if (process.env.NODE_ENV === "production") {
+  serveWebClient(app);
+}
 
 app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
   const msg = err instanceof Error ? err.message : "internal error";
