@@ -79,7 +79,6 @@ import OverviewDashboard from "@/components/tournament/OverviewDashboard";
 import ResultsAdmin from "@/components/tournament/ResultsAdmin";
 import RoundControlCenter from "@/components/tournament/RoundControlCenter";
 import AuditLog from "@/components/tournament/AuditLog";
-import PresentationMode from "@/components/tournament/PresentationMode";
 import RegistrationLinksCenter from "@/components/tournament/RegistrationLinksCenter";
 import RoundsManager from "@/components/tournament/RoundsManager";
 import ReportsPanel from "@/components/tournament/ReportsPanel";
@@ -89,7 +88,6 @@ import AutoSaveIndicator from "@/components/tournament/AutoSaveIndicator";
 import TournamentSkeleton from "@/components/tournament/TournamentSkeleton";
 import RoleSwitcher from "@/components/tournament/RoleSwitcher";
 import { useRole } from "@/context/RoleContext";
-import AnnouncePickerDialog from "@/components/announce/AnnouncePickerDialog";
 import type { SidebarGroup } from "@/components/tournament/TournamentSidebar";
 import ProtectionSettingsDialog from "@/components/tournament/ProtectionSettingsDialog";
 import UnlockGate from "@/components/tournament/UnlockGate";
@@ -1013,8 +1011,6 @@ export default function TournamentDetail() {
     const requested = new URLSearchParams(window.location.search).get("tab");
     return (requested as TabType) || "overview";
   });
-  const [announceOpen, setAnnounceOpen] = useState(false);
-  const [presentMode, setPresentMode] = useState(false);
   const { toast } = useToast();
   const { can } = useRole();
   // Selected round numbers for the standings tab. Empty set = all rounds.
@@ -2496,31 +2492,31 @@ export default function TournamentDetail() {
 
   const navGroups: SidebarGroup<TabType>[] = [
     {
+      // Everything the organiser needs day to day — nothing else.
       title: "البطولة",
-      tabs: [{ key: "overview", label: "نظرة عامة", icon: LayoutDashboard }],
-    },
-    {
-      title: "التشغيل",
       tabs: [
-        { key: "rounds", label: "الجولات", icon: Layers },
-        { key: "control", label: "القاعات", icon: ListChecks },
-      ],
-    },
-    {
-      title: "المشاركون",
-      tabs: [
+        { key: "overview", label: "🏠 نظرة عامة", icon: LayoutDashboard },
+        { key: "rounds", label: "⚔️ الجولات", icon: Layers },
+        { key: "control", label: "🏛️ القاعات", icon: ListChecks },
         ...(can("manageTeams")
-          ? ([{ key: "teams" as TabType, label: "الفرق", icon: Users }] as const)
+          ? ([{ key: "teams" as TabType, label: "👥 الفرق", icon: Users }] as const)
           : []),
         ...(can("manageJudges")
-          ? ([
-              { key: "judges" as TabType, label: "المحكمون", icon: UserCheck },
-            ] as const)
+          ? ([{ key: "judges" as TabType, label: "👨‍⚖️ المحكمون", icon: UserCheck }] as const)
+          : []),
+        ...(can("viewScores")
+          ? ([{ key: "standings" as TabType, label: "📊 النتائج", icon: BarChart2 }] as const)
           : []),
       ],
     },
     {
-      title: "التسجيل",
+      title: "الإدارة",
+      tabs: [{ key: "settings", label: "⚙️ إعدادات البطولة", icon: Settings }],
+    },
+    {
+      // Secondary destinations, still one click away.
+      title: "المزيد",
+      collapsible: true,
       tabs: [
         { key: "links", label: "روابط التسجيل", icon: LinkIcon },
         ...(can("manageJudges")
@@ -2533,25 +2529,13 @@ export default function TournamentDetail() {
               },
             ] as const)
           : []),
-      ],
-    },
-    ...(can("viewScores")
-      ? [
-          {
-            title: "النتائج",
-            tabs: [
+        ...(can("viewScores")
+          ? ([
               { key: "resultsAdmin" as TabType, label: "إدارة النتائج", icon: ClipboardList, restricted: true },
-              { key: "standings" as TabType, label: "الترتيب", icon: BarChart2, restricted: true },
               { key: "speakers" as TabType, label: "المتحدثين", icon: Mic, restricted: true },
-            ],
-          },
-        ]
-      : []),
-    {
-      title: "التقارير والإعدادات",
-      tabs: [
+            ] as const)
+          : []),
         { key: "reports", label: "التقارير", icon: FileText },
-        { key: "settings", label: "الإعدادات", icon: Settings },
         ...(can("viewAudit")
           ? ([{ key: "audit" as TabType, label: "سجل العمليات", icon: History }] as const)
           : []),
@@ -2559,35 +2543,11 @@ export default function TournamentDetail() {
     },
   ];
 
-  if (presentMode) {
-    return (
-      <PresentationMode
-        tournament={tournament}
-        canAnnounce={can("announceResults")}
-        onMarkRevealed={(roundNumber, matchId) =>
-          markResultAnnounced(tournament.id, roundNumber, matchId)
-        }
-        onExit={() => setPresentMode(false)}
-      />
-    );
-  }
-
   return (
     <div
       className="min-h-screen flex flex-col md:flex-row"
       style={{ backgroundColor: BRAND.surface }}
     >
-      <AnnouncePickerDialog
-        tournament={tournament}
-        open={announceOpen}
-        onOpenChange={setAnnounceOpen}
-        onAnnounce={(match) =>
-          setLocation(
-            `/announce/${tournament.id}/${tournament.currentRound}/${match.id}`
-          )
-        }
-      />
-
       <TournamentSidebar
         groups={navGroups}
         activeTab={activeTab}
@@ -2664,7 +2624,7 @@ export default function TournamentDetail() {
             <RoleSwitcher />
 
             <button
-              onClick={() => setPresentMode(true)}
+              onClick={() => setLocation(`/present/${tournament.id}`)}
               className={`${BTN.base} ${BTN.secondary} h-10 px-4 shrink-0`}
               data-testid="button-presentation-mode"
             >
@@ -2674,13 +2634,13 @@ export default function TournamentDetail() {
 
             {can("announceResults") && (
             <button
-              onClick={() => setAnnounceOpen(true)}
+              onClick={() => setLocation(`/present/${tournament.id}`)}
               className={`${BTN.base} ${BTN.primary} h-10 px-5 shrink-0 shadow-lg`}
               style={BTN_PRIMARY_STYLE}
               data-testid="button-announce-results"
             >
               <Megaphone className="w-4 h-4" />
-              إعلان النتائج
+              📢 إعلان النتائج
             </button>
             )}
             </div>
@@ -2732,16 +2692,6 @@ export default function TournamentDetail() {
           </div>
         )}
 
-        {activeTab === "overview" && can("manageTeams") && (
-          <div className="mb-3">
-            <RegistrationLinksCard
-              pendingTeams={tournament.pendingTeams?.length ?? 0}
-              pendingJudges={tournament.pendingJudges?.length ?? 0}
-              onTeamLink={handleRegistrationLink}
-              onJudgeLink={handleJudgeRegistrationLink}
-            />
-          </div>
-        )}
         {activeTab === "overview" && (
           <OverviewDashboard
             tournament={tournament}
@@ -2752,7 +2702,7 @@ export default function TournamentDetail() {
                 `/match/${tournament.id}/${tournament.currentRound}/${match.id}`
               )
             }
-            onAnnounce={() => setAnnounceOpen(true)}
+            onAnnounce={() => setLocation(`/present/${tournament.id}`)}
           />
         )}
 
@@ -2764,7 +2714,7 @@ export default function TournamentDetail() {
                 `/match/${tournament.id}/${tournament.currentRound}/${match.id}`
               )
             }
-            onAnnounce={() => setAnnounceOpen(true)}
+            onAnnounce={() => setLocation(`/present/${tournament.id}`)}
             onToggleLock={(locked) => {
               setRoundLocked(tournament.id, tournament.currentRound, locked);
               toast({

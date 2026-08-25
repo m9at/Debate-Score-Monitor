@@ -13,6 +13,7 @@ import GroupDetail from "@/pages/group-detail";
 import TournamentDetail from "@/pages/tournament-detail";
 import TournamentNewPage from "@/pages/tournament-new";
 import AnnouncePage from "@/pages/announce";
+import PresentPage from "@/pages/present";
 import MatchScoring from "@/pages/match-scoring";
 import Leaderboard from "@/pages/leaderboard";
 import TeamHistory from "@/pages/team-history";
@@ -179,6 +180,7 @@ function Router() {
       <Route path="/join/judges/:id" component={JudgeRegisterPage} />
       <Route path="/judges-public" component={JudgesPublicPage} />
       <Route path="/results/:id" component={ResultsPage} />
+      <Route path="/present/:id" component={PresentPage} />
       <Route path="/announce/:id/:round/:matchId" component={AnnouncePage} />
       <Route path="/import" component={ImportPage} />
       <Route path="/judge/round/:sessionId" component={JudgeRoundPage} />

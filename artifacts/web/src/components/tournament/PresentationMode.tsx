@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { X } from "lucide-react";
+import { Play, RotateCcw, X } from "lucide-react";
 import type { Tournament } from "@/types/tournament";
 import { BRAND, BRAND_GRADIENT } from "@/lib/brand";
 import { getRoomStatus } from "@/lib/roomStatus";
@@ -10,6 +10,7 @@ import PresentRoomCard from "@/components/present/PresentRoomCard";
 import PresentRoomFocus from "@/components/present/PresentRoomFocus";
 import PresentCaseText from "@/components/present/PresentCaseText";
 import RevealOverlay from "@/components/present/RevealOverlay";
+import { useAnnounceQueue } from "@/hooks/useAnnounceQueue";
 
 interface PresentationModeProps {
   tournament: Tournament;
@@ -54,11 +55,19 @@ export default function PresentationMode({
     setAnnouncingId(null);
   }, [presentedRound]);
 
-  // Real full screen; leaving it exits the mode.
+  // Ask for real full screen, but never let the request (or a browser that
+  // refuses it, e.g. inside an iframe) end the show: only leaving a full screen
+  // we actually entered goes back.
   useEffect(() => {
-    document.documentElement.requestFullscreen?.().catch(() => {});
+    let entered = false;
+    void document.documentElement
+      .requestFullscreen?.()
+      .then(() => {
+        entered = true;
+      })
+      .catch(() => {});
     const onChange = () => {
-      if (!document.fullscreenElement) onExit();
+      if (entered && !document.fullscreenElement) onExit();
     };
     document.addEventListener("fullscreenchange", onChange);
     return () => {
@@ -99,8 +108,15 @@ export default function PresentationMode({
   const focused = focusedRoomId
     ? (rooms.find(({ match }) => match.id === focusedRoomId) ?? null)
     : null;
-  const announcingMatch = announcingId
-    ? (round?.matches.find((m) => m.id === announcingId) ?? null)
+  /** Rooms whose result exists — the auto-play show runs through these. */
+  const showableIds = rooms
+    .filter(({ status }) => status === "ready" || status === "announced")
+    .map(({ match }) => match.id);
+  const queue = useAnnounceQueue(showableIds);
+
+  const shownId = queue.currentId ?? announcingId;
+  const announcingMatch = shownId
+    ? (round?.matches.find((m) => m.id === shownId) ?? null)
     : null;
 
   return (
@@ -192,9 +208,24 @@ export default function PresentationMode({
                     />
                   ))}
                 </div>
-                <p className="text-center text-white/35 text-base md:text-xl font-bold">
-                  أُعلنت {revealedCount} من {rooms.length} قاعة
-                </p>
+                <div className="flex flex-col items-center gap-4">
+                  <p className="text-center text-white/35 text-base md:text-xl font-bold">
+                    أُعلنت {revealedCount} من {rooms.length} قاعة
+                  </p>
+                  {canAnnounce && showableIds.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={queue.start}
+                      className="inline-flex items-center gap-2 h-12 px-6 rounded-2xl text-white
+                                 font-bold text-[15px] transition-transform hover:scale-[1.03]"
+                      style={{ backgroundImage: BRAND_GRADIENT }}
+                      data-testid="button-start-auto-show"
+                    >
+                      <Play className="w-4 h-4" />
+                      بدء العرض التلقائي ({showableIds.length} قاعة)
+                    </button>
+                  )}
+                </div>
               </>
             )}
           </motion.div>
@@ -202,14 +233,55 @@ export default function PresentationMode({
       </AnimatePresence>
 
       <AnimatePresence>
+        {queue.done && (
+          <motion.div
+            key="show-done"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-6 px-6 text-center"
+            style={{ backgroundColor: BRAND.ink }}
+            data-testid="show-finished"
+          >
+            <p className="text-white font-bold text-3xl md:text-5xl">
+              انتهى إعلان نتائج {roundLabel}
+            </p>
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={queue.start}
+                className="inline-flex items-center gap-2 h-12 px-6 rounded-2xl text-white font-bold"
+                style={{ backgroundImage: BRAND_GRADIENT }}
+                data-testid="button-replay-show"
+              >
+                <RotateCcw className="w-4 h-4" />
+                إعادة العرض
+              </button>
+              <button
+                type="button"
+                onClick={queue.stop}
+                className="h-12 px-6 rounded-2xl font-bold text-white/70 bg-white/10 hover:bg-white/20"
+                data-testid="button-close-show-finished"
+              >
+                عودة للقاعات
+              </button>
+            </div>
+          </motion.div>
+        )}
+
         {announcingMatch && round && (
           <RevealOverlay
             tournament={tournament}
             round={round}
             roundNumber={presentedRound}
             match={announcingMatch}
-            onRevealed={() => onMarkRevealed(presentedRound, announcingMatch.id)}
+            onRevealed={() => {
+              onMarkRevealed(presentedRound, announcingMatch.id);
+              // Starts the 5-second hold only now, with the result on screen.
+              if (queue.active) queue.revealed(announcingMatch.id);
+            }}
             onClose={() => {
+              if (queue.active) queue.stop();
               setAnnouncingId(null);
               setFocusedRoomId(null);
             }}
