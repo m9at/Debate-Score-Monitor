@@ -1,4 +1,4 @@
-import { entities } from "@/api/base44Client";
+const API_BASE = "/api";
 
 export type ProfileRole = "judge" | "team";
 export type ParticipationStatus = "pending" | "approved" | "withdrawn";
@@ -39,10 +39,11 @@ export interface ParticipationRecord {
 export interface RegistrationLinkRecord {
   id: string;
   tournamentId: string;
-  kind: "team" | "judge";
+  kind: ProfileRole extends never ? never : "team" | "judge";
   state: LinkState;
 }
 
+/** A participant row as the admin panel shows it. */
 export interface ParticipantRecord<P> {
   id: string;
   status: ParticipationStatus;
@@ -51,191 +52,86 @@ export interface ParticipantRecord<P> {
   profile: P | null;
 }
 
-function normalizeContact(v: string) {
-  return v.trim().toLowerCase().replace(/\s+/g, "");
-}
-
-function profileFromRow(row: any): JudgeProfileRecord | TeamProfileRecord {
-  if (row.role === "team") {
-    return {
-      id: row.profile_id,
-      name: row.name,
-      contact: row.contact,
-      contactKind: row.contact_kind ?? (row.contact?.includes("@") ? "email" : "phone"),
-      logoUrl: row.logo_url ?? null,
-      institution: row.institution ?? null,
-      lastMembers: row.last_members ?? [],
-      details: row.details ?? {},
-    };
+async function http<T>(path: string, init?: RequestInit): Promise<T> {
+  const res = await fetch(`${API_BASE}${path}`, {
+    ...init,
+    headers: { "Content-Type": "application/json", ...(init?.headers ?? {}) },
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(text || `HTTP ${res.status}`);
   }
-  return {
-    id: row.profile_id,
-    name: row.name,
-    contact: row.contact,
-    contactKind: row.contact_kind ?? (row.contact?.includes("@") ? "email" : "phone"),
-    photoUrl: row.photo_url ?? null,
-    institution: row.institution ?? null,
-    experience: row.experience ?? null,
-    details: row.details ?? {},
-  };
+  return (await res.json()) as T;
 }
 
-function participationFromRow(row: any): ParticipationRecord {
-  return {
-    id: row.participation_id,
-    tournamentId: row.tournament_id,
-    role: row.role,
-    profileId: row.profile_id,
-    status: row.status,
-    payload: row.payload ?? {},
-    createdAt: row.created_date ?? new Date(row.created_at_ms ?? Date.now()).toISOString(),
-  };
-}
-
-export async function lookupProfile<P>(
+/** Is there already a permanent profile behind this phone/email? */
+export function lookupProfile<P>(
   role: ProfileRole,
   contact: string,
-): Promise<{ found: false } | { found: true; profile: P; participations: ParticipationRecord[] }> {
-  const normalized = normalizeContact(contact);
-  const rows = await entities.ParticipantProfile.filter({ role, contact: normalized }, "-updated_date", 1);
-  const row = rows[0];
-  if (!row) return { found: false };
-  const parts = await entities.TournamentParticipation.filter({ profile_id: row.profile_id, role }, "-created_date", 5000);
-  return {
-    found: true,
-    profile: profileFromRow(row) as P,
-    participations: parts.map(participationFromRow),
-  };
+): Promise<
+  { found: false } | { found: true; profile: P; participations: ParticipationRecord[] }
+> {
+  return http(
+    `/profiles/${role}/lookup?contact=${encodeURIComponent(contact)}`,
+  );
 }
 
 export interface RegisterInput {
   name: string;
   contact: string;
   institution?: string;
+  /** judge */
   photoUrl?: string;
   experience?: string;
+  /** team */
   logoUrl?: string;
+  /** Per-tournament data, e.g. this tournament's speaker list. */
   payload?: Record<string, unknown>;
   details?: Record<string, unknown>;
 }
 
-export async function registerForTournament<P>(
+/** Register / join a tournament — creates the profile only on the first visit. */
+export function registerForTournament<P>(
   tournamentId: string,
   role: ProfileRole,
   input: RegisterInput,
 ): Promise<{ ok: true; reused: boolean; profile: P }> {
-  const link = (await getRegistrationLinks(tournamentId))[role];
-  if (link.state !== "open") throw new Error("التسجيل مغلق لهذه البطولة");
-
-  const contact = normalizeContact(input.contact);
-  const found = await entities.ParticipantProfile.filter({ role, contact }, "-updated_date", 1);
-  let profileRow = found[0];
-  const profileId = profileRow?.profile_id ?? crypto.randomUUID();
-  const payloadMembers = Array.isArray(input.payload?.speakerNames)
-    ? (input.payload?.speakerNames as string[])
-    : Array.isArray(input.payload?.members)
-      ? (input.payload?.members as string[])
-      : [];
-  const profilePayload = {
-    profile_id: profileId,
-    role,
-    name: input.name.trim(),
-    contact,
-    contact_kind: contact.includes("@") ? "email" : "phone",
-    photo_url: input.photoUrl ?? profileRow?.photo_url ?? "",
-    logo_url: input.logoUrl ?? profileRow?.logo_url ?? "",
-    institution: input.institution ?? profileRow?.institution ?? "",
-    experience: input.experience ?? profileRow?.experience ?? "",
-    last_members: role === "team" && payloadMembers.length ? payloadMembers : (profileRow?.last_members ?? []),
-    details: input.details ?? profileRow?.details ?? {},
-    updated_at_ms: Date.now(),
-  };
-  if (profileRow) profileRow = await entities.ParticipantProfile.update(profileRow.id, profilePayload);
-  else profileRow = await entities.ParticipantProfile.create(profilePayload);
-
-  const existingParts = await entities.TournamentParticipation.filter({
-    tournament_id: tournamentId,
-    role,
-    profile_id: profileId,
-  }, "-updated_date", 1);
-  const partPayload = {
-    participation_id: existingParts[0]?.participation_id ?? crypto.randomUUID(),
-    tournament_id: tournamentId,
-    role,
-    profile_id: profileId,
-    status: existingParts[0]?.status ?? "pending",
-    payload: input.payload ?? {},
-    created_at_ms: existingParts[0]?.created_at_ms ?? Date.now(),
-    updated_at_ms: Date.now(),
-  };
-  if (existingParts[0]) await entities.TournamentParticipation.update(existingParts[0].id, partPayload);
-  else await entities.TournamentParticipation.create(partPayload);
-
-  return { ok: true, reused: !!found[0], profile: profileFromRow(profileRow) as P };
+  return http(`/tournaments/${tournamentId}/registrations/${role}`, {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
 }
 
-export async function listParticipants<P>(
+export function listParticipants<P>(
   tournamentId: string,
   role: ProfileRole,
 ): Promise<ParticipantRecord<P>[]> {
-  const parts = await entities.TournamentParticipation.filter({ tournament_id: tournamentId, role }, "-created_date", 5000);
-  const profileIds = [...new Set(parts.map((p: any) => p.profile_id))];
-  const profileRows = await Promise.all(profileIds.map(async (profileId) => {
-    const rows = await entities.ParticipantProfile.filter({ profile_id: profileId, role }, "-updated_date", 1);
-    return rows[0] ?? null;
-  }));
-  const byId = new Map(profileRows.filter(Boolean).map((p: any) => [p.profile_id, p]));
-  return parts.map((row: any) => ({
-    id: row.participation_id,
-    status: row.status,
-    payload: row.payload ?? {},
-    createdAt: row.created_date ?? new Date(row.created_at_ms ?? Date.now()).toISOString(),
-    profile: byId.get(row.profile_id) ? profileFromRow(byId.get(row.profile_id)) as P : null,
-  }));
+  return http(`/tournaments/${tournamentId}/registrations/${role}`);
 }
 
-export async function setParticipationStatus(
+export function setParticipationStatus(
   participationId: string,
   status: ParticipationStatus,
 ): Promise<{ ok: true }> {
-  const rows = await entities.TournamentParticipation.filter({ participation_id: participationId }, "-updated_date", 1);
-  if (!rows[0]) throw new Error("التسجيل غير موجود");
-  await entities.TournamentParticipation.update(rows[0].id, { status, updated_at_ms: Date.now() });
-  return { ok: true };
+  return http(`/registrations/${participationId}`, {
+    method: "PATCH",
+    body: JSON.stringify({ status }),
+  });
 }
 
-async function ensureLink(tournamentId: string, kind: "team" | "judge"): Promise<RegistrationLinkRecord> {
-  const rows = await entities.RegistrationLink.filter({ tournament_id: tournamentId, kind }, "-updated_date", 1);
-  let row = rows[0];
-  if (!row) {
-    row = await entities.RegistrationLink.create({
-      link_id: `${tournamentId}-${kind}`,
-      tournament_id: tournamentId,
-      kind,
-      state: "open",
-      updated_at_ms: Date.now(),
-    });
-  }
-  return { id: row.link_id, tournamentId: row.tournament_id, kind: row.kind, state: row.state };
-}
-
-export async function getRegistrationLinks(
+export function getRegistrationLinks(
   tournamentId: string,
 ): Promise<{ team: RegistrationLinkRecord; judge: RegistrationLinkRecord }> {
-  const [team, judge] = await Promise.all([
-    ensureLink(tournamentId, "team"),
-    ensureLink(tournamentId, "judge"),
-  ]);
-  return { team, judge };
+  return http(`/tournaments/${tournamentId}/registration-links`);
 }
 
-export async function setRegistrationLinkState(
+export function setRegistrationLinkState(
   tournamentId: string,
   kind: "team" | "judge",
   state: LinkState,
 ): Promise<{ ok: true; state: LinkState }> {
-  await ensureLink(tournamentId, kind);
-  const rows = await entities.RegistrationLink.filter({ tournament_id: tournamentId, kind }, "-updated_date", 1);
-  await entities.RegistrationLink.update(rows[0].id, { state, updated_at_ms: Date.now() });
-  return { ok: true, state };
+  return http(`/tournaments/${tournamentId}/registration-links/${kind}`, {
+    method: "PATCH",
+    body: JSON.stringify({ state }),
+  });
 }
