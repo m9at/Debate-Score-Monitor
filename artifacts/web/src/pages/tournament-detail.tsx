@@ -1007,7 +1007,11 @@ export default function TournamentDetail() {
   } = useTournament();
   const tournament = getTournament(params?.id || "");
 
-  const [activeTab, setActiveTab] = useState<TabType>("overview");
+  // `?tab=` lets the tournament card's menu open a specific tab directly.
+  const [activeTab, setActiveTab] = useState<TabType>(() => {
+    const requested = new URLSearchParams(window.location.search).get("tab");
+    return (requested as TabType) || "overview";
+  });
   const [announceOpen, setAnnounceOpen] = useState(false);
   const [presentMode, setPresentMode] = useState(false);
   const { toast } = useToast();

@@ -118,6 +118,7 @@ export default function Home() {
         onRename={() => startRename(t.id, t.name)}
         onMoveToFolder={() => setMoveId(t.id)}
         onToggleArchive={() => setTournamentArchived(t.id, !t.archived)}
+        onSettings={() => setLocation(`/tournament/${t.id}?tab=settings`)}
         onDelete={() => deleteTournament(t.id)}
       />
     </motion.div>

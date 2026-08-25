@@ -1,26 +1,14 @@
 import { useState } from "react";
 import {
-  Archive,
-  ArchiveRestore,
   FolderInput,
   Gavel,
   LayoutGrid,
   Lock,
   LogIn,
-  Pencil,
-  Trash2,
   Users,
 } from "lucide-react";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+import DeleteTournamentDialog from "./DeleteTournamentDialog";
+import TournamentCardMenu from "./TournamentCardMenu";
 import type { Tournament } from "@/types/tournament";
 import { BRAND, BRAND_GRADIENT, BTN, BTN_PRIMARY_STYLE } from "@/lib/brand";
 import { getTournamentCounts, getTournamentStatus } from "@/lib/tournamentStatus";
@@ -35,6 +23,8 @@ interface TournamentCardProps {
   onRename: () => void;
   onMoveToFolder: () => void;
   onToggleArchive: () => void;
+  /** Opens the tournament straight on its settings tab. */
+  onSettings: () => void;
   onDelete: () => void;
 }
 
@@ -69,34 +59,6 @@ function Stat({
   );
 }
 
-/** Small written action — every important command stays visible, never in a ⋮ menu. */
-function CardAction({
-  icon: Icon,
-  label,
-  onClick,
-  tone = "normal",
-  testId,
-}: {
-  icon: typeof Users;
-  label: string;
-  onClick: () => void;
-  tone?: "normal" | "danger";
-  testId: string;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      className={`${BTN.base} ${
-        tone === "danger" ? BTN.danger : BTN.secondary
-      } flex-1 min-w-[7.5rem] px-2.5`}
-      data-testid={testId}
-    >
-      <Icon className="w-4 h-4" />
-      {label}
-    </button>
-  );
-}
-
 export default function TournamentCard({
   tournament,
   folderName,
@@ -104,6 +66,7 @@ export default function TournamentCard({
   onRename,
   onMoveToFolder,
   onToggleArchive,
+  onSettings,
   onDelete,
 }: TournamentCardProps) {
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -130,7 +93,7 @@ export default function TournamentCard({
       <div className="p-5 pt-6 flex-1">
         {/* Title row */}
         <div className="mb-3">
-          <div className="flex items-center gap-1.5 mb-2">
+          <div className="flex items-start gap-1.5 mb-2">
             <h3
               className="font-bold text-[19px] leading-snug truncate"
               style={{ color: BRAND.ink }}
@@ -146,6 +109,17 @@ export default function TournamentCard({
                 data-testid="icon-protected"
               />
             )}
+            <div className="ms-auto shrink-0 -mt-1">
+              <TournamentCardMenu
+                archived={tournament.archived}
+                onOpen={onOpen}
+                onEdit={onRename}
+                onMoveToFolder={onMoveToFolder}
+                onToggleArchive={onToggleArchive}
+                onSettings={onSettings}
+                onDelete={() => setConfirmDelete(true)}
+              />
+            </div>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
             <StatusBadge status={status} />
@@ -220,8 +194,8 @@ export default function TournamentCard({
         </div>
       </div>
 
-      {/* Actions — all written out, nothing hidden behind an icon menu */}
-      <div className="px-5 pb-5 space-y-2">
+      {/* Only the everyday action stays on the card; the rest live in the ⋮ menu */}
+      <div className="px-5 pb-5">
         <button
           onClick={onOpen}
           className={`${BTN.base} ${BTN.primary} h-11 w-full text-[14px]`}
@@ -229,58 +203,16 @@ export default function TournamentCard({
           data-testid="button-open-tournament"
         >
           <LogIn className="w-4 h-4" />
-          دخول البطولة
+          فتح البطولة
         </button>
-        <div className="flex flex-wrap gap-2">
-          <CardAction
-            icon={Pencil}
-            label="تعديل البطولة"
-            onClick={onRename}
-            testId="button-card-edit"
-          />
-          <CardAction
-            icon={FolderInput}
-            label="نقل إلى مجلد"
-            onClick={onMoveToFolder}
-            testId="button-card-move"
-          />
-          <CardAction
-            icon={tournament.archived ? ArchiveRestore : Archive}
-            label={tournament.archived ? "استعادة" : "أرشفة"}
-            onClick={onToggleArchive}
-            testId="button-card-archive"
-          />
-          <CardAction
-            icon={Trash2}
-            label="حذف"
-            tone="danger"
-            onClick={() => setConfirmDelete(true)}
-            testId="button-card-delete"
-          />
-        </div>
       </div>
 
-      <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
-        <AlertDialogContent dir="rtl">
-          <AlertDialogHeader>
-            <AlertDialogTitle>حذف البطولة</AlertDialogTitle>
-            <AlertDialogDescription>
-              سيتم حذف «{tournament.name}» وجميع جولاتها ونتائجها نهائياً. لا يمكن
-              التراجع عن هذه العملية.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>إلغاء</AlertDialogCancel>
-            <AlertDialogAction
-              className="bg-destructive hover:bg-destructive/90"
-              onClick={onDelete}
-              data-testid="button-confirm-delete-tournament"
-            >
-              حذف نهائي
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <DeleteTournamentDialog
+        open={confirmDelete}
+        onOpenChange={setConfirmDelete}
+        tournamentName={tournament.name}
+        onConfirm={onDelete}
+      />
     </div>
   );
 }
