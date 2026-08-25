@@ -87,6 +87,7 @@ import ShareLinkDialog from "@/components/tournament/ShareLinkDialog";
 import AutoSaveIndicator from "@/components/tournament/AutoSaveIndicator";
 import TournamentSkeleton from "@/components/tournament/TournamentSkeleton";
 import RoleSwitcher from "@/components/tournament/RoleSwitcher";
+import JudgeRequestsPanel from "@/components/judges/JudgeRequestsPanel";
 import { useRole } from "@/context/RoleContext";
 import type { SidebarGroup } from "@/components/tournament/TournamentSidebar";
 import ProtectionSettingsDialog from "@/components/tournament/ProtectionSettingsDialog";
@@ -2845,7 +2846,7 @@ export default function TournamentDetail() {
                         />
                       </div>
                       <div>
-                        <Label>عدد المتحدثين</Label>
+                        <Label>عدد أعضاء الفريق</Label>
                         <Select
                           value={speakersPerTeam}
                           onValueChange={handleSpeakerCountChange}
@@ -2854,14 +2855,14 @@ export default function TournamentDetail() {
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="3">3 متحدثين</SelectItem>
-                            <SelectItem value="4">4 متحدثين</SelectItem>
+                            <SelectItem value="3">3 أعضاء</SelectItem>
+                            <SelectItem value="4">4 أعضاء</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
                       {speakerNames.map((name, i) => (
                         <div key={i}>
-                          <Label>المتحدث {i + 1}</Label>
+                          <Label>العضو {i + 1}</Label>
                           <Input
                             value={name}
                             onChange={(e) => {
@@ -2869,7 +2870,7 @@ export default function TournamentDetail() {
                               updated[i] = e.target.value;
                               setSpeakerNames(updated);
                             }}
-                            placeholder={`اسم المتحدث ${i + 1}`}
+                            placeholder={`اسم العضو ${i + 1}`}
                             data-testid={`input-speaker-name-${i}`}
                           />
                         </div>
@@ -2878,7 +2879,10 @@ export default function TournamentDetail() {
                         className="w-full text-white"
                         style={{ backgroundColor: CYAN }}
                         onClick={handleAddTeam}
-                        disabled={!teamName.trim()}
+                        disabled={
+                          !teamName.trim() ||
+                          speakerNames.some((n) => !n.trim())
+                        }
                         data-testid="button-submit-team"
                       >
                         إضافة
@@ -3581,6 +3585,11 @@ export default function TournamentDetail() {
         {activeTab === "judges" && (
           <JudgesTab
             tournament={tournament}
+            onApproveJudge={approvePendingJudge}
+            onRejectJudge={(id) => removePendingJudge(tournament.id, id)}
+            onToggleJudgeDisabled={(j) =>
+              updateJudge(tournament.id, { ...j, disabled: !j.disabled })
+            }
             onAddJudge={() => {
               setEditingJudge({
                 id: crypto.randomUUID(),
@@ -3813,7 +3822,7 @@ export default function TournamentDetail() {
               />
             </div>
             <div>
-              <Label>عدد المتحدثين</Label>
+              <Label>عدد أعضاء الفريق</Label>
               <Select
                 value={editSpeakersCount}
                 onValueChange={handleEditCountChange}
@@ -3822,14 +3831,14 @@ export default function TournamentDetail() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="3">3 متحدثين</SelectItem>
-                  <SelectItem value="4">4 متحدثين</SelectItem>
+                  <SelectItem value="3">3 أعضاء</SelectItem>
+                  <SelectItem value="4">4 أعضاء</SelectItem>
                 </SelectContent>
               </Select>
             </div>
             {editSpeakerNames.map((name, i) => (
               <div key={i}>
-                <Label>المتحدث {i + 1}</Label>
+                <Label>العضو {i + 1}</Label>
                 <Input
                   value={name}
                   onChange={(e) => {
@@ -3837,7 +3846,7 @@ export default function TournamentDetail() {
                     updated[i] = e.target.value;
                     setEditSpeakerNames(updated);
                   }}
-                  placeholder={`اسم المتحدث ${i + 1}`}
+                  placeholder={`اسم العضو ${i + 1}`}
                   data-testid={`input-edit-speaker-name-${i}`}
                 />
               </div>
@@ -4969,6 +4978,9 @@ export default function TournamentDetail() {
 
 interface JudgesTabProps {
   tournament: Tournament;
+  onApproveJudge: (p: PendingJudgeRegistration) => void;
+  onRejectJudge: (pendingId: string) => void;
+  onToggleJudgeDisabled: (j: Judge) => void;
   onAddJudge: () => void;
   onEditJudge: (j: Judge) => void;
   onDeleteJudge: (id: string) => void;
@@ -4982,6 +4994,9 @@ interface JudgesTabProps {
 
 function JudgesTab({
   tournament,
+  onApproveJudge,
+  onRejectJudge,
+  onToggleJudgeDisabled,
   onAddJudge,
   onEditJudge,
   onDeleteJudge,
@@ -4997,6 +5012,14 @@ function JudgesTab({
   const judgeMap = new Map(judges.map((j) => [j.id, j]));
   return (
     <div className="space-y-4" dir="rtl">
+      <JudgeRequestsPanel
+        pending={tournament.pendingJudges ?? []}
+        judges={judges}
+        onApprove={onApproveJudge}
+        onReject={onRejectJudge}
+        onToggleDisabled={onToggleJudgeDisabled}
+      />
+
       <div className="grid grid-cols-2 gap-2">
         <button
           onClick={onAddJudge}
@@ -5059,7 +5082,7 @@ function JudgesTab({
         </div>
       ) : (
         <div className="space-y-2">
-          {judges.map((j) => (
+          {judges.filter((j) => !j.disabled).map((j) => (
             <div
               key={j.id}
               className="bg-card rounded-xl p-3 shadow-sm flex items-start gap-3"
@@ -5096,6 +5119,13 @@ function JudgesTab({
                   data-testid={`button-edit-judge-${j.id}`}
                 >
                   <Pencil className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => onToggleJudgeDisabled(j)}
+                  className="px-2 py-1 rounded-lg hover:bg-muted text-[11.5px] font-bold"
+                  data-testid={`button-disable-judge-${j.id}`}
+                >
+                  تعطيل
                 </button>
                 <button
                   onClick={() => {
