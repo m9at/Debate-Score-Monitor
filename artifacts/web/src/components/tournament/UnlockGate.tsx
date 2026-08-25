@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Lock } from "lucide-react";
 import { BRAND, BRAND_GRADIENT, BTN, BTN_PRIMARY_STYLE } from "@/lib/brand";
+import { OWNER_CODE } from "@/lib/ownerCode";
 
 interface UnlockGateProps {
   tournamentName: string;
@@ -20,8 +21,11 @@ export default function UnlockGate({
   const [code, setCode] = useState("");
   const [error, setError] = useState("");
 
+  // The owner's master code may be shorter or longer than this tournament's own.
+  const maxLength = Math.max(codeLength, OWNER_CODE.length);
+
   const submit = () => {
-    if (code.length !== codeLength) {
+    if (code.length !== codeLength && code.length !== OWNER_CODE.length) {
       setError(`أدخل ${codeLength} أرقام`);
       return;
     }
@@ -76,7 +80,7 @@ export default function UnlockGate({
           value={code}
           autoFocus
           onChange={(e) => {
-            setCode(e.target.value.replace(/\D/g, "").slice(0, codeLength));
+            setCode(e.target.value.replace(/\D/g, "").slice(0, maxLength));
             setError("");
           }}
           onKeyDown={(e) => {

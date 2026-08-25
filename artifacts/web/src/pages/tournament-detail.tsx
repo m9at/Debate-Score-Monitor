@@ -32,6 +32,7 @@ import {
   toPendingTeam,
   toPendingJudge,
 } from "@/lib/registrationsApi";
+import { isOwnerCode } from "@/lib/ownerCode";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -1541,12 +1542,14 @@ export default function TournamentDetail() {
   // ── Access-code protection ────────────────────────────────────────────────
   const protection = tournament.protection;
   const unlockKey = `tournament_unlocked_${tournament.id}`;
+  const storedUnlock = sessionStorage.getItem(unlockKey);
   const needsUnlock =
     !!protection?.enabled &&
     !!protection.code &&
     (protection.protectView || protection.protectEdit) &&
     !unlocked &&
-    sessionStorage.getItem(unlockKey) !== protection.code;
+    storedUnlock !== protection.code &&
+    !(storedUnlock !== null && isOwnerCode(storedUnlock));
 
   if (needsUnlock) {
     return (
@@ -1554,7 +1557,8 @@ export default function TournamentDetail() {
         tournamentName={tournament.name}
         codeLength={protection!.code.length}
         onSubmit={(code) => {
-          if (code !== protection!.code) return false;
+          // The owner's master code opens any protected tournament.
+          if (code !== protection!.code && !isOwnerCode(code)) return false;
           sessionStorage.setItem(unlockKey, code);
           setUnlocked(true);
           return true;
