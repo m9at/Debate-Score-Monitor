@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { useTournament } from "@/context/TournamentContext";
 import { useGroups } from "@/context/GroupContext";
 import { useToast } from "@/hooks/use-toast";
 import { WIZARD_STEPS, emptySetup, type TournamentSetup } from "@/lib/wizard/types";
+import { deleteDraft, fetchDraft, saveDraft } from "@/lib/draftsApi";
 import WizardShell from "@/components/wizard/WizardShell";
 import StepInfo from "@/components/wizard/StepInfo";
 import StepOrganise from "@/components/wizard/StepOrganise";
@@ -57,7 +58,11 @@ const STEP_META: Record<
   },
 };
 
-/** Multi-step tournament creation wizard — nothing is saved until the last step. */
+/**
+ * Multi-step tournament creation wizard. The tournament itself is only created
+ * on the last step, but progress is continuously saved online as a draft, so
+ * leaving the wizard never loses work — `?draft=<id>` resumes it.
+ */
 export default function TournamentNewPage() {
   const [, navigate] = useLocation();
   const { createTournamentFromSetup } = useTournament();
@@ -67,6 +72,38 @@ export default function TournamentNewPage() {
   const [stepIndex, setStepIndex] = useState(0);
   const [setup, setSetup] = useState<TournamentSetup>(emptySetup);
   const [confirmCode, setConfirmCode] = useState("");
+  const resumeId = new URLSearchParams(window.location.search).get("draft");
+  const [loading, setLoading] = useState(!!resumeId);
+  /** Drafts are only written once the tournament has a name worth listing. */
+  const savable = setup.name.trim().length > 1;
+
+  // Resume an unfinished draft.
+  useEffect(() => {
+    if (!resumeId) return;
+    let alive = true;
+    fetchDraft(resumeId)
+      .then((row) => {
+        if (!alive || !row) return;
+        setSetup(row.setup);
+        setStepIndex(Math.min(row.stepIndex, WIZARD_STEPS.length - 1));
+        setConfirmCode(row.setup.protection?.code ?? "");
+      })
+      .finally(() => alive && setLoading(false));
+    return () => {
+      alive = false;
+    };
+  }, [resumeId]);
+
+  // Autosave progress — debounced so typing doesn't hammer the API.
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  useEffect(() => {
+    if (loading || !savable) return;
+    clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(() => {
+      saveDraft(setup, stepIndex).catch(() => {});
+    }, 800);
+    return () => clearTimeout(saveTimer.current);
+  }, [setup, stepIndex, loading, savable]);
 
   const patch = (p: Partial<TournamentSetup>) =>
     setSetup((prev) => ({ ...prev, ...p }));
@@ -93,6 +130,7 @@ export default function TournamentNewPage() {
 
   const create = () => {
     const id = createTournamentFromSetup(setup);
+    deleteDraft(setup.draftId).catch(() => {});
     if (setup.folderId) moveTournamentToGroup(id, setup.folderId);
     toast({
       title: "تم إنشاء البطولة",
@@ -108,12 +146,33 @@ export default function TournamentNewPage() {
     setStepIndex((i) => Math.min(i + 1, WIZARD_STEPS.length - 1));
   };
 
+  /** Closing the wizard saves, never discards. */
+  const onCancel = async () => {
+    if (savable) {
+      clearTimeout(saveTimer.current);
+      await saveDraft(setup, stepIndex).catch(() => {});
+      toast({
+        title: "تم الحفظ كمسودة",
+        description: `يمكنك متابعة إنشاء «${setup.name.trim()}» من لوحة البطولات`,
+      });
+    }
+    navigate("/");
+  };
+
   const onBack = () => {
-    if (stepIndex === 0) return navigate("/");
+    if (stepIndex === 0) return void onCancel();
     setStepIndex((i) => i - 1);
   };
 
   const meta = STEP_META[stepKey];
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center text-sm">
+        جارٍ تحميل المسودة…
+      </div>
+    );
+  }
 
   return (
     <WizardShell
@@ -124,7 +183,7 @@ export default function TournamentNewPage() {
       nextLabel={isLast ? "إنشاء البطولة" : "التالي"}
       onBack={onBack}
       onNext={onNext}
-      onCancel={() => navigate("/")}
+      onCancel={onCancel}
     >
       {stepKey === "info" && <StepInfo setup={setup} patch={patch} />}
       {stepKey === "organise" && <StepOrganise setup={setup} patch={patch} />}

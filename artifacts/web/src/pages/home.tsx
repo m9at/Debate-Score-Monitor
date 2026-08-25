@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useLocation } from "wouter";
 import { useTournament } from "@/context/TournamentContext";
 import { useGroups } from "@/context/GroupContext";
@@ -25,6 +25,12 @@ import HomeHeader from "@/components/home/HomeHeader";
 import TournamentCard from "@/components/home/TournamentCard";
 import FolderStrip from "@/components/home/FolderStrip";
 import MoveToFolderDialog from "@/components/home/MoveToFolderDialog";
+import DraftCard from "@/components/home/DraftCard";
+import {
+  deleteDraft,
+  fetchDrafts,
+  type TournamentDraftRow,
+} from "@/lib/draftsApi";
 import { BRAND, BTN, BTN_PRIMARY_STYLE, BTN_SIZE } from "@/lib/brand";
 
 export default function Home() {
@@ -55,6 +61,19 @@ export default function Home() {
 
   // Move-to-folder dialog
   const [moveId, setMoveId] = useState<string | null>(null);
+
+  // Unfinished creation wizards, kept online so they survive refreshes/devices.
+  const [drafts, setDrafts] = useState<TournamentDraftRow[]>([]);
+  useEffect(() => {
+    fetchDrafts()
+      .then(setDrafts)
+      .catch(() => {});
+  }, []);
+
+  const removeDraft = (id: string) => {
+    setDrafts((d) => d.filter((x) => x.id !== id));
+    deleteDraft(id).catch(() => {});
+  };
 
   const [query, setQuery] = useState("");
   const [archiveOpen, setArchiveOpen] = useState(false);
@@ -156,6 +175,34 @@ export default function Home() {
       />
 
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 md:px-6 py-5 md:py-7">
+        {/* Unfinished drafts — resume where the wizard stopped */}
+        {drafts.length > 0 && (
+          <section className="mb-8">
+            <div className="flex items-baseline gap-2 mb-4">
+              <h2 className="text-2xl font-bold" style={{ color: BRAND.ink }}>
+                مسودات لم تكتمل
+              </h2>
+              <span
+                className="text-[13px] font-semibold"
+                style={{ color: `${BRAND.ink}80` }}
+                data-testid="text-draft-count"
+              >
+                {drafts.length} مسودة
+              </span>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+              {drafts.map((d) => (
+                <DraftCard
+                  key={d.id}
+                  draft={d}
+                  onResume={() => setLocation(`/tournament/new?draft=${d.id}`)}
+                  onDelete={() => removeDraft(d.id)}
+                />
+              ))}
+            </div>
+          </section>
+        )}
+
         {/* Current tournaments */}
         <section>
           <div className="flex items-center justify-between gap-3 mb-4 flex-wrap">
