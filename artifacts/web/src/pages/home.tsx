@@ -154,12 +154,12 @@ export default function Home() {
           <>
             <button
               onClick={() => setGroupDialogOpen(true)}
-              className={`${BTN.base} ${BTN_SIZE.md} bg-white/10 border border-white/20
-                          text-white hover:bg-white/20 backdrop-blur-sm`}
+              className={`${BTN.base} ${BTN.primary} ${BTN_SIZE.md} shadow-lg`}
+              style={BTN_PRIMARY_STYLE}
               data-testid="button-create-group"
             >
-              <FolderPlus className="w-4 h-4" />
-              <span className="hidden sm:inline">مجلد جديد</span>
+              <FolderPlus className="w-4 h-4" strokeWidth={2.5} />
+              مجلد جديد
             </button>
             <button
               onClick={() => setLocation("/tournament/new")}
@@ -175,34 +175,6 @@ export default function Home() {
       />
 
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 md:px-6 py-5 md:py-7">
-        {/* Unfinished drafts — resume where the wizard stopped */}
-        {drafts.length > 0 && (
-          <section className="mb-8">
-            <div className="flex items-baseline gap-2 mb-4">
-              <h2 className="text-2xl font-bold" style={{ color: BRAND.ink }}>
-                مسودات لم تكتمل
-              </h2>
-              <span
-                className="text-[13px] font-semibold"
-                style={{ color: `${BRAND.ink}80` }}
-                data-testid="text-draft-count"
-              >
-                {drafts.length} مسودة
-              </span>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
-              {drafts.map((d) => (
-                <DraftCard
-                  key={d.id}
-                  draft={d}
-                  onResume={() => setLocation(`/tournament/new?draft=${d.id}`)}
-                  onDelete={() => removeDraft(d.id)}
-                />
-              ))}
-            </div>
-          </section>
-        )}
-
         {/* Current tournaments */}
         <section>
           <div className="flex items-center justify-between gap-3 mb-4 flex-wrap">
@@ -298,6 +270,34 @@ export default function Home() {
               onOpen={(id) => setLocation(`/group/${id}`)}
               onDelete={deleteGroup}
             />
+          </section>
+        )}
+
+        {/* Unfinished drafts — resume where the wizard stopped */}
+        {drafts.length > 0 && (
+          <section className="mt-9">
+            <div className="flex items-baseline gap-2 mb-4">
+              <h2 className="text-2xl font-bold" style={{ color: BRAND.ink }}>
+                مسودات لم تكتمل
+              </h2>
+              <span
+                className="text-[13px] font-semibold"
+                style={{ color: `${BRAND.ink}80` }}
+                data-testid="text-draft-count"
+              >
+                {drafts.length} مسودة
+              </span>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+              {drafts.map((d) => (
+                <DraftCard
+                  key={d.id}
+                  draft={d}
+                  onResume={() => setLocation(`/tournament/new?draft=${d.id}`)}
+                  onDelete={() => removeDraft(d.id)}
+                />
+              ))}
+            </div>
           </section>
         )}
 

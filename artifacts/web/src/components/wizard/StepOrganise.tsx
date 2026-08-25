@@ -26,7 +26,6 @@ export default function StepOrganise({ setup, patch }: Props) {
     patch({ folderId: id });
   };
 
-  const rounds = Array.from({ length: setup.totalRounds }, (_, i) => i + 1);
 
   return (
     <div className="space-y-4">
@@ -120,38 +119,10 @@ export default function StepOrganise({ setup, patch }: Props) {
         </div>
       </Panel>
 
-      <Panel
-        title="الجولة الابتدائية"
-        hint="من أي جولة تبدأ البطولة؟ عادةً الجولة الأولى"
-      >
-        <div className="flex flex-wrap gap-2">
-          {rounds.map((n) => (
-            <button
-              key={n}
-              type="button"
-              onClick={() => patch({ startRound: n })}
-              className="h-11 min-w-[5.5rem] px-4 rounded-xl border font-bold text-[13.5px] transition-all"
-              style={
-                setup.startRound === n
-                  ? {
-                      borderColor: BRAND.purple,
-                      backgroundColor: `${BRAND.purple}12`,
-                      color: BRAND.purple,
-                    }
-                  : { borderColor: BRAND.border, color: BRAND.ink }
-              }
-              data-testid={`wizard-start-round-${n}`}
-            >
-              الجولة {n}
-            </button>
-          ))}
-        </div>
-      </Panel>
-
       <Panel>
         <Field
           label="نص القضية"
-          hint="قضية الجولة الابتدائية — تظهر بخط كبير في وضع العرض، ويمكن تعديلها لكل جولة لاحقاً"
+          hint="قضية الجولة الأولى — تظهر بخط كبير في وضع العرض، ويمكن تعديلها لكل جولة لاحقاً"
         >
           <div className="relative">
             <Quote
