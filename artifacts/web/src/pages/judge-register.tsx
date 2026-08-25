@@ -8,6 +8,7 @@ import { joinTournamentIdFromPath } from "@/lib/joinLink";
 import {
   fetchPublicTournament,
   submitJudgeRegistration,
+  type PublicTournamentRules,
 } from "@/lib/registrationsApi";
 import {
   lookupProfile,
@@ -18,6 +19,8 @@ import { useRequiredFields } from "@/hooks/useRequiredFields";
 import { labelOf } from "@/lib/registrationFields";
 import ContactGate from "@/components/register/ContactGate";
 import ReturningProfileCard from "@/components/register/ReturningProfileCard";
+import ImageUploadField from "@/components/register/ImageUploadField";
+import RulesCard from "@/components/register/RulesCard";
 
 const CYAN = "#29ABE2";
 const PURPLE = "#7B2D8E";
@@ -35,6 +38,7 @@ export default function JudgeRegisterPage() {
   const [info, setInfo] = useState<JudgeRegistrationInfo | null>(null);
   const [topic, setTopic] = useState("");
   const [error, setError] = useState(false);
+  const [rules, setRules] = useState<PublicTournamentRules | undefined>();
 
   const [step, setStep] = useState<Step>("contact");
   const [busy, setBusy] = useState(false);
@@ -74,6 +78,7 @@ export default function JudgeRegisterPage() {
         return;
       }
       if (pub.topic) setTopic(pub.topic);
+      setRules(pub.rules);
       if (pub.name) setInfo((p) => (p ? { ...p, tournamentName: pub.name } : p));
     });
   }, []);
@@ -214,6 +219,8 @@ export default function JudgeRegisterPage() {
           />
         )}
 
+        <RulesCard rules={rules} kind="judge" />
+
         {step === "form" && (
           <div className="bg-card rounded-2xl p-4 space-y-3">
             <p className="text-muted-foreground text-sm">
@@ -223,12 +230,11 @@ export default function JudgeRegisterPage() {
             </p>
             <Text label="الاسم الكامل" value={name} onChange={setName} testId="input-judge-name" placeholder="مثال: د. سلمى الراشدية" />
             <Text label="المؤسسة" value={institution} onChange={setInstitution} testId="input-judge-institution" placeholder="مثال: جامعة السلطان قابوس" />
-            <Text
-              label="رابط الصورة الشخصية (اختياري)"
+            <ImageUploadField
+              label="الصورة الشخصية (اختياري)"
               value={photoUrl}
               onChange={setPhotoUrl}
               testId="input-judge-photo"
-              placeholder="https://..."
             />
             <div>
               <label className="text-sm font-bold block mb-1.5">الخبرة في التحكيم</label>

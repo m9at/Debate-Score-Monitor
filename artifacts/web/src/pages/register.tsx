@@ -7,6 +7,7 @@ import {
 import { joinTournamentIdFromPath } from "@/lib/joinLink";
 import {
   fetchPublicTournament,
+  type PublicTournamentRules,
   submitTeamRegistration,
 } from "@/lib/registrationsApi";
 import type { TeamDocument } from "@/types/tournament";
@@ -17,6 +18,8 @@ import {
 } from "@/lib/profilesApi";
 import { useRequiredFields } from "@/hooks/useRequiredFields";
 import { labelOf } from "@/lib/registrationFields";
+import ImageUploadField from "@/components/register/ImageUploadField";
+import RulesCard from "@/components/register/RulesCard";
 import ContactGate from "@/components/register/ContactGate";
 import ReturningProfileCard from "@/components/register/ReturningProfileCard";
 
@@ -37,6 +40,7 @@ export default function RegisterPage() {
   const [profile, setProfile] = useState<TeamProfileRecord | null>(null);
   const [previousCount, setPreviousCount] = useState(0);
   const [logoUrl, setLogoUrl] = useState("");
+  const [rules, setRules] = useState<PublicTournamentRules | undefined>();
 
   const [teamName, setTeamName] = useState("");
   const [institution, setInstitution] = useState("");
@@ -68,6 +72,7 @@ export default function RegisterPage() {
         return;
       }
       if (pub.topic) setTopic(pub.topic);
+      setRules(pub.rules);
       if (pub.name) {
         setInfo((prev) => (prev ? { ...prev, tournamentName: pub.name } : prev));
       }
@@ -272,6 +277,8 @@ export default function RegisterPage() {
     <div className="min-h-screen bg-background" dir="rtl">
       <Header info={info} topic={topic} />
       <main className="max-w-2xl mx-auto px-4 py-6 space-y-4">
+        <RulesCard rules={rules} kind="team" />
+
         <div className="bg-card rounded-2xl p-4 space-y-3">
           <div>
             <label className="text-sm font-bold block mb-1.5">اسم المؤسسة</label>
@@ -293,21 +300,14 @@ export default function RegisterPage() {
               data-testid="input-team-name"
             />
           </div>
+          <ImageUploadField
+            label="شعار الفريق (اختياري)"
+            value={logoUrl}
+            onChange={setLogoUrl}
+            testId="input-team-logo"
+          />
           <div>
-            <label className="text-sm font-bold block mb-1.5">
-              شعار الفريق (اختياري)
-            </label>
-            <input
-              value={logoUrl}
-              onChange={(e) => setLogoUrl(e.target.value)}
-              dir="ltr"
-              placeholder="https://..."
-              className="w-full h-11 px-3 rounded-xl bg-muted outline-none"
-              data-testid="input-team-logo"
-            />
-          </div>
-          <div>
-            <label className="text-sm font-bold block mb-1.5">عدد المتحدثين</label>
+            <label className="text-sm font-bold block mb-1.5">عدد أعضاء الفريق</label>
             <div className="flex gap-2">
               {[3, 4].map((n) => (
                 <button
@@ -320,7 +320,7 @@ export default function RegisterPage() {
                     color: speakersPerTeam === n ? "#fff" : undefined,
                   }}
                 >
-                  {n} متحدثين
+                  {n} أعضاء
                 </button>
               ))}
             </div>

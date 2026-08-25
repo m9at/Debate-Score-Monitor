@@ -4,6 +4,8 @@ export const publicTournaments = pgTable("public_tournaments", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),
   topic: text("topic").notNull().default(""),
+  /** Published snapshot of قواعد البطولة — the source the public links read. */
+  rules: jsonb("rules"),
   updatedAt: timestamp("updated_at", { withTimezone: true })
     .notNull()
     .defaultNow(),

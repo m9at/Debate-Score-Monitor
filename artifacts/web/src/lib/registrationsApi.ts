@@ -6,10 +6,26 @@ import type {
 
 const API_BASE = "/api";
 
+/**
+ * قواعد البطولة as published for the public links — the single source the
+ * registration pages and the judging screens read.
+ */
+export interface PublicTournamentRules {
+  /** Allowed team sizes, e.g. [3, 4]. */
+  speakersPerTeam?: number[];
+  scoreMin?: number;
+  scoreMax?: number;
+  judgesPerRoom?: number;
+  replySpeech?: boolean;
+  /** Free-text rules written by the organiser. */
+  text?: string;
+}
+
 export interface PublicTournamentInfo {
   id: string;
   name: string;
   topic: string;
+  rules?: PublicTournamentRules;
 }
 
 export type RegistrationKind = "team" | "judge";
@@ -61,7 +77,11 @@ export async function publishTournament(
 ): Promise<void> {
   await http(`/tournaments/${encodeURIComponent(info.id)}`, {
     method: "PUT",
-    body: JSON.stringify({ name: info.name, topic: info.topic }),
+    body: JSON.stringify({
+      name: info.name,
+      topic: info.topic,
+      rules: info.rules ?? null,
+    }),
   });
 }
 

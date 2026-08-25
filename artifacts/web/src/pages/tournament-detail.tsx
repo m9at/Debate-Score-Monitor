@@ -88,6 +88,7 @@ import AutoSaveIndicator from "@/components/tournament/AutoSaveIndicator";
 import TournamentSkeleton from "@/components/tournament/TournamentSkeleton";
 import RoleSwitcher from "@/components/tournament/RoleSwitcher";
 import JudgeRequestsPanel from "@/components/judges/JudgeRequestsPanel";
+import TeamRequestsPanel from "@/components/teams/TeamRequestsPanel";
 import { useRole } from "@/context/RoleContext";
 import type { SidebarGroup } from "@/components/tournament/TournamentSidebar";
 import ProtectionSettingsDialog from "@/components/tournament/ProtectionSettingsDialog";
@@ -1266,12 +1267,25 @@ export default function TournamentDetail() {
   // Publish tournament name + topic so the public registration link can show them.
   useEffect(() => {
     if (!tournament) return;
+    // قواعد البطولة travel with the public link, so registration pages and the
+    // judging screens always read the same rules and the same score range.
+    const s = tournament.settings;
     void publishTournament({
       id: tournament.id,
       name: tournament.name,
       topic: publicTopic,
+      rules: s
+        ? {
+            speakersPerTeam: [3, 4],
+            scoreMin: s.scoreMin,
+            scoreMax: s.scoreMax,
+            judgesPerRoom: s.judgesPerRoom,
+            replySpeech: s.replySpeech,
+            text: s.rules,
+          }
+        : undefined,
     }).catch(() => {});
-  }, [tournament?.id, tournament?.name, publicTopic]);
+  }, [tournament?.id, tournament?.name, publicTopic, tournament?.settings]);
 
   // Poll the server for new registrations submitted via the public link
   // and pump them into the organizer's pending lists, then delete on the server
@@ -2807,6 +2821,12 @@ export default function TournamentDetail() {
 
         {activeTab === "teams" && (
           <div>
+            <TeamRequestsPanel
+              acceptedCount={tournament.teams.length}
+              pending={tournament.pendingTeams ?? []}
+              onApprove={approvePendingTeam}
+              onReject={(id) => removePendingTeam(tournament.id, id)}
+            />
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-base font-bold">
                 الفرق
@@ -2925,7 +2945,19 @@ export default function TournamentDetail() {
                           </p>
                         )}
                         <p className="text-xs text-muted-foreground mt-1">
-                          {team.speakersPerTeam} متحدثين
+                          {team.speakersPerTeam} أعضاء
+                          {(() => {
+                            // The room the team debates in this round, if drawn.
+                            const cur = tournament.rounds[tournament.currentRound - 1];
+                            const m = cur?.matches.find(
+                              (mm) =>
+                                mm.team1.teamId === team.id ||
+                                mm.team2.teamId === team.id
+                            );
+                            return m
+                              ? ` · القاعة ${m.roomLabel?.trim() || m.roomNumber}`
+                              : "";
+                          })()}
                         </p>
                         <div className="flex flex-wrap gap-1 mt-2">
                           {team.speakerNames.map((name, j) => (

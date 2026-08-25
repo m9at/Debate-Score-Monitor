@@ -243,18 +243,25 @@ app.put(
   "/api/tournaments/:id",
   wrap(async (req, res) => {
     const id = param(req, "id");
-    const { name, topic } = req.body ?? {};
+    const { name, topic, rules } = req.body ?? {};
     if (typeof name !== "string" || !name.trim()) {
       res.status(400).json({ error: "missing name" });
       return;
     }
     const safeTopic = typeof topic === "string" ? topic : "";
+    const safeRules =
+      rules && typeof rules === "object" ? rules : null;
     await db
       .insert(publicTournaments)
-      .values({ id, name: name.trim(), topic: safeTopic })
+      .values({ id, name: name.trim(), topic: safeTopic, rules: safeRules })
       .onConflictDoUpdate({
         target: publicTournaments.id,
-        set: { name: name.trim(), topic: safeTopic, updatedAt: new Date() },
+        set: {
+          name: name.trim(),
+          topic: safeTopic,
+          rules: safeRules,
+          updatedAt: new Date(),
+        },
       });
     res.json({ ok: true });
   }),
@@ -273,7 +280,12 @@ app.get(
       res.status(404).json({ error: "tournament not found" });
       return;
     }
-    res.json({ id: row.id, name: row.name, topic: row.topic });
+    res.json({
+      id: row.id,
+      name: row.name,
+      topic: row.topic,
+      rules: row.rules ?? undefined,
+    });
   }),
 );
 
