@@ -4,6 +4,7 @@ import {
   decodeJudgeRegisterToken,
   type JudgeRegistrationInfo,
 } from "@/lib/judgeRegistrationCodec";
+import { joinTournamentIdFromPath } from "@/lib/joinLink";
 import {
   fetchPublicTournament,
   submitJudgeRegistration,
@@ -49,16 +50,27 @@ export default function JudgeRegisterPage() {
   const [canChair, setCanChair] = useState(false);
 
   useEffect(() => {
+    // Either the per-tournament path link, or an older `?d=` token link.
+    const pathId = joinTournamentIdFromPath("judges");
     const d = new URLSearchParams(window.location.search).get("d");
-    const parsed = d ? decodeJudgeRegisterToken(d) : null;
+    const parsed: JudgeRegistrationInfo | null = pathId
+      ? { tournamentId: pathId, tournamentName: "" }
+      : d
+        ? decodeJudgeRegisterToken(d)
+        : null;
     if (!parsed) {
       setError(true);
       return;
     }
     setInfo(parsed);
     void fetchPublicTournament(parsed.tournamentId).then((pub) => {
-      if (pub?.topic) setTopic(pub.topic);
-      if (pub?.name) setInfo((p) => (p ? { ...p, tournamentName: pub.name } : p));
+      // The server is the authority on whether this tournament exists.
+      if (!pub) {
+        setError(true);
+        return;
+      }
+      if (pub.topic) setTopic(pub.topic);
+      if (pub.name) setInfo((p) => (p ? { ...p, tournamentName: pub.name } : p));
     });
   }, []);
 

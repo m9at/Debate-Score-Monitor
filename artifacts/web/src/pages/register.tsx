@@ -4,6 +4,7 @@ import {
   decodeRegisterToken,
   type RegistrationInfo,
 } from "@/lib/registrationCodec";
+import { joinTournamentIdFromPath } from "@/lib/joinLink";
 import {
   fetchPublicTournament,
   submitTeamRegistration,
@@ -43,21 +44,27 @@ export default function RegisterPage() {
   const [warning, setWarning] = useState("");
 
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const d = params.get("d");
-    if (!d) {
-      setError(true);
-      return;
-    }
-    const parsed = decodeRegisterToken(d);
+    // Either the per-tournament path link, or an older `?d=` token link.
+    const pathId = joinTournamentIdFromPath("teams");
+    const d = new URLSearchParams(window.location.search).get("d");
+    const parsed: RegistrationInfo | null = pathId
+      ? { tournamentId: pathId, tournamentName: "" }
+      : d
+        ? decodeRegisterToken(d)
+        : null;
     if (!parsed) {
       setError(true);
       return;
     }
     setInfo(parsed);
     void fetchPublicTournament(parsed.tournamentId).then((pub) => {
-      if (pub?.topic) setTopic(pub.topic);
-      if (pub?.name) {
+      // The server is the authority on whether this tournament exists.
+      if (!pub) {
+        setError(true);
+        return;
+      }
+      if (pub.topic) setTopic(pub.topic);
+      if (pub.name) {
         setInfo((prev) => (prev ? { ...prev, tournamentName: pub.name } : prev));
       }
     });

@@ -6,6 +6,7 @@ import {
   teamProfiles,
   tournamentParticipations,
   registrationLinks,
+  publicTournaments,
 } from "@workspace/db";
 import { and, eq, inArray } from "drizzle-orm";
 
@@ -85,6 +86,16 @@ profilesRouter.post(
     const role = param(req, "role");
     if (!ROLES.has(role)) {
       res.status(400).json({ error: "bad role" });
+      return;
+    }
+
+    // The link must belong to a tournament that actually exists.
+    const [tournament] = await db
+      .select({ id: publicTournaments.id })
+      .from(publicTournaments)
+      .where(eq(publicTournaments.id, tournamentId));
+    if (!tournament) {
+      res.status(404).json({ error: "tournament_not_found" });
       return;
     }
 

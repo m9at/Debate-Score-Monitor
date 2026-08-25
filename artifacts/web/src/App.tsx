@@ -174,6 +174,9 @@ function Router() {
       {/* All routes are now public */}
       <Route path="/register" component={RegisterPage} />
       <Route path="/judge-register" component={JudgeRegisterPage} />
+      {/* Per-tournament join links (the id lives in the path). */}
+      <Route path="/join/teams/:id" component={RegisterPage} />
+      <Route path="/join/judges/:id" component={JudgeRegisterPage} />
       <Route path="/judges-public" component={JudgesPublicPage} />
       <Route path="/results/:id" component={ResultsPage} />
       <Route path="/announce/:id/:round/:matchId" component={AnnouncePage} />
