@@ -14,6 +14,8 @@ import {
   registerForTournament,
   type JudgeProfileRecord,
 } from "@/lib/profilesApi";
+import { useRequiredFields } from "@/hooks/useRequiredFields";
+import { labelOf } from "@/lib/registrationFields";
 import ContactGate from "@/components/register/ContactGate";
 import ReturningProfileCard from "@/components/register/ReturningProfileCard";
 
@@ -48,6 +50,8 @@ export default function JudgeRegisterPage() {
   const [experience, setExperience] = useState("");
   const [photoUrl, setPhotoUrl] = useState("");
   const [canChair, setCanChair] = useState(false);
+  // Fields the organiser marked mandatory for this tournament's judge link.
+  const requiredFields = useRequiredFields(info?.tournamentId, "judge");
 
   useEffect(() => {
     // Either the per-tournament path link, or an older `?d=` token link.
@@ -105,6 +109,19 @@ export default function JudgeRegisterPage() {
     if (!info) return;
     if (!name.trim()) {
       setWarning("الاسم مطلوب");
+      return;
+    }
+    const missing = requiredFields.find((f) =>
+      f === "institution"
+        ? !institution.trim()
+        : f === "experience"
+          ? !experience.trim()
+          : f === "photoUrl"
+            ? !photoUrl.trim()
+            : false,
+    );
+    if (missing) {
+      setWarning(`${labelOf("judge", missing)} مطلوب`);
       return;
     }
     setWarning("");

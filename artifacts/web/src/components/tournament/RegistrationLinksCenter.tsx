@@ -8,6 +8,7 @@ import {
   Link2,
   Lock,
   QrCode,
+  Settings,
   Share2,
   Unlock,
   Users,
@@ -16,9 +17,14 @@ import {
 import { BRAND, BTN, BTN_PRIMARY_STYLE } from "@/lib/brand";
 import {
   getRegistrationLinks,
+  setRegistrationLinkSettings,
   setRegistrationLinkState,
   type LinkState,
+  type RegistrationLinkRecord,
+  type RegistrationLinkSettings,
 } from "@/lib/profilesApi";
+import LinkSettingsDialog from "./LinkSettingsDialog";
+import { labelOf } from "@/lib/registrationFields";
 
 interface Props {
   tournamentId: string;
@@ -44,22 +50,16 @@ export default function RegistrationLinksCenter({
   judgeUrl,
   onViewRegistrants,
 }: Props) {
-  const [states, setStates] = useState<Record<Kind, LinkState>>({
-    team: "open",
-    judge: "open",
-  });
+  const [links, setLinks] = useState<Record<Kind, RegistrationLinkRecord | null>>(
+    { team: null, judge: null },
+  );
   const [showArchived, setShowArchived] = useState(false);
 
   useEffect(() => {
     let alive = true;
     void getRegistrationLinks(tournamentId)
       .then((r) => {
-        if (alive) {
-          setStates({
-            team: r.team.state as LinkState,
-            judge: r.judge.state as LinkState,
-          });
-        }
+        if (alive) setLinks({ team: r.team, judge: r.judge });
       })
       .catch(() => {});
     return () => {
@@ -68,8 +68,23 @@ export default function RegistrationLinksCenter({
   }, [tournamentId]);
 
   const update = async (kind: Kind, state: LinkState) => {
-    setStates((s) => ({ ...s, [kind]: state })); // optimistic
-    await setRegistrationLinkState(tournamentId, kind, state).catch(() => {});
+    setLinks((l) => ({
+      ...l,
+      [kind]: l[kind] ? { ...l[kind]!, state } : l[kind],
+    })); // optimistic
+    const fresh = await setRegistrationLinkState(tournamentId, kind, state).catch(
+      () => null,
+    );
+    if (fresh) setLinks((l) => ({ ...l, [kind]: fresh }));
+  };
+
+  const saveSettings = async (kind: Kind, settings: RegistrationLinkSettings) => {
+    const fresh = await setRegistrationLinkSettings(
+      tournamentId,
+      kind,
+      settings,
+    ).catch(() => null);
+    if (fresh) setLinks((l) => ({ ...l, [kind]: fresh }));
   };
 
   const cards: { kind: Kind; title: string; url: string; icon: typeof Users }[] = [
@@ -77,10 +92,11 @@ export default function RegistrationLinksCenter({
     { kind: "judge", title: "تسجيل المحكمين", url: judgeUrl, icon: UserCheck },
   ];
 
+  const stateOf = (kind: Kind): LinkState => links[kind]?.state ?? "open";
   const visible = cards.filter((c) =>
-    showArchived ? true : states[c.kind] !== "archived",
+    showArchived ? true : stateOf(c.kind) !== "archived",
   );
-  const archivedCount = cards.filter((c) => states[c.kind] === "archived").length;
+  const archivedCount = cards.filter((c) => stateOf(c.kind) === "archived").length;
 
   return (
     <section className="space-y-4" data-testid="registration-links-center">
@@ -106,11 +122,13 @@ export default function RegistrationLinksCenter({
         {visible.map((c) => (
           <LinkCard
             key={c.kind}
+            kind={c.kind}
             title={c.title}
             icon={c.icon}
             url={c.url}
-            state={states[c.kind]}
+            link={links[c.kind]}
             onState={(s) => update(c.kind, s)}
+            onSaveSettings={(s) => void saveSettings(c.kind, s)}
             onViewRegistrants={() => onViewRegistrants(c.kind)}
           />
         ))}
@@ -120,22 +138,28 @@ export default function RegistrationLinksCenter({
 }
 
 function LinkCard({
+  kind,
   title,
   icon: Icon,
   url,
-  state,
+  link,
   onState,
+  onSaveSettings,
   onViewRegistrants,
 }: {
+  kind: Kind;
   title: string;
   icon: typeof Users;
   url: string;
-  state: LinkState;
+  link: RegistrationLinkRecord | null;
   onState: (s: LinkState) => void;
+  onSaveSettings: (s: RegistrationLinkSettings) => void;
   onViewRegistrants: () => void;
 }) {
   const [copied, setCopied] = useState(false);
   const [qr, setQr] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const state: LinkState = link?.state ?? "open";
   const open = state === "open";
   const archived = state === "archived";
 
@@ -255,6 +279,15 @@ function LinkCard({
         </button>
         <button
           type="button"
+          onClick={() => setSettingsOpen(true)}
+          className={`${BTN.base} ${BTN.secondary} h-9 px-3 text-[12.5px]`}
+          data-testid="button-link-settings"
+        >
+          <Settings className="w-4 h-4" />
+          إعدادات الرابط
+        </button>
+        <button
+          type="button"
           onClick={() => setQr((v) => !v)}
           className={`${BTN.base} ${BTN.secondary} h-9 px-3 text-[12.5px]`}
           data-testid="button-qr-link"
@@ -316,11 +349,54 @@ function LinkCard({
         </div>
       )}
 
+      {/* Active constraints, so the organiser sees them without opening the dialog */}
+      {link && (
+        <ul className="text-[11.5px] space-y-1" style={{ color: `${BRAND.ink}99` }}>
+          {link.maxRegistrants !== null && (
+            <li data-testid="link-cap-summary">
+              المسجلون: {link.registrantCount} / {link.maxRegistrants}
+            </li>
+          )}
+          {link.closesAt && (
+            <li data-testid="link-deadline-summary">
+              يُغلق: {new Date(link.closesAt).toLocaleString("ar", {
+                day: "numeric",
+                month: "short",
+                hour: "2-digit",
+                minute: "2-digit",
+              })}
+            </li>
+          )}
+          {link.requiredFields.length > 0 && (
+            <li data-testid="link-required-summary">
+              حقول مطلوبة إضافية:{" "}
+              {link.requiredFields.map((f) => labelOf(kind, f)).join("، ")}
+            </li>
+          )}
+        </ul>
+      )}
+
       {!open && !archived && (
         <p className="text-[11.5px]" style={{ color: `${BRAND.ink}99` }}>
-          الرابط مغلق: من يفتحه الآن لن يستطيع إكمال التسجيل.
+          {link?.closedReason === "full"
+            ? "الرابط مغلق تلقائياً: تم الوصول للحد الأقصى للمسجلين."
+            : link?.closedReason === "deadline"
+              ? "الرابط مغلق تلقائياً: انتهى موعد التسجيل."
+              : "الرابط مغلق: من يفتحه الآن لن يستطيع إكمال التسجيل."}
         </p>
       )}
+
+      <LinkSettingsDialog
+        open={settingsOpen}
+        onOpenChange={setSettingsOpen}
+        kind={kind}
+        title={title}
+        registrantCount={link?.registrantCount ?? 0}
+        requiredFields={link?.requiredFields ?? []}
+        closesAt={link?.closesAt ?? null}
+        maxRegistrants={link?.maxRegistrants ?? null}
+        onSave={onSaveSettings}
+      />
     </div>
   );
 }

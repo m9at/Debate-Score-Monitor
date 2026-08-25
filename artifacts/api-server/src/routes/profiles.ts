@@ -8,7 +8,7 @@ import {
   registrationLinks,
   publicTournaments,
 } from "@workspace/db";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, count, eq, inArray } from "drizzle-orm";
 
 /**
  * Permanent judge/team profiles, their per-tournament participations, and the
@@ -99,9 +99,13 @@ profilesRouter.post(
       return;
     }
 
-    const link = await getLink(tournamentId, role === "team" ? "team" : "judge");
+    const link = await linkView(tournamentId, role === "team" ? "team" : "judge");
     if (link.state !== "open") {
-      res.status(409).json({ error: "registration_closed", state: link.state });
+      res.status(409).json({
+        error: "registration_closed",
+        state: link.state,
+        reason: link.closedReason,
+      });
       return;
     }
 
@@ -279,41 +283,109 @@ async function getLink(tournamentId: string, kind: "team" | "judge") {
   return { ...created, updatedAt: new Date() };
 }
 
+/** How many people registered through a link so far (any status). */
+async function registrantCount(tournamentId: string, role: "team" | "judge") {
+  const [row] = await db
+    .select({ n: count() })
+    .from(tournamentParticipations)
+    .where(
+      and(
+        eq(tournamentParticipations.tournamentId, tournamentId),
+        eq(tournamentParticipations.role, role),
+      ),
+    );
+  return Number(row?.n ?? 0);
+}
+
+/**
+ * The link as the world sees it: the stored state, plus the auto-close rules
+ * (deadline passed / cap reached) applied on read so a stale row never lets a
+ * closed link accept registrations.
+ */
+async function linkView(tournamentId: string, kind: "team" | "judge") {
+  const row = await getLink(tournamentId, kind);
+  const count = await registrantCount(tournamentId, kind);
+  const deadlinePassed = !!row.closesAt && new Date(row.closesAt) <= new Date();
+  const capReached =
+    typeof row.maxRegistrants === "number" && count >= row.maxRegistrants;
+  const state =
+    row.state === "archived"
+      ? "archived"
+      : row.state === "open" && (deadlinePassed || capReached)
+        ? "closed"
+        : row.state;
+  return {
+    id: row.id,
+    tournamentId,
+    kind,
+    state,
+    requiredFields: (row.requiredFields ?? []) as string[],
+    closesAt: row.closesAt ? new Date(row.closesAt).toISOString() : null,
+    maxRegistrants: row.maxRegistrants ?? null,
+    registrantCount: count,
+    autoClosed: state === "closed" && row.state === "open",
+    closedReason: deadlinePassed ? "deadline" : capReached ? "full" : null,
+  };
+}
+
 /** Both links of a tournament, created on first read so the UI always has them. */
 profilesRouter.get(
   "/api/tournaments/:tournamentId/registration-links",
   wrap(async (req, res) => {
     const tournamentId = param(req, "tournamentId");
     const [team, judge] = await Promise.all([
-      getLink(tournamentId, "team"),
-      getLink(tournamentId, "judge"),
+      linkView(tournamentId, "team"),
+      linkView(tournamentId, "judge"),
     ]);
     res.json({ team, judge });
   }),
 );
 
-/** Close, reopen or archive a link. Registrations already made are untouched. */
+/**
+ * Close, reopen or archive a link, and/or change its settings (required form
+ * fields, closing time, registrant cap). Registrations already made are
+ * untouched.
+ */
 profilesRouter.patch(
   "/api/tournaments/:tournamentId/registration-links/:kind",
   wrap(async (req, res) => {
     const tournamentId = param(req, "tournamentId");
     const kind = param(req, "kind") === "team" ? "team" : "judge";
-    const state = str(req.body?.state);
-    if (!STATES.has(state)) {
-      res.status(400).json({ error: "bad state" });
-      return;
+    const body = req.body ?? {};
+    const patch: Record<string, unknown> = { updatedAt: new Date() };
+
+    if (body.state !== undefined) {
+      const state = str(body.state);
+      if (!STATES.has(state)) {
+        res.status(400).json({ error: "bad state" });
+        return;
+      }
+      patch.state = state;
     }
+    if (body.requiredFields !== undefined) {
+      patch.requiredFields = Array.isArray(body.requiredFields)
+        ? body.requiredFields.filter((f: unknown) => typeof f === "string")
+        : [];
+    }
+    if (body.closesAt !== undefined) {
+      patch.closesAt = body.closesAt ? new Date(String(body.closesAt)) : null;
+    }
+    if (body.maxRegistrants !== undefined) {
+      const n = Number(body.maxRegistrants);
+      patch.maxRegistrants = Number.isFinite(n) && n > 0 ? Math.floor(n) : null;
+    }
+
     await getLink(tournamentId, kind);
     await db
       .update(registrationLinks)
-      .set({ state, updatedAt: new Date() })
+      .set(patch)
       .where(
         and(
           eq(registrationLinks.tournamentId, tournamentId),
           eq(registrationLinks.kind, kind),
         ),
       );
-    res.json({ ok: true, state });
+    res.json(await linkView(tournamentId, kind));
   }),
 );
 

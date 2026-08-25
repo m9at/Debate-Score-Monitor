@@ -15,6 +15,8 @@ import {
   registerForTournament,
   type TeamProfileRecord,
 } from "@/lib/profilesApi";
+import { useRequiredFields } from "@/hooks/useRequiredFields";
+import { labelOf } from "@/lib/registrationFields";
 import ContactGate from "@/components/register/ContactGate";
 import ReturningProfileCard from "@/components/register/ReturningProfileCard";
 
@@ -42,6 +44,8 @@ export default function RegisterPage() {
   const [speakerNames, setSpeakerNames] = useState<string[]>(["", "", ""]);
   const [documents, setDocuments] = useState<TeamDocument[]>([]);
   const [warning, setWarning] = useState("");
+  // Fields the organiser marked mandatory for this tournament's team link.
+  const requiredFields = useRequiredFields(info?.tournamentId, "team");
 
   useEffect(() => {
     // Either the per-tournament path link, or an older `?d=` token link.
@@ -141,6 +145,14 @@ export default function RegisterPage() {
     }
     if (speakerNames.some((s) => !s.trim())) {
       setWarning("يجب إدخال أسماء جميع المتحدثين");
+      return;
+    }
+    if (requiredFields.includes("logoUrl") && !logoUrl.trim()) {
+      setWarning(`${labelOf("team", "logoUrl")} مطلوب`);
+      return;
+    }
+    if (requiredFields.includes("documents") && documents.length === 0) {
+      setWarning(`${labelOf("team", "documents")} مطلوبة`);
       return;
     }
     setWarning("");

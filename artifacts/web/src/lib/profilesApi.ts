@@ -41,6 +41,21 @@ export interface RegistrationLinkRecord {
   tournamentId: string;
   kind: ProfileRole extends never ? never : "team" | "judge";
   state: LinkState;
+  /** Optional form fields the organiser made mandatory. */
+  requiredFields: string[];
+  /** ISO closing moment, or null for no deadline. */
+  closesAt: string | null;
+  maxRegistrants: number | null;
+  registrantCount: number;
+  /** True when the link is closed by a rule rather than by hand. */
+  autoClosed: boolean;
+  closedReason: "deadline" | "full" | null;
+}
+
+export interface RegistrationLinkSettings {
+  requiredFields?: string[];
+  closesAt?: string | null;
+  maxRegistrants?: number | null;
 }
 
 /** A participant row as the admin panel shows it. */
@@ -129,9 +144,20 @@ export function setRegistrationLinkState(
   tournamentId: string,
   kind: "team" | "judge",
   state: LinkState,
-): Promise<{ ok: true; state: LinkState }> {
+): Promise<RegistrationLinkRecord> {
   return http(`/tournaments/${tournamentId}/registration-links/${kind}`, {
     method: "PATCH",
     body: JSON.stringify({ state }),
+  });
+}
+
+export function setRegistrationLinkSettings(
+  tournamentId: string,
+  kind: "team" | "judge",
+  settings: RegistrationLinkSettings,
+): Promise<RegistrationLinkRecord> {
+  return http(`/tournaments/${tournamentId}/registration-links/${kind}`, {
+    method: "PATCH",
+    body: JSON.stringify(settings),
   });
 }
