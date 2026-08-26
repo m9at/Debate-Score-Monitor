@@ -15,6 +15,8 @@ import {
   SPEAKER_MAX,
   REPLY_MIN,
   REPLY_MAX,
+  clampScoreInput,
+  clampScoreOnBlur,
 } from "@/lib/scoreValidation";
 import { getMatchSession, submitMatchResult } from "@/lib/firebaseJudgeApi";
 
@@ -218,10 +220,10 @@ export default function JudgePage() {
           </div>
         )}
         <div style={{
-          background: "#FFF3CD", border: "1px solid #FFCC02", color: "#856404",
+          background: "#7B2D8E0d", border: "1px solid #7B2D8E33", color: "#5D1F6D",
           borderRadius: 10, padding: "8px 12px", marginBottom: 12, fontSize: 12, lineHeight: 1.6,
         }}>
-          <strong>تنبيه:</strong> درجة المتحدث {SPEAKER_RANGE_LABEL} • درجة الرد {REPLY_RANGE_LABEL}
+          <strong>قواعد الدرجات (ثابتة):</strong> درجة المتحدث يجب أن تكون بين {SPEAKER_MIN} و{SPEAKER_MAX} • درجة الرد بين {REPLY_MIN} و{REPLY_MAX}
         </div>
 
         <div className="judge-card judge-card-gov">
@@ -479,14 +481,12 @@ function ScoreInput({ value, cls, valid, hint, onChange, disabled, min, max }: {
 }) {
   const filled = value.trim() !== "";
   const invalid = filled && !valid;
-  const handleChange = (v: string) => {
-    if (v === "") { onChange(""); return; }
-    const n = parseFloat(v);
-    if (isNaN(n)) { onChange(""); return; }
-    if (typeof max === "number" && n > max) { onChange(String(max)); return; }
-    if (typeof min === "number" && n < 0) { onChange("0"); return; }
-    onChange(v);
-  };
+  // The tournament's score rules are fixed: a value outside the range can never
+  // be entered — not by typing, pasting or stepping.
+  const lo = min ?? 0;
+  const hi = max ?? Number.MAX_SAFE_INTEGER;
+  const handleChange = (v: string) => onChange(clampScoreInput(v, lo, hi));
+  const handleBlur = () => onChange(clampScoreOnBlur(value, lo, hi));
   return (
     <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 2 }}>
       <input
@@ -500,6 +500,7 @@ function ScoreInput({ value, cls, valid, hint, onChange, disabled, min, max }: {
         placeholder="--"
         disabled={disabled}
         onFocus={(e) => e.target.select()}
+        onBlur={handleBlur}
         className={`judge-score-input ${cls}`}
         style={{
           ...(invalid ? { borderColor: "#FF3B30", borderWidth: 2, borderStyle: "solid" } : {}),

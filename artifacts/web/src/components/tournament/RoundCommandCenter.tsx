@@ -3,6 +3,7 @@ import {
   AlertTriangle,
   CheckCircle2,
   Gavel,
+  Link as LinkIcon,
   Play,
   Sparkles,
 } from "lucide-react";
@@ -32,6 +33,8 @@ interface RoundCommandCenterProps {
   onStartNextRound: () => void;
   /** Makes the selected (already prepared) round the live one. */
   onStartSelectedRound: () => void;
+  /** Personal judging link for one judge of this round. */
+  onJudgeLink: (judgeId: string) => void;
   canManage: boolean;
 }
 
@@ -48,6 +51,7 @@ export default function RoundCommandCenter({
   onAutoAssign,
   onStartNextRound,
   onStartSelectedRound,
+  onJudgeLink,
   canManage,
 }: RoundCommandCenterProps) {
   const round = tournament.rounds.find((r) => r.roundNumber === selectedRound);
@@ -73,6 +77,14 @@ export default function RoundCommandCenter({
       for (const id of a?.panelistJudgeIds ?? []) taken.add(id);
     }
     return taken;
+  };
+
+  const judgesOf = (m: Match) => {
+    const a = m.judgeAssignment;
+    const ids = [...(a?.chairJudgeId ? [a.chairJudgeId] : []), ...(a?.panelistJudgeIds ?? [])];
+    return ids
+      .map((id) => judges.find((j) => j.id === id))
+      .filter(Boolean) as typeof judges;
   };
 
   const judgeNamesOf = (m: Match) => {
@@ -253,6 +265,7 @@ export default function RoundCommandCenter({
                 <th className="px-4 py-2 font-bold">القاعة</th>
                 <th className="px-4 py-2 font-bold">الفريقان</th>
                 <th className="px-4 py-2 font-bold">المحكمون</th>
+                <th className="px-4 py-2 font-bold">روابط التحكيم</th>
               </tr>
             </thead>
             <tbody>
@@ -282,6 +295,27 @@ export default function RoundCommandCenter({
                         {judgeNamesOf(m).join("، ") || "—"}
                       </span>
                     )}
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="flex flex-wrap gap-1.5">
+                      {judgesOf(m).map((j) => (
+                        <button
+                          key={j.id}
+                          type="button"
+                          onClick={() => onJudgeLink(j.id)}
+                          className={`${BTN.base} ${BTN.secondary} ${BTN_SIZE.sm}`}
+                          data-testid={`judge-link-${j.id}`}
+                        >
+                          <LinkIcon className="w-3.5 h-3.5" />
+                          {j.name}
+                        </button>
+                      ))}
+                      {judgesOf(m).length === 0 && (
+                        <span className="text-[12px] font-semibold" style={{ color: `${BRAND.ink}80` }}>
+                          —
+                        </span>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}

@@ -3,6 +3,7 @@ import { useRoute } from "wouter";
 import {
   type RoundData,
   type RoomInfo,
+  type RoomJudge,
   type JudgeScores,
 } from "@/lib/judgeCodec";
 import {
@@ -16,6 +17,8 @@ import {
   SPEAKER_MAX,
   REPLY_MIN,
   REPLY_MAX,
+  clampScoreInput,
+  clampScoreOnBlur,
 } from "@/lib/scoreValidation";
 import { getRoundSession, submitRoomResult } from "@/lib/firebaseJudgeApi";
 
@@ -28,6 +31,8 @@ export default function JudgeRoundPage() {
   const [submittedRooms, setSubmittedRooms] = useState<Set<number>>(new Set());
   const [error, setError] = useState<string | null>(null);
   const [selectedRoom, setSelectedRoom] = useState<number | null>(null);
+  /** The judge this link belongs to — read once from the URL, never typed. */
+  const judgeId = new URLSearchParams(window.location.search).get("j");
 
   useEffect(() => {
     if (!sessionId) { setError("الرابط غير صالح"); return; }
@@ -37,6 +42,12 @@ export default function JudgeRoundPage() {
         if (cancelled) return;
         if (!s) { setError("هذا الرابط غير موجود أو انتهت صلاحيته"); return; }
         setRoundData(s.roundData);
+        if (judgeId) {
+          const mine = s.roundData.rooms.find((r) =>
+            (r.judges ?? []).some((j) => j.id === judgeId),
+          );
+          if (mine) setSelectedRoom(mine.roomNumber);
+        }
         if (s.results) {
           setSubmittedRooms(new Set(Object.keys(s.results).map(Number)));
         }
@@ -46,7 +57,7 @@ export default function JudgeRoundPage() {
         setError(e instanceof Error ? e.message : "تعذّر تحميل الجولة");
       });
     return () => { cancelled = true; };
-  }, [sessionId]);
+  }, [sessionId, judgeId]);
 
   if (error) {
     return (
@@ -81,6 +92,12 @@ export default function JudgeRoundPage() {
         sessionId={sessionId!}
         tournamentName={roundData.tournamentName}
         roundNumber={roundData.roundNumber}
+        identifiedJudge={
+          judgeId
+            ? ((room.judges ?? []).find((j) => j.id === judgeId) ?? null)
+            : null
+        }
+        lockedToRoom={!!judgeId}
         onBack={(submittedOk) => {
           if (submittedOk) {
             setSubmittedRooms((prev) => new Set(prev).add(room.roomNumber));
@@ -146,8 +163,13 @@ function Header({ title, subtitle }: { title?: string; subtitle?: string }) {
   );
 }
 
-function RoomScoring({ room, sessionId, tournamentName, roundNumber, onBack }: {
-  room: RoomInfo; sessionId: string; tournamentName: string; roundNumber: number; onBack: (submittedOk: boolean) => void;
+function RoomScoring({ room, sessionId, tournamentName, roundNumber, identifiedJudge, lockedToRoom, onBack }: {
+  room: RoomInfo; sessionId: string; tournamentName: string; roundNumber: number;
+  /** Known from the link — the judge never types their own name. */
+  identifiedJudge: RoomJudge | null;
+  /** A personal link shows only that judge's room. */
+  lockedToRoom: boolean;
+  onBack: (submittedOk: boolean) => void;
 }) {
   const [govScores, setGovScores] = useState<string[]>(new Array(room.govSpeakersCount).fill(""));
   const [oppScores, setOppScores] = useState<string[]>(new Array(room.oppSpeakersCount).fill(""));
@@ -157,7 +179,7 @@ function RoomScoring({ room, sessionId, tournamentName, roundNumber, onBack }: {
   const [oppReplyNum, setOppReplyNum] = useState(1);
   const [govReplyScore, setGovReplyScore] = useState("");
   const [oppReplyScore, setOppReplyScore] = useState("");
-  const [judgeName, setJudgeName] = useState("");
+  const [judgeName, setJudgeName] = useState(identifiedJudge?.name ?? "");
   const [judgeNotes, setJudgeNotes] = useState("");
   const [warning, setWarning] = useState("");
   const [submitted, setSubmitted] = useState(false);
@@ -219,7 +241,9 @@ function RoomScoring({ room, sessionId, tournamentName, roundNumber, onBack }: {
               🔁 إعادة المحاولة
             </button>
           )}
-          <button onClick={() => onBack(submitStatus === "sent")} className="judge-btn judge-btn-back">← الرجوع للقاعات</button>
+          {!lockedToRoom && (
+            <button onClick={() => onBack(submitStatus === "sent")} className="judge-btn judge-btn-back">← الرجوع للقاعات</button>
+          )}
         </div>
       </div>
     );
@@ -381,7 +405,7 @@ function RoomScoring({ room, sessionId, tournamentName, roundNumber, onBack }: {
           </div>
 
           <div style={{
-            background: "#FFF3CD", border: "1px solid #FFCC02", color: "#856404",
+            background: "#7B2D8E0d", border: "1px solid #7B2D8E33", color: "#5D1F6D",
             borderRadius: 10, padding: "10px 12px", marginTop: 12, marginBottom: 12,
             fontSize: 13, lineHeight: 1.6, textAlign: "center", fontWeight: 700,
           }}>
@@ -410,10 +434,10 @@ function RoomScoring({ room, sessionId, tournamentName, roundNumber, onBack }: {
         <button onClick={() => onBack(false)} className="judge-back-btn">→ الرجوع للقاعات</button>
 
         <div style={{
-          background: "#FFF3CD", border: "1px solid #FFCC02", color: "#856404",
+          background: "#7B2D8E0d", border: "1px solid #7B2D8E33", color: "#5D1F6D",
           borderRadius: 10, padding: "8px 12px", marginBottom: 12, fontSize: 12, lineHeight: 1.6,
         }}>
-          <strong>تنبيه:</strong> درجة المتحدث {SPEAKER_RANGE_LABEL} • درجة الرد {REPLY_RANGE_LABEL}
+          <strong>قواعد الدرجات (ثابتة):</strong> درجة المتحدث يجب أن تكون بين {SPEAKER_MIN} و{SPEAKER_MAX} • درجة الرد بين {REPLY_MIN} و{REPLY_MAX}
         </div>
 
         <div className="judge-card judge-card-gov">
@@ -471,9 +495,18 @@ function RoomScoring({ room, sessionId, tournamentName, roundNumber, onBack }: {
         </div>
 
         <div className="judge-card judge-card-info">
-          <div className="judge-info-label">👨‍⚖️ اسم المحكم</div>
-          <input type="text" value={judgeName} onChange={(e) => setJudgeName(e.target.value)}
-            placeholder="أدخل اسمك (اختياري)" className="judge-text-input" />
+          {identifiedJudge ? (
+            <div className="judge-info-label">
+              👨‍⚖️ المحكم: {identifiedJudge.name}
+              {identifiedJudge.chair ? " (رئيس اللجنة)" : ""}
+            </div>
+          ) : (
+            <>
+              <div className="judge-info-label">👨‍⚖️ اسم المحكم</div>
+              <input type="text" value={judgeName} onChange={(e) => setJudgeName(e.target.value)}
+                placeholder="أدخل اسمك" className="judge-text-input" />
+            </>
+          )}
           <div className="judge-info-label" style={{ marginTop: 14 }}>📝 ملاحظات</div>
           <textarea value={judgeNotes} onChange={(e) => setJudgeNotes(e.target.value)}
             placeholder="ملاحظات (اختياري)" className="judge-textarea" />
@@ -635,14 +668,12 @@ function ScoreInput({ value, cls, valid, hint, onChange, disabled, min, max }: {
 }) {
   const filled = value.trim() !== "";
   const invalid = filled && !valid;
-  const handleChange = (v: string) => {
-    if (v === "") { onChange(""); return; }
-    const n = parseFloat(v);
-    if (isNaN(n)) { onChange(""); return; }
-    if (typeof max === "number" && n > max) { onChange(String(max)); return; }
-    if (typeof min === "number" && n < 0) { onChange("0"); return; }
-    onChange(v);
-  };
+  // The tournament's score rules are fixed: a value outside the range can never
+  // be entered — not by typing, pasting or stepping.
+  const lo = min ?? 0;
+  const hi = max ?? Number.MAX_SAFE_INTEGER;
+  const handleChange = (v: string) => onChange(clampScoreInput(v, lo, hi));
+  const handleBlur = () => onChange(clampScoreOnBlur(value, lo, hi));
   return (
     <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 2 }}>
       <input
@@ -656,6 +687,7 @@ function ScoreInput({ value, cls, valid, hint, onChange, disabled, min, max }: {
         placeholder="--"
         disabled={disabled}
         onFocus={(e) => e.target.select()}
+        onBlur={handleBlur}
         className={`judge-score-input ${cls}`}
         style={{
           ...(invalid ? { borderColor: "#FF3B30", borderWidth: 2, borderStyle: "solid" } : {}),

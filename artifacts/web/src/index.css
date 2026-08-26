@@ -168,12 +168,12 @@
 
 .judge-page {
   min-height: 100vh;
-  background: #F5F5F7;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Tahoma, sans-serif;
-  color: #1A1A2E;
+  background: #F7F8FC;
+  font-family: 'Cairo', -apple-system, BlinkMacSystemFont, 'Segoe UI', Tahoma, sans-serif;
+  color: #2B1B45;
 }
 .judge-hdr {
-  background: linear-gradient(135deg, #4ECDC4 0%, #7B5EA7 100%);
+  background: linear-gradient(135deg, #7B2D8E 0%, #29ABE2 100%);
   padding: 20px 16px 24px;
   text-align: center;
 }
@@ -201,7 +201,7 @@
 .judge-loading {
   text-align: center;
   padding: 60px 20px;
-  color: #8A8A99;
+  color: #6B5C86;
   font-size: 16px;
 }
 .judge-card {
@@ -211,17 +211,17 @@
   margin-bottom: 14px;
   box-shadow: 0 2px 10px rgba(0,0,0,.07);
 }
-.judge-card-gov { border-top: 4px solid #4ECDC4; }
-.judge-card-opp { border-top: 4px solid #7B5EA7; }
-.judge-card-info { border-top: 4px solid #7B5EA7; }
+.judge-card-gov { border-top: 4px solid #29ABE2; }
+.judge-card-opp { border-top: 4px solid #7B2D8E; }
+.judge-card-info { border-top: 4px solid #7B2D8E; }
 .judge-card-room {
-  border-top: 4px solid #7B5EA7;
+  border-top: 4px solid #7B2D8E;
   cursor: pointer;
   transition: box-shadow .2s;
 }
 .judge-card-room:hover { box-shadow: 0 4px 16px rgba(0,0,0,.12); }
 .judge-card-done {
-  border-top: 4px solid #34C759;
+  border-top: 4px solid #22C55E;
   opacity: .85;
 }
 .judge-row {
@@ -237,10 +237,10 @@
   font-size: 12px;
   font-weight: 700;
 }
-.judge-badge-gov { background: rgba(78,205,196,.15); color: #4ECDC4; }
-.judge-badge-opp { background: rgba(123,94,167,.15); color: #7B5EA7; }
-.judge-badge-done { background: rgba(52,199,89,.15); color: #34C759; }
-.judge-badge-pend { background: rgba(255,149,0,.12); color: #FF9500; }
+.judge-badge-gov { background: rgba(41,171,226,.15); color: #29ABE2; }
+.judge-badge-opp { background: rgba(123,45,142,.15); color: #7B2D8E; }
+.judge-badge-done { background: rgba(34,197,94,.15); color: #22C55E; }
+.judge-badge-pend { background: rgba(245,158,11,.12); color: #F59E0B; }
 .judge-total-box {
   display: flex;
   justify-content: space-between;
@@ -249,12 +249,12 @@
   padding: 10px 14px;
   margin-bottom: 14px;
 }
-.judge-total-box-gov { background: rgba(78,205,196,.08); }
-.judge-total-box-opp { background: rgba(123,94,167,.08); }
-.judge-total-lbl { font-size: 13px; color: #8A8A99; }
+.judge-total-box-gov { background: rgba(41,171,226,.08); }
+.judge-total-box-opp { background: rgba(123,45,142,.08); }
+.judge-total-lbl { font-size: 13px; color: #6B5C86; }
 .judge-total-val { font-size: 26px; font-weight: 700; }
-.judge-total-val-gov { color: #4ECDC4; }
-.judge-total-val-opp { color: #7B5EA7; }
+.judge-total-val-gov { color: #29ABE2; }
+.judge-total-val-opp { color: #7B2D8E; }
 .judge-sp-row {
   display: flex;
   align-items: center;
@@ -279,8 +279,8 @@
   font-size: 15px;
   flex-shrink: 0;
 }
-.judge-sp-icon-gov { background: rgba(78,205,196,.12); }
-.judge-sp-icon-opp { background: rgba(123,94,167,.12); }
+.judge-sp-icon-gov { background: rgba(41,171,226,.12); }
+.judge-sp-icon-opp { background: rgba(123,45,142,.12); }
 .judge-sp-name {
   font-size: 14px;
   font-weight: 500;
@@ -292,23 +292,23 @@
   width: 80px;
   height: 48px;
   border-radius: 10px;
-  border: 1.5px solid #E5E5EA;
-  background: #F5F5F7;
+  border: 1.5px solid #E7E9F2;
+  background: #F7F8FC;
   text-align: center;
   font-size: 20px;
   font-weight: 700;
-  color: #1A1A2E;
+  color: #2B1B45;
   outline: none;
   transition: border-color .2s;
   -moz-appearance: textfield;
 }
 .judge-score-input::-webkit-inner-spin-button,
 .judge-score-input::-webkit-outer-spin-button { -webkit-appearance: none; }
-.judge-score-input:focus.gov { border-color: #4ECDC4; }
-.judge-score-input:focus.opp { border-color: #7B5EA7; }
+.judge-score-input:focus.gov { border-color: #29ABE2; }
+.judge-score-input:focus.opp { border-color: #7B2D8E; }
 .judge-reply-section {
   margin-top: 12px;
-  border-top: 1px solid #E5E5EA;
+  border-top: 1px solid #E7E9F2;
   padding-top: 14px;
 }
 .judge-reply-hdr {
@@ -320,14 +320,14 @@
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  background: rgba(78,205,196,.15);
-  color: #4ECDC4;
+  background: rgba(41,171,226,.15);
+  color: #29ABE2;
   padding: 4px 10px;
   border-radius: 8px;
   font-size: 12px;
   font-weight: 700;
 }
-.judge-reply-badge-opp { background: rgba(123,94,167,.15); color: #7B5EA7; }
+.judge-reply-badge-opp { background: rgba(123,45,142,.15); color: #7B2D8E; }
 .judge-reply-row {
   display: flex;
   align-items: center;
@@ -343,37 +343,37 @@
   font-weight: 700;
   font-family: inherit;
   cursor: pointer;
-  border: 1.5px solid #E5E5EA;
-  background: #F5F5F7;
-  color: #8A8A99;
+  border: 1.5px solid #E7E9F2;
+  background: #F7F8FC;
+  color: #6B5C86;
   transition: all .15s;
 }
-.judge-rbt-gov { background: #4ECDC4 !important; color: #fff !important; border-color: transparent !important; }
-.judge-rbt-opp { background: #7B5EA7 !important; color: #fff !important; border-color: transparent !important; }
+.judge-rbt-gov { background: #29ABE2 !important; color: #fff !important; border-color: transparent !important; }
+.judge-rbt-opp { background: #7B2D8E !important; color: #fff !important; border-color: transparent !important; }
 .judge-text-input {
   width: 100%;
   border-radius: 10px;
-  border: 1.5px solid #E5E5EA;
-  background: #F5F5F7;
+  border: 1.5px solid #E7E9F2;
+  background: #F7F8FC;
   padding: 10px 14px;
   font-size: 14px;
   font-family: inherit;
-  color: #1A1A2E;
+  color: #2B1B45;
   outline: none;
   transition: border-color .2s;
   box-sizing: border-box;
   direction: rtl;
 }
-.judge-text-input:focus { border-color: #7B5EA7; }
+.judge-text-input:focus { border-color: #7B2D8E; }
 .judge-textarea {
   width: 100%;
   border-radius: 10px;
-  border: 1.5px solid #E5E5EA;
-  background: #F5F5F7;
+  border: 1.5px solid #E7E9F2;
+  background: #F7F8FC;
   padding: 10px 14px;
   font-size: 14px;
   font-family: inherit;
-  color: #1A1A2E;
+  color: #2B1B45;
   outline: none;
   transition: border-color .2s;
   box-sizing: border-box;
@@ -381,11 +381,11 @@
   min-height: 80px;
   resize: vertical;
 }
-.judge-textarea:focus { border-color: #7B5EA7; }
+.judge-textarea:focus { border-color: #7B2D8E; }
 .judge-info-label {
   font-size: 13px;
   font-weight: 600;
-  color: #8A8A99;
+  color: #6B5C86;
   margin-bottom: 8px;
   display: flex;
   align-items: center;
@@ -419,24 +419,24 @@
   font-family: inherit;
 }
 .judge-btn:active { opacity: .8; }
-.judge-btn-submit { background: #7B5EA7; color: #fff; }
+.judge-btn-submit { background: #7B2D8E; color: #fff; }
 .judge-btn-disabled { background: #ccc; color: #fff; cursor: not-allowed; }
 .judge-btn-back {
-  background: #F5F5F7;
-  color: #1A1A2E;
-  border: 1.5px solid #E5E5EA;
+  background: #F7F8FC;
+  color: #2B1B45;
+  border: 1.5px solid #E7E9F2;
   margin-top: 14px;
 }
 .judge-back-btn {
-  background: #F5F5F7;
-  border: 1.5px solid #E5E5EA;
+  background: #F7F8FC;
+  border: 1.5px solid #E7E9F2;
   border-radius: 10px;
   padding: 8px 16px;
   cursor: pointer;
   font-size: 14px;
   font-weight: 600;
   font-family: inherit;
-  color: #1A1A2E;
+  color: #2B1B45;
   margin-bottom: 16px;
   display: flex;
   align-items: center;
@@ -449,18 +449,18 @@
   justify-content: space-between;
 }
 .judge-room-num { font-size: 18px; font-weight: 700; }
-.judge-room-teams { font-size: 13px; color: #8A8A99; margin-top: 4px; }
-.judge-room-arrow { font-size: 20px; color: #8A8A99; }
+.judge-room-teams { font-size: 13px; color: #6B5C86; margin-top: 4px; }
+.judge-room-arrow { font-size: 20px; color: #6B5C86; }
 .judge-success {
-  background: rgba(52,199,89,.1);
-  border: 1.5px solid rgba(52,199,89,.3);
+  background: rgba(34,197,94,.1);
+  border: 1.5px solid rgba(34,197,94,.3);
   border-radius: 16px;
   padding: 32px 20px;
   text-align: center;
 }
 .judge-success-icon { font-size: 48px; margin-bottom: 12px; }
-.judge-success-title { font-size: 20px; font-weight: 700; color: #34C759; margin-bottom: 6px; }
-.judge-success-sub { font-size: 14px; color: #8A8A99; line-height: 1.5; }
+.judge-success-title { font-size: 20px; font-weight: 700; color: #22C55E; margin-bottom: 6px; }
+.judge-success-sub { font-size: 14px; color: #6B5C86; line-height: 1.5; }
 .judge-err {
   background: rgba(255,59,48,.08);
   border: 1.5px solid rgba(255,59,48,.25);
@@ -469,8 +469,8 @@
   text-align: center;
 }
 .judge-err-icon { font-size: 48px; margin-bottom: 12px; }
-.judge-err-title { font-size: 18px; font-weight: 700; color: #FF3B30; margin-bottom: 6px; }
-.judge-err-sub { font-size: 14px; color: #8A8A99; }
+.judge-err-title { font-size: 18px; font-weight: 700; color: #EF4444; margin-bottom: 6px; }
+.judge-err-sub { font-size: 14px; color: #6B5C86; }
 
 /* ── Announcement screen (projector) ───────────────────────────────── */
 @keyframes confetti-fall {

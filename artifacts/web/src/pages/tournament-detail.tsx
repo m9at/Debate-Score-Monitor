@@ -11,6 +11,7 @@ import {
 } from "@/lib/firebaseJudgeApi";
 import {
   buildSessionUrl,
+  buildJudgeSessionUrl,
   decodeScores,
   type RoomInfo,
   type RoundData,
@@ -82,6 +83,7 @@ import AuditLog from "@/components/tournament/AuditLog";
 import RegistrationLinksCenter from "@/components/tournament/RegistrationLinksCenter";
 import RoundsManager from "@/components/tournament/RoundsManager";
 import RoundCommandCenter from "@/components/tournament/RoundCommandCenter";
+import ImageUploadField from "@/components/common/ImageUploadField";
 import ReportsPanel from "@/components/tournament/ReportsPanel";
 import SettingsPanel from "@/components/tournament/SettingsPanel";
 import ShareLinkDialog from "@/components/tournament/ShareLinkDialog";
@@ -1226,6 +1228,7 @@ export default function TournamentDetail() {
   const [editTeamName, setEditTeamName] = useState("");
   const [editSpeakersCount, setEditSpeakersCount] = useState<"3" | "4">("3");
   const [editSpeakerNames, setEditSpeakerNames] = useState<string[]>([]);
+  const [editTeamLogo, setEditTeamLogo] = useState<string | undefined>();
 
   // Delete tournament confirmation
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
@@ -1699,33 +1702,70 @@ export default function TournamentDetail() {
     toast({ title: `تم تجهيز الجولة ${nextNum} وبدؤها` });
   };
 
+  /**
+   * The round as the judging link sees it: rooms, rosters and — so the link can
+   * identify the judge itself — the judges assigned to each room.
+   */
+  const buildRoundData = (): RoundData => {
+    const rooms: RoomInfo[] = (currentRound?.matches ?? []).map((m) => {
+      const gov = tournament.teams.find((t) => t.id === m.team1.teamId);
+      const opp = tournament.teams.find((t) => t.id === m.team2.teamId);
+      const a = m.judgeAssignment;
+      const ids = [
+        ...(a?.chairJudgeId ? [a.chairJudgeId] : []),
+        ...(a?.panelistJudgeIds ?? []),
+      ];
+      return {
+        roomNumber: m.roomNumber,
+        roomLabel: m.roomLabel,
+        matchId: m.id,
+        govTeamName: gov?.name ?? "الموالاة",
+        oppTeamName: opp?.name ?? "المعارضة",
+        govTeamId: m.team1.teamId,
+        govSpeakerNames: gov?.speakerNames ?? [],
+        oppSpeakerNames: opp?.speakerNames ?? [],
+        govSpeakersCount: gov?.speakersPerTeam ?? 3,
+        oppSpeakersCount: opp?.speakersPerTeam ?? 3,
+        judges: ids
+          .map((id) => {
+            const j = (tournament.judges ?? []).find((x) => x.id === id);
+            return j ? { id: j.id, name: j.name, chair: a?.chairJudgeId === id } : null;
+          })
+          .filter(Boolean) as { id: string; name: string; chair: boolean }[],
+      };
+    });
+    return {
+      tournamentId: tournament.id,
+      tournamentName: tournament.name,
+      roundNumber: currentRoundNum,
+      rooms,
+      caseText: currentRound?.caseText,
+    };
+  };
+
+  /** Personal link for one judge: their room only, their name pre-filled. */
+  const handleJudgeLink = async (judgeId: string) => {
+    if (!currentRound || linkLoading) return;
+    setLinkLoading(true);
+    try {
+      const sid = await createRoundSession(buildRoundData());
+      const judge = (tournament.judges ?? []).find((j) => j.id === judgeId);
+      openShareDialog(
+        `رابط تحكيم — ${judge?.name ?? "المحكم"}`,
+        buildJudgeSessionUrl(sid, judgeId),
+      );
+    } catch {
+      window.alert("حدث خطأ أثناء إنشاء رابط المحكم");
+    } finally {
+      setLinkLoading(false);
+    }
+  };
+
   const handleRoundJudgeLink = async () => {
     if (!currentRound || linkLoading) return;
     setLinkLoading(true);
     try {
-      const rooms: RoomInfo[] = currentRound.matches.map((m) => {
-        const gov = tournament.teams.find((t) => t.id === m.team1.teamId);
-        const opp = tournament.teams.find((t) => t.id === m.team2.teamId);
-        return {
-          roomNumber: m.roomNumber,
-          roomLabel: m.roomLabel,
-          matchId: m.id,
-          govTeamName: gov?.name ?? "الموالاة",
-          oppTeamName: opp?.name ?? "المعارضة",
-          govTeamId: m.team1.teamId,
-          govSpeakerNames: gov?.speakerNames ?? [],
-          oppSpeakerNames: opp?.speakerNames ?? [],
-          govSpeakersCount: gov?.speakersPerTeam ?? 3,
-          oppSpeakersCount: opp?.speakersPerTeam ?? 3,
-        };
-      });
-      const roundData: RoundData = {
-        tournamentId: tournament.id,
-        tournamentName: tournament.name,
-        roundNumber: currentRoundNum,
-        rooms,
-        caseText: currentRound?.caseText,
-      };
+      const roundData = buildRoundData();
       const sid = await createRoundSession(roundData);
       const url = buildSessionUrl("round", sid);
       openShareDialog("رابط المحكمين", url);
@@ -2454,6 +2494,7 @@ export default function TournamentDetail() {
   const openEditTeam = (team: Team) => {
     setEditingTeamId(team.id);
     setEditTeamName(team.name);
+    setEditTeamLogo(team.logoDataUrl);
     const count = (team.speakersPerTeam ?? 3) as 3 | 4;
     setEditSpeakersCount(String(count) as "3" | "4");
     const names = [...(team.speakerNames ?? [])];
@@ -2496,6 +2537,7 @@ export default function TournamentDetail() {
     updateTeam(tournament.id, {
       ...orig,
       name: editTeamName.trim(),
+      logoDataUrl: editTeamLogo,
       speakersPerTeam: count,
       speakerNames: editSpeakerNames.slice(0, count).map((n) => n.trim()),
     });
@@ -2655,9 +2697,9 @@ export default function TournamentDetail() {
             </button>
 
             <button
-              onClick={() => window.location.reload()}
-              aria-label="تحديث الصفحة"
-              title="تحديث الصفحة"
+              onClick={() => setViewingRound(currentRoundNum)}
+              aria-label="تحديث البيانات"
+              title="تحديث البيانات"
               className="w-10 h-10 rounded-xl border bg-white hover:bg-[#7B2D8E]/[0.06] flex items-center justify-center shrink-0 transition-all active:scale-95"
               style={{ borderColor: BRAND.border, color: BRAND.ink }}
               data-testid="button-refresh-page"
@@ -2755,6 +2797,7 @@ export default function TournamentDetail() {
               logAction(tournament.id, "بدء الجولة", `الجولة ${currentRoundNum}`);
               toast({ title: `الجولة الجارية الآن: الجولة ${currentRoundNum}` });
             }}
+            onJudgeLink={handleJudgeLink}
             canManage={can("manageJudges")}
           />
           <OverviewDashboard
@@ -3903,6 +3946,12 @@ export default function TournamentDetail() {
                 data-testid="input-edit-team-name"
               />
             </div>
+            <ImageUploadField
+              label="شعار الفريق"
+              value={editTeamLogo}
+              onChange={setEditTeamLogo}
+              testId="input-team-logo-file"
+            />
             <div>
               <Label>عدد أعضاء الفريق</Label>
               <Select
@@ -4343,6 +4392,14 @@ export default function TournamentDetail() {
                   data-testid="input-judge-name"
                 />
               </div>
+              <ImageUploadField
+                label="صورة المحكم"
+                value={editingJudge.photoDataUrl}
+                onChange={(dataUrl) =>
+                  setEditingJudge({ ...editingJudge, photoDataUrl: dataUrl })
+                }
+                testId="input-judge-photo-file"
+              />
               <div>
                 <Label>المؤسسة</Label>
                 <Input

@@ -73,6 +73,8 @@ export interface Team {
   matchesPlayed: number;
   institution?: string;
   documents?: TeamDocument[];
+  /** Team logo uploaded directly into the system (data URL), replaceable. */
+  logoDataUrl?: string;
   registeredAt?: number;
 }
 
@@ -83,6 +85,8 @@ export interface Judge {
   experience?: string;
   canChair: boolean;
   conflictTeamIds: string[];
+  /** Judge photo uploaded directly into the system (data URL), replaceable. */
+  photoDataUrl?: string;
   registeredAt?: number;
   /** Temporarily unavailable — kept in the list but skipped by the draw. */
   disabled?: boolean;
