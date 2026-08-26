@@ -81,6 +81,7 @@ import RoundControlCenter from "@/components/tournament/RoundControlCenter";
 import AuditLog from "@/components/tournament/AuditLog";
 import RegistrationLinksCenter from "@/components/tournament/RegistrationLinksCenter";
 import RoundsManager from "@/components/tournament/RoundsManager";
+import RoundCommandCenter from "@/components/tournament/RoundCommandCenter";
 import ReportsPanel from "@/components/tournament/ReportsPanel";
 import SettingsPanel from "@/components/tournament/SettingsPanel";
 import ShareLinkDialog from "@/components/tournament/ShareLinkDialog";
@@ -1670,6 +1671,34 @@ export default function TournamentDetail() {
     setRoundNotification(false);
   };
 
+  /**
+   * The one action that moves the tournament forward from النظرة العامة:
+   * pairings → rooms → judges → the round becomes the live one. Nothing is
+   * started before every readiness check passes.
+   */
+  const prepareAndStartNextRound = () => {
+    if (!tournament) return;
+    const nextNum = currentRoundNum + 1;
+    const existing = tournament.rounds.find((r) => r.roundNumber === nextNum);
+
+    if (!existing) {
+      if (canGenerateSemifinal) generateSemifinal(tournament.id);
+      else if (canGenerateFinal) generateFinal(tournament.id);
+      else if (canGenerateRound) generateRound(tournament.id);
+      else {
+        window.alert("لا يمكن تجهيز الجولة التالية — أكمل نتائج الجولة الحالية أولاً.");
+        return;
+      }
+      autoAssignJudges(tournament.id, nextNum);
+    }
+
+    setCurrentRound(tournament.id, nextNum);
+    setViewingRound(nextNum);
+    setRoundNotification(false);
+    logAction(tournament.id, "بدء الجولة", `الجولة ${nextNum}`);
+    toast({ title: `تم تجهيز الجولة ${nextNum} وبدؤها` });
+  };
+
   const handleRoundJudgeLink = async () => {
     if (!currentRound || linkLoading) return;
     setLinkLoading(true);
@@ -2708,9 +2737,29 @@ export default function TournamentDetail() {
         )}
 
         {activeTab === "overview" && (
+          <div className="space-y-5">
+          <RoundCommandCenter
+            tournament={tournament}
+            selectedRound={currentRoundNum}
+            onSelectRound={(n) => {
+              setViewingRound(n);
+              setRoundNotification(false);
+            }}
+            onAssignJudges={(matchId, assignment) =>
+              setMatchJudges(tournament.id, currentRoundNum, matchId, assignment)
+            }
+            onAutoAssign={() => autoAssignJudges(tournament.id, currentRoundNum)}
+            onStartNextRound={prepareAndStartNextRound}
+            onStartSelectedRound={() => {
+              setCurrentRound(tournament.id, currentRoundNum);
+              logAction(tournament.id, "بدء الجولة", `الجولة ${currentRoundNum}`);
+              toast({ title: `الجولة الجارية الآن: الجولة ${currentRoundNum}` });
+            }}
+            canManage={can("manageJudges")}
+          />
           <OverviewDashboard
             tournament={tournament}
-            onOpenRounds={() => setActiveTab("rounds")}
+            displayRound={currentRoundNum}
             onFollowJudging={() => setActiveTab("control")}
             onRoomDetails={(match) =>
               setLocation(
@@ -2719,6 +2768,7 @@ export default function TournamentDetail() {
             }
             onAnnounce={() => setLocation(`/present/${tournament.id}`)}
           />
+          </div>
         )}
 
         {activeTab === "control" && (
