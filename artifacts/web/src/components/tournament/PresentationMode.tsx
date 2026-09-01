@@ -55,26 +55,15 @@ export default function PresentationMode({
     setAnnouncingId(null);
   }, [presentedRound]);
 
-  // Ask for real full screen, but never let the request (or a browser that
-  // refuses it, e.g. inside an iframe) end the show: only leaving a full screen
-  // we actually entered goes back.
+  // Ask for real full screen ONCE, on mount. Leaving full screen (or a browser
+  // that refuses it) never ends the show: only the ✕ button does, so a reveal
+  // animation or a re-render can no longer drop the organiser out of the mode.
   useEffect(() => {
-    let entered = false;
-    void document.documentElement
-      .requestFullscreen?.()
-      .then(() => {
-        entered = true;
-      })
-      .catch(() => {});
-    const onChange = () => {
-      if (entered && !document.fullscreenElement) onExit();
-    };
-    document.addEventListener("fullscreenchange", onChange);
+    void document.documentElement.requestFullscreen?.().catch(() => {});
     return () => {
-      document.removeEventListener("fullscreenchange", onChange);
       if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {});
     };
-  }, [onExit]);
+  }, []);
 
   const teamName = useMemo(() => {
     const byId = new Map(tournament.teams.map((t) => [t.id, t.name]));
@@ -263,7 +252,7 @@ export default function PresentationMode({
                 className="h-12 px-6 rounded-2xl font-bold text-white/70 bg-white/10 hover:bg-white/20"
                 data-testid="button-close-show-finished"
               >
-                عودة للقاعات
+                عودة لعرض القاعات
               </button>
             </div>
           </motion.div>

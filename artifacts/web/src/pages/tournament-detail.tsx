@@ -82,6 +82,7 @@ import RoundControlCenter from "@/components/tournament/RoundControlCenter";
 import AuditLog from "@/components/tournament/AuditLog";
 import RegistrationLinksCenter from "@/components/tournament/RegistrationLinksCenter";
 import RoundsManager from "@/components/tournament/RoundsManager";
+import RoundOptionsMenu from "@/components/tournament/RoundOptionsMenu";
 import RoundCommandCenter from "@/components/tournament/RoundCommandCenter";
 import RoundJudgeBoard from "@/components/tournament/RoundJudgeBoard";
 import ImageUploadField from "@/components/common/ImageUploadField";
@@ -2708,6 +2709,41 @@ export default function TournamentDetail() {
               <span className="text-base leading-none">↻</span>
             </button>
 
+            {tournament.rounds.length > 0 && !tournament.finished && (
+              <RoundOptionsMenu
+                roundNumber={currentRoundNum}
+                round={currentRound}
+                isCurrent={tournament.currentRound === currentRoundNum}
+                isPresented={
+                  (tournament.presentedRound ?? tournament.currentRound) ===
+                  currentRoundNum
+                }
+                completedCount={completedCount}
+                onSetCurrent={() => {
+                  setCurrentRound(tournament.id, currentRoundNum);
+                  logAction(tournament.id, "تعيين الجولة الحالية", `الجولة ${currentRoundNum}`);
+                  toast({ title: `الجولة الحالية الآن: الجولة ${currentRoundNum}` });
+                }}
+                onSetPresented={() => {
+                  setPresentedRound(tournament.id, currentRoundNum);
+                  toast({ title: `وضع العرض يعرض الجولة ${currentRoundNum}` });
+                }}
+                onDraw={() => generateRound(tournament.id)}
+                onAutoAssignJudges={() => {
+                  autoAssignJudges(tournament.id, currentRoundNum);
+                  toast({ title: "تم توزيع المحكمين على القاعات" });
+                }}
+                onToggleLock={(locked) => {
+                  setRoundLocked(tournament.id, currentRoundNum, locked);
+                  toast({ title: locked ? "تم قفل إدخال النتائج" : "تم فتح إدخال النتائج" });
+                }}
+                onDelete={() => {
+                  deleteRound(tournament.id, currentRoundNum);
+                  if (currentRoundNum > 1) setViewingRound(currentRoundNum - 1);
+                }}
+              />
+            )}
+
             <RoleSwitcher />
 
             <button
@@ -3270,58 +3306,6 @@ export default function TournamentDetail() {
                     }}
                   />
                 </div>
-                {/* Delete round — only if no data recorded yet */}
-                {currentRound && completedCount === 0 && !currentRound.completed && !tournament.finished && (
-                  <div className="flex justify-end mb-2">
-                    <AlertDialog>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <button
-                            className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-muted"
-                            title="خيارات الجولة"
-                            aria-label="خيارات الجولة"
-                            data-testid={`button-round-options-${currentRoundNum}`}
-                          >
-                            <MoreHorizontal className="w-4 h-4 text-muted-foreground" />
-                          </button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="text-right">
-                          <AlertDialogTrigger asChild>
-                            <DropdownMenuItem
-                              className="text-destructive font-semibold"
-                              onSelect={(e) => e.preventDefault()}
-                              data-testid={`button-delete-round-${currentRoundNum}`}
-                            >
-                              <Trash2 className="w-3.5 h-3.5 ml-2" />
-                              حذف الجولة {currentRoundNum}
-                            </DropdownMenuItem>
-                          </AlertDialogTrigger>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                      <AlertDialogContent dir="rtl">
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>حذف الجولة {currentRoundNum}</AlertDialogTitle>
-                          <AlertDialogDescription>
-                            سيتم حذف الجولة {currentRoundNum} ومباراياتها. هذا الإجراء لا يمكن التراجع عنه. لا يمكن الحذف إلا إذا لم يُسجَّل أي نتيجة.
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel>إلغاء</AlertDialogCancel>
-                          <AlertDialogAction
-                            className="bg-destructive hover:bg-destructive/90"
-                            onClick={() => {
-                              deleteRound(tournament.id, currentRoundNum);
-                              if (currentRoundNum > 1) setViewingRound(currentRoundNum - 1);
-                            }}
-                          >
-                            حذف الجولة
-                          </AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
-                  </div>
-                )}
-
                 {/* Case / motion editor */}
                 {currentRound && (
                   <div className="mb-3">
