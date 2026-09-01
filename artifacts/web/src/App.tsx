@@ -25,6 +25,7 @@ import JudgeRegisterPage from "@/pages/judge-register";
 import JudgesPublicPage from "@/pages/judges-public";
 import PublicHomePage from "@/pages/public-home";
 import PublicTournamentPage from "@/pages/public-tournament";
+import PublicRoundPage from "@/pages/public-round";
 import ImportPage from "@/pages/import";
 import StatsPage from "@/pages/stats";
 import NotFound from "@/pages/not-found";
@@ -183,6 +184,7 @@ function Router() {
       <Route path="/judges-public" component={JudgesPublicPage} />
       {/* وضع الجمهور — the whole platform, read-only */}
       <Route path="/public" component={PublicHomePage} />
+      <Route path="/public/:id/round/:round" component={PublicRoundPage} />
       <Route path="/public/:id" component={PublicTournamentPage} />
       <Route path="/results/:id" component={ResultsPage} />
       <Route path="/present/:id" component={PresentPage} />

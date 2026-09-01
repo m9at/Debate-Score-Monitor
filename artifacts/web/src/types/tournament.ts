@@ -190,12 +190,26 @@ export interface Tournament {
   description?: string;
   /** Optional tournament logo (data URL), shown next to the brand logo. */
   logoDataUrl?: string;
+  /** الشعار الأبيض — logo variant for dark backgrounds, images and heroes. */
+  logoWhiteDataUrl?: string;
+  /** صورة البطولة — the hero image of وضع الجمهور and the tournament cards. */
+  coverImageDataUrl?: string;
+  /** عداد تنازلي اختياري لموعد يحدده المسؤول (إعلان النتائج، بداية جولة…). */
+  countdown?: TournamentCountdown;
   /** Rooms defined during setup. */
   rooms?: Room[];
   /** Format settings defined during setup. */
   settings?: TournamentSettings;
   /** Trail of important administrative actions. */
   auditLog?: AuditEntry[];
+}
+
+export interface TournamentCountdown {
+  enabled: boolean;
+  /** What the countdown is for — shown above the digits. */
+  label: string;
+  /** Target moment (epoch ms). */
+  at: number;
 }
 
 export interface TournamentProtection {

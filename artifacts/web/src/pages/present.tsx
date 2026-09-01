@@ -10,6 +10,13 @@ import PresentationMode from "@/components/tournament/PresentationMode";
  */
 export default function PresentPage() {
   const [, params] = useRoute("/present/:id");
+  // The admin panel passes the round it is actually showing (?round=N), so
+  // إعلان النتائج always opens THAT round and never a fixed one.
+  const roundParam = Number(
+    new URLSearchParams(window.location.search).get("round"),
+  );
+  const requestedRound =
+    Number.isFinite(roundParam) && roundParam > 0 ? roundParam : undefined;
   const [, setLocation] = useLocation();
   const { getTournament, markResultAnnounced } = useTournament();
 
@@ -30,6 +37,7 @@ export default function PresentPage() {
   return (
     <PresentationMode
       tournament={tournament}
+      roundNumber={requestedRound}
       canAnnounce
       onMarkRevealed={(roundNumber, matchId) =>
         markResultAnnounced(tournament.id, roundNumber, matchId)

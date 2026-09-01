@@ -16,6 +16,8 @@ interface PresentationModeProps {
   tournament: Tournament;
   /** Persists a room's result as `revealed`. */
   onMarkRevealed: (roundNumber: number, matchId: string) => void;
+  /** The round to present — overrides the tournament's own presented round. */
+  roundNumber?: number;
   /** True for the admin who opened the mode — gates the announce action. */
   canAnnounce: boolean;
   onExit: () => void;
@@ -32,12 +34,13 @@ interface PresentationModeProps {
  */
 export default function PresentationMode({
   tournament,
+  roundNumber,
   onMarkRevealed,
   canAnnounce,
   onExit,
 }: PresentationModeProps) {
   const presentedRound = Math.max(
-    tournament.presentedRound ?? tournament.currentRound ?? 1,
+    roundNumber ?? tournament.presentedRound ?? tournament.currentRound ?? 1,
     1,
   );
   const [focusedRoomId, setFocusedRoomId] = useState<string | null>(null);

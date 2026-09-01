@@ -18,11 +18,32 @@ export default function PublicTournamentCard({
   return (
     <Link
       href={`/public/${t.id}`}
-      className="block rounded-2xl bg-white border p-4 md:p-5 space-y-3 transition-all
-                 hover:-translate-y-0.5 hover:shadow-md"
+      className="block rounded-2xl bg-white border p-4 md:p-5 space-y-3 overflow-hidden transition-all
+                 hover:-translate-y-1 hover:shadow-lg"
       style={{ borderColor: BRAND.border }}
       data-testid={`public-tournament-${t.id}`}
     >
+      {t.coverImageDataUrl && (
+        <div className="-mx-4 -mt-4 md:-mx-5 md:-mt-5 mb-1 h-40 md:h-48 overflow-hidden rounded-t-2xl relative">
+          <img
+            src={t.coverImageDataUrl}
+            alt={t.name}
+            className="w-full h-full object-cover transition-transform duration-500 hover:scale-[1.04]"
+            data-testid="public-tournament-cover"
+          />
+          <div
+            className="absolute inset-0"
+            style={{ background: `linear-gradient(180deg, transparent 45%, ${BRAND.ink}99 100%)` }}
+          />
+          {t.logoWhiteDataUrl && (
+            <img
+              src={t.logoWhiteDataUrl}
+              alt=""
+              className="absolute bottom-3 right-4 h-9 object-contain"
+            />
+          )}
+        </div>
+      )}
       <div className="flex items-start gap-3 flex-wrap">
         <h2 className="flex-1 font-black text-[17px]" style={{ color: BRAND.ink }}>
           {t.name}

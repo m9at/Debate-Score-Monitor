@@ -4,3 +4,4 @@ export * from "./tournament-registrations";
 export * from "./profiles";
 export * from "./registration-links";
 export * from "./tournament-drafts";
+export * from "./public-view-stats";

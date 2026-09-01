@@ -78,7 +78,7 @@ export default function TournamentCard({
 
   return (
     <div
-      className="group relative rounded-2xl bg-white border shadow-sm flex flex-col
+      className="group relative rounded-2xl bg-white border shadow-sm flex flex-col overflow-hidden
                  transition-all duration-300 hover:shadow-xl hover:-translate-y-1"
       style={{ borderColor: BRAND.border }}
       data-testid={`card-tournament-${tournament.id}`}
@@ -89,6 +89,28 @@ export default function TournamentCard({
         className="absolute top-0 left-0 right-0 h-1 rounded-t-2xl"
         style={{ backgroundImage: BRAND_GRADIENT }}
       />
+
+      {tournament.coverImageDataUrl && (
+        <div className="relative h-36 overflow-hidden" data-testid="tournament-card-cover">
+          <img
+            src={tournament.coverImageDataUrl}
+            alt={tournament.name}
+            className="w-full h-full object-cover transition-transform duration-500
+                       group-hover:scale-[1.05]"
+          />
+          <div
+            className="absolute inset-0"
+            style={{ background: `linear-gradient(180deg, transparent 50%, ${BRAND.ink}8c 100%)` }}
+          />
+          {tournament.logoWhiteDataUrl && (
+            <img
+              src={tournament.logoWhiteDataUrl}
+              alt=""
+              className="absolute bottom-2.5 right-4 h-8 object-contain"
+            />
+          )}
+        </div>
+      )}
 
       <div className="p-5 pt-6 flex-1">
         {/* Title row */}

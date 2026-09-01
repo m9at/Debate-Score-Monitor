@@ -852,7 +852,18 @@ interface TournamentContextType {
   updateTournamentInfo: (
     tournamentId: string,
     patch: Partial<
-      Pick<Tournament, "name" | "description" | "startDate" | "endDate" | "totalRounds">
+      Pick<
+        Tournament,
+        | "name"
+        | "description"
+        | "startDate"
+        | "endDate"
+        | "totalRounds"
+        | "logoDataUrl"
+        | "logoWhiteDataUrl"
+        | "coverImageDataUrl"
+        | "countdown"
+      >
     >
   ) => void;
   setTournamentArchived: (tournamentId: string, archived: boolean) => void;
@@ -1298,7 +1309,18 @@ export function TournamentProvider({ children }: { children: ReactNode }) {
     (
       tournamentId: string,
       patch: Partial<
-        Pick<Tournament, "name" | "description" | "startDate" | "endDate" | "totalRounds">
+        Pick<
+        Tournament,
+        | "name"
+        | "description"
+        | "startDate"
+        | "endDate"
+        | "totalRounds"
+        | "logoDataUrl"
+        | "logoWhiteDataUrl"
+        | "coverImageDataUrl"
+        | "countdown"
+      >
       >
     ) => {
       const t = stateRef.current.tournaments.find((x) => x.id === tournamentId);
@@ -1410,6 +1432,9 @@ export function TournamentProvider({ children }: { children: ReactNode }) {
       finished: false,
       description: setup.description?.trim() || undefined,
       logoDataUrl: setup.logoDataUrl,
+      // The image uploaded at creation also serves as the tournament's cover,
+      // until the organiser uploads a dedicated one in الهوية والشعارات.
+      coverImageDataUrl: setup.logoDataUrl,
       startDate: setup.startDate,
       endDate: setup.endDate,
       rooms: setup.rooms,

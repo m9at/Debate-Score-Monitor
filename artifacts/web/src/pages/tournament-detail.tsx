@@ -88,6 +88,9 @@ import RoundJudgeBoard from "@/components/tournament/RoundJudgeBoard";
 import ImageUploadField from "@/components/common/ImageUploadField";
 import ReportsPanel from "@/components/tournament/ReportsPanel";
 import SettingsPanel from "@/components/tournament/SettingsPanel";
+import IdentityPanel from "@/components/tournament/IdentityPanel";
+import CountdownPanel from "@/components/tournament/CountdownPanel";
+import PublicStatsPanel from "@/components/tournament/PublicStatsPanel";
 import ShareLinkDialog from "@/components/tournament/ShareLinkDialog";
 import AutoSaveIndicator from "@/components/tournament/AutoSaveIndicator";
 import TournamentSkeleton from "@/components/tournament/TournamentSkeleton";
@@ -1009,6 +1012,7 @@ export default function TournamentDetail() {
     setRoundLocked,
     markResultAnnounced,
     setPublicVisible,
+    updateTournamentInfo,
     logAction,
     tournaments,
   } = useTournament();
@@ -2748,7 +2752,7 @@ export default function TournamentDetail() {
             <RoleSwitcher />
 
             <button
-              onClick={() => setLocation(`/present/${tournament.id}`)}
+              onClick={() => setLocation(`/present/${tournament.id}?round=${currentRoundNum}`)}
               className={`${BTN.base} ${BTN.secondary} h-10 px-4 shrink-0`}
               data-testid="button-presentation-mode"
             >
@@ -2758,7 +2762,7 @@ export default function TournamentDetail() {
 
             {can("announceResults") && (
             <button
-              onClick={() => setLocation(`/present/${tournament.id}`)}
+              onClick={() => setLocation(`/present/${tournament.id}?round=${currentRoundNum}`)}
               className={`${BTN.base} ${BTN.primary} h-10 px-5 shrink-0 shadow-lg`}
               style={BTN_PRIMARY_STYLE}
               data-testid="button-announce-results"
@@ -2846,7 +2850,7 @@ export default function TournamentDetail() {
                 `/match/${tournament.id}/${tournament.currentRound}/${match.id}`
               )
             }
-            onAnnounce={() => setLocation(`/present/${tournament.id}`)}
+            onAnnounce={() => setLocation(`/present/${tournament.id}?round=${currentRoundNum}`)}
           />
         )}
 
@@ -2858,7 +2862,7 @@ export default function TournamentDetail() {
                 `/match/${tournament.id}/${tournament.currentRound}/${match.id}`
               )
             }
-            onAnnounce={() => setLocation(`/present/${tournament.id}`)}
+            onAnnounce={() => setLocation(`/present/${tournament.id}?round=${currentRoundNum}`)}
             onToggleLock={(locked) => {
               setRoundLocked(tournament.id, tournament.currentRound, locked);
               toast({
@@ -2919,6 +2923,18 @@ export default function TournamentDetail() {
         )}
 
         {activeTab === "settings" && (
+          <div className="space-y-4">
+          <PublicStatsPanel tournamentId={tournament.id} />
+          <IdentityPanel
+            tournament={tournament}
+            onChange={(patch) => updateTournamentInfo(tournament.id, patch)}
+          />
+          <CountdownPanel
+            tournament={tournament}
+            onChange={(countdown) =>
+              updateTournamentInfo(tournament.id, { countdown })
+            }
+          />
           <SettingsPanel
             tournament={tournament}
             hideScores={hideScores}
@@ -2947,6 +2963,7 @@ export default function TournamentDetail() {
             onReopen={() => setConfirmReopenOpen(true)}
             onDelete={() => setConfirmDeleteOpen(true)}
           />
+          </div>
         )}
 
         {activeTab === "audit" && <AuditLog entries={tournament.auditLog ?? []} />}
