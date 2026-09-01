@@ -39,6 +39,8 @@ export default function RoundJudgeBoard({
   const teamName = (id: string) =>
     tournament.teams.find((t) => t.id === id)?.name ?? "—";
   const roundFinished = !!round?.completed;
+  const judgesPerRoom =
+    round?.judgesPerRoom ?? tournament.settings?.judgesPerRoom ?? 1;
 
   /** Judges already used by the other rooms of this round. */
   const takenBy = (exceptMatchId: string) => {
@@ -138,11 +140,14 @@ export default function RoundJudgeBoard({
                       judges={judges}
                       assignment={m.judgeAssignment}
                       takenElsewhere={takenBy(m.id)}
+                      slots={judgesPerRoom}
                       onChange={(a) => onAssignJudges(m.id, a)}
                     />
                   ) : (
                     <span className="text-[13px] font-semibold" style={{ color: BRAND.ink }}>
-                      {judgesOf(m).map((j) => j.name).join("، ") || "—"}
+                      {judgesOf(m)
+                        .map((j, i) => (i === 0 ? `${j.name} (رئيس الجلسة)` : j.name))
+                        .join("، ") || "—"}
                     </span>
                   )}
                 </td>

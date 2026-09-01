@@ -4,7 +4,6 @@ import {
   LayoutGrid,
   ListChecks,
   Megaphone,
-  Repeat,
   Trophy,
   Users,
 } from "lucide-react";
@@ -12,13 +11,16 @@ import type { Match, Tournament } from "@/types/tournament";
 import { useRole } from "@/context/RoleContext";
 import { BRAND, BRAND_GRADIENT, BTN, BTN_SIZE } from "@/lib/brand";
 import { getRoomStatus, roomStatusMeta, type RoomStatus } from "@/lib/roomStatus";
+import DisplayRoundCard from "./DisplayRoundCard";
 import PublicRoomCard from "./PublicRoomCard";
 
 interface OverviewDashboardProps {
   tournament: Tournament;
   /** Round the organiser chose to inspect — all figures below follow it. */
   displayRound: number;
-  /** Round selector / start controls, shown right under the summary. */
+  /** Switches the round every figure below follows. */
+  onSelectRound: (roundNumber: number) => void;
+  /** Readiness / start controls, shown right under the summary. */
   roundControl?: ReactNode;
   onFollowJudging: () => void;
   onRoomDetails: (match: Match) => void;
@@ -72,6 +74,7 @@ function StatCard({
 export default function OverviewDashboard({
   tournament,
   displayRound,
+  onSelectRound,
   roundControl,
   onFollowJudging,
   onRoomDetails,
@@ -192,11 +195,10 @@ export default function OverviewDashboard({
         <StatCard icon={LayoutGrid} value={roomsCount} label="القاعات" tone={BRAND.blue} />
         <StatCard icon={Users} value={tournament.teams.length} label="الفِرق" tone={BRAND.purple} />
         <StatCard icon={Gavel} value={judgesCount} label="المحكمون" tone={BRAND.blueDeep} />
-        <StatCard
-          icon={Repeat}
-          value={tournament.started ? `الجولة ${displayRound}` : "—"}
-          label="الجولة المعروضة"
-          tone={BRAND.gold}
+        <DisplayRoundCard
+          tournament={tournament}
+          displayRound={displayRound}
+          onSelectRound={onSelectRound}
         />
       </section>
 

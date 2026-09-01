@@ -9,7 +9,6 @@ interface RoundCommandCenterProps {
   tournament: Tournament;
   /** Round number the organiser is inspecting. */
   selectedRound: number;
-  onSelectRound: (roundNumber: number) => void;
   /**
    * Prepares and starts the next round: pairings → rooms → judges → current round.
    * Only offered once the selected round is finished.
@@ -28,7 +27,6 @@ interface RoundCommandCenterProps {
 export default function RoundCommandCenter({
   tournament,
   selectedRound,
-  onSelectRound,
   onStartNextRound,
   onStartSelectedRound,
   canManage,
@@ -54,29 +52,14 @@ export default function RoundCommandCenter({
 
   return (
     <section className="space-y-4" dir="rtl" data-testid="round-command-center">
-      {/* Round selector — everything below follows this choice. */}
+      {/* Round actions — the round itself is chosen from the summary tile. */}
       <div
         className="rounded-2xl bg-white border shadow-sm p-4 flex flex-wrap items-center gap-3"
         style={{ borderColor: BRAND.border }}
       >
-        <label className="font-bold text-[14px]" style={{ color: BRAND.ink }}>
-          الجولة المعروضة
-        </label>
-        <select
-          value={selectedRound}
-          onChange={(e) => onSelectRound(Number(e.target.value))}
-          className="h-10 px-3 rounded-xl border bg-white font-bold text-[13.5px] outline-none"
-          style={{ borderColor: BRAND.border, color: BRAND.ink }}
-          data-testid="select-round"
-        >
-          {tournament.rounds.map((r) => (
-            <option key={r.roundNumber} value={r.roundNumber}>
-              {roundTitle(r, r.roundNumber)}
-              {r.completed ? " — منتهية" : ""}
-              {tournament.currentRound === r.roundNumber ? " (الحالية)" : ""}
-            </option>
-          ))}
-        </select>
+        <span className="font-bold text-[14px]" style={{ color: BRAND.ink }}>
+          {round ? roundTitle(round, selectedRound) : "الجولة"}
+        </span>
 
         <span className="flex-1" />
 

@@ -503,8 +503,26 @@ function RoomScoring({ room, sessionId, tournamentName, roundNumber, identifiedJ
           ) : (
             <>
               <div className="judge-info-label">👨‍⚖️ اسم المحكم</div>
-              <input type="text" value={judgeName} onChange={(e) => setJudgeName(e.target.value)}
-                placeholder="أدخل اسمك" className="judge-text-input" />
+              {(room.judges ?? []).length > 0 ? (
+                <select
+                  value={judgeName}
+                  onChange={(e) => setJudgeName(e.target.value)}
+                  className="judge-text-input"
+                  style={{ fontWeight: 700 }}
+                  data-testid="select-judge-name"
+                >
+                  <option value="">— اختر اسمك من محكمي هذه القاعة —</option>
+                  {(room.judges ?? []).map((j) => (
+                    <option key={j.id} value={j.name}>
+                      {j.name}
+                      {j.chair ? " (رئيس الجلسة)" : ""}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <input type="text" value={judgeName} onChange={(e) => setJudgeName(e.target.value)}
+                  placeholder="أدخل اسمك" className="judge-text-input" />
+              )}
             </>
           )}
           <div className="judge-info-label" style={{ marginTop: 14 }}>📝 ملاحظات</div>

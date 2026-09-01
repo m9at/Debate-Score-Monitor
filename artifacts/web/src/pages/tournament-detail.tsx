@@ -2786,14 +2786,14 @@ export default function TournamentDetail() {
           <OverviewDashboard
             tournament={tournament}
             displayRound={currentRoundNum}
+            onSelectRound={(n) => {
+              setViewingRound(n);
+              setRoundNotification(false);
+            }}
             roundControl={
               <RoundCommandCenter
                 tournament={tournament}
                 selectedRound={currentRoundNum}
-                onSelectRound={(n) => {
-                  setViewingRound(n);
-                  setRoundNotification(false);
-                }}
                 onStartNextRound={prepareAndStartNextRound}
                 onStartSelectedRound={() => {
                   setCurrentRound(tournament.id, currentRoundNum);
@@ -3274,16 +3274,30 @@ export default function TournamentDetail() {
                 {currentRound && completedCount === 0 && !currentRound.completed && !tournament.finished && (
                   <div className="flex justify-end mb-2">
                     <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <button
-                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold hover:opacity-80 transition-opacity"
-                          style={{ backgroundColor: "rgba(239,68,68,0.08)", color: "#EF4444" }}
-                          data-testid={`button-delete-round-${currentRoundNum}`}
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                          حذف هذه الجولة
-                        </button>
-                      </AlertDialogTrigger>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <button
+                            className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-muted"
+                            title="خيارات الجولة"
+                            aria-label="خيارات الجولة"
+                            data-testid={`button-round-options-${currentRoundNum}`}
+                          >
+                            <MoreHorizontal className="w-4 h-4 text-muted-foreground" />
+                          </button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="text-right">
+                          <AlertDialogTrigger asChild>
+                            <DropdownMenuItem
+                              className="text-destructive font-semibold"
+                              onSelect={(e) => e.preventDefault()}
+                              data-testid={`button-delete-round-${currentRoundNum}`}
+                            >
+                              <Trash2 className="w-3.5 h-3.5 ml-2" />
+                              حذف الجولة {currentRoundNum}
+                            </DropdownMenuItem>
+                          </AlertDialogTrigger>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                       <AlertDialogContent dir="rtl">
                         <AlertDialogHeader>
                           <AlertDialogTitle>حذف الجولة {currentRoundNum}</AlertDialogTitle>
