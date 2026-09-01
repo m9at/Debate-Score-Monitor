@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, type ReactNode } from "react";
 import {
   Gavel,
   LayoutGrid,
@@ -18,6 +18,8 @@ interface OverviewDashboardProps {
   tournament: Tournament;
   /** Round the organiser chose to inspect — all figures below follow it. */
   displayRound: number;
+  /** Round selector / start controls, shown right under the summary. */
+  roundControl?: ReactNode;
   onFollowJudging: () => void;
   onRoomDetails: (match: Match) => void;
   onAnnounce: () => void;
@@ -70,6 +72,7 @@ function StatCard({
 export default function OverviewDashboard({
   tournament,
   displayRound,
+  roundControl,
   onFollowJudging,
   onRoomDetails,
   onAnnounce,
@@ -100,7 +103,7 @@ export default function OverviewDashboard({
     return c;
   }, [statuses]);
 
-  const roomsCount = tournament.rooms?.length ?? matches.length;
+  const roomsCount = matches.length || (tournament.rooms?.length ?? 0);
   const judgesCount = (tournament.judges ?? []).filter((j) => !j.disabled).length;
   const progress =
     tournament.totalRounds > 0
@@ -196,6 +199,8 @@ export default function OverviewDashboard({
           tone={BRAND.gold}
         />
       </section>
+
+      {roundControl}
 
       {/* Current round status */}
       {tournament.started && matches.length > 0 && (

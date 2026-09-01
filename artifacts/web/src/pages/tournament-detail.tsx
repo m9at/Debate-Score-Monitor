@@ -83,6 +83,7 @@ import AuditLog from "@/components/tournament/AuditLog";
 import RegistrationLinksCenter from "@/components/tournament/RegistrationLinksCenter";
 import RoundsManager from "@/components/tournament/RoundsManager";
 import RoundCommandCenter from "@/components/tournament/RoundCommandCenter";
+import RoundJudgeBoard from "@/components/tournament/RoundJudgeBoard";
 import ImageUploadField from "@/components/common/ImageUploadField";
 import ReportsPanel from "@/components/tournament/ReportsPanel";
 import SettingsPanel from "@/components/tournament/SettingsPanel";
@@ -2751,7 +2752,10 @@ export default function TournamentDetail() {
       {/* Content */}
       <div className={`flex-1 ${LAYOUT.page} pb-28 pt-2`}>
         {/* إدارة الجولات — always visible, never hidden in a menu */}
-        {tournament.rounds.length > 0 && activeTab !== "settings" && activeTab !== "reports" && (
+        {tournament.rounds.length > 0 &&
+          activeTab !== "overview" &&
+          activeTab !== "settings" &&
+          activeTab !== "reports" && (
           <div className="mb-4">
             <RoundsManager
               tournament={tournament}
@@ -2779,30 +2783,26 @@ export default function TournamentDetail() {
         )}
 
         {activeTab === "overview" && (
-          <div className="space-y-5">
-          <RoundCommandCenter
-            tournament={tournament}
-            selectedRound={currentRoundNum}
-            onSelectRound={(n) => {
-              setViewingRound(n);
-              setRoundNotification(false);
-            }}
-            onAssignJudges={(matchId, assignment) =>
-              setMatchJudges(tournament.id, currentRoundNum, matchId, assignment)
-            }
-            onAutoAssign={() => autoAssignJudges(tournament.id, currentRoundNum)}
-            onStartNextRound={prepareAndStartNextRound}
-            onStartSelectedRound={() => {
-              setCurrentRound(tournament.id, currentRoundNum);
-              logAction(tournament.id, "بدء الجولة", `الجولة ${currentRoundNum}`);
-              toast({ title: `الجولة الجارية الآن: الجولة ${currentRoundNum}` });
-            }}
-            onJudgeLink={handleJudgeLink}
-            canManage={can("manageJudges")}
-          />
           <OverviewDashboard
             tournament={tournament}
             displayRound={currentRoundNum}
+            roundControl={
+              <RoundCommandCenter
+                tournament={tournament}
+                selectedRound={currentRoundNum}
+                onSelectRound={(n) => {
+                  setViewingRound(n);
+                  setRoundNotification(false);
+                }}
+                onStartNextRound={prepareAndStartNextRound}
+                onStartSelectedRound={() => {
+                  setCurrentRound(tournament.id, currentRoundNum);
+                  logAction(tournament.id, "بدء الجولة", `الجولة ${currentRoundNum}`);
+                  toast({ title: `الجولة الجارية الآن: الجولة ${currentRoundNum}` });
+                }}
+                canManage={can("manageJudges")}
+              />
+            }
             onFollowJudging={() => setActiveTab("control")}
             onRoomDetails={(match) =>
               setLocation(
@@ -2811,7 +2811,6 @@ export default function TournamentDetail() {
             }
             onAnnounce={() => setLocation(`/present/${tournament.id}`)}
           />
-          </div>
         )}
 
         {activeTab === "control" && (
@@ -3708,6 +3707,18 @@ export default function TournamentDetail() {
         )}
 
         {activeTab === "judges" && (
+          <>
+          <RoundJudgeBoard
+            tournament={tournament}
+            selectedRound={currentRoundNum}
+            onSelectRound={(n) => setViewingRound(n)}
+            onAssignJudges={(matchId, assignment) =>
+              setMatchJudges(tournament.id, currentRoundNum, matchId, assignment)
+            }
+            onAutoAssign={() => autoAssignJudges(tournament.id, currentRoundNum)}
+            onJudgeLink={handleJudgeLink}
+            canManage={can("manageJudges")}
+          />
           <JudgesTab
             tournament={tournament}
             onApproveJudge={approvePendingJudge}
@@ -3749,6 +3760,7 @@ export default function TournamentDetail() {
               setJudgeAssignOpen(true);
             }}
           />
+          </>
         )}
 
         {activeTab === "pending" && (
@@ -5283,285 +5295,6 @@ function JudgesTab({
         </div>
       )}
 
-      {tournament.rounds.length > 0 && (
-        <div className="space-y-4 pt-3">
-          <div className="flex items-center gap-2">
-            <div
-              className="w-1 h-6 rounded-full"
-              style={{
-                background: `linear-gradient(180deg, ${GOLD}, ${PURPLE})`,
-              }}
-            />
-            <h3 className="font-extrabold text-base">
-              توزيع المحكمين على القاعات
-            </h3>
-          </div>
-          {tournament.rounds.map((round) => {
-            const totalAssigned = round.matches.filter(
-              (m) =>
-                (m.judgeAssignment?.chairJudgeId ||
-                  (m.judgeAssignment?.panelistJudgeIds?.length ?? 0) > 0)
-            ).length;
-            return (
-              <div
-                key={round.roundNumber}
-                className="rounded-2xl p-4 shadow-md space-y-4"
-                style={{
-                  background: `linear-gradient(135deg, ${PURPLE}10 0%, ${CYAN}08 100%)`,
-                  border: `1.5px solid ${PURPLE}33`,
-                }}
-              >
-                <div className="flex items-center gap-2 flex-wrap">
-                  <div
-                    className="px-3 py-1.5 rounded-lg font-bold text-sm"
-                    style={{ backgroundColor: PURPLE, color: "#fff" }}
-                  >
-                    الجولة {round.roundNumber}
-                  </div>
-                  <div
-                    className="text-[11px] font-semibold px-2 py-1 rounded-md"
-                    style={{
-                      backgroundColor:
-                        totalAssigned === round.matches.length
-                          ? SUCCESS + "26"
-                          : GOLD + "26",
-                      color:
-                        totalAssigned === round.matches.length
-                          ? SUCCESS
-                          : GOLD,
-                    }}
-                  >
-                    {totalAssigned}/{round.matches.length} مُعيَّنة
-                  </div>
-                  <div className="flex items-center gap-1.5 text-xs ms-auto">
-                    <span className="text-muted-foreground font-semibold">
-                      محكمون/قاعة:
-                    </span>
-                    <Input
-                      type="number"
-                      min={1}
-                      max={9}
-                      value={round.judgesPerRoom ?? 3}
-                      onChange={(e) =>
-                        onSetJudgesPerRoom(
-                          round.roundNumber,
-                          Math.max(1, parseInt(e.target.value) || 1)
-                        )
-                      }
-                      className="w-14 h-8 text-center font-bold"
-                      data-testid={`input-judges-per-room-${round.roundNumber}`}
-                    />
-                  </div>
-                  <button
-                    onClick={() => onAutoAssign(round.roundNumber)}
-                    disabled={judges.length === 0}
-                    className="text-xs px-3 py-2 rounded-lg font-bold disabled:opacity-50 inline-flex items-center gap-1"
-                    style={{
-                      background: `linear-gradient(135deg, ${CYAN}, ${PURPLE})`,
-                      color: "#fff",
-                    }}
-                    data-testid={`button-auto-assign-${round.roundNumber}`}
-                  >
-                    <Activity className="w-3.5 h-3.5" />
-                    توزيع تلقائي
-                  </button>
-                </div>
-
-                <div className="space-y-3">
-                  {round.matches.map((m) => {
-                    const a = m.judgeAssignment;
-                    const chair = a?.chairJudgeId
-                      ? judgeMap.get(a.chairJudgeId)
-                      : null;
-                    const panel = (a?.panelistJudgeIds ?? [])
-                      .map((id) => judgeMap.get(id))
-                      .filter((j): j is NonNullable<typeof j> => !!j);
-                    const isUnassigned = !chair && panel.length === 0;
-                    return (
-                      <div
-                        key={m.id}
-                        className="rounded-2xl bg-card overflow-hidden shadow-sm"
-                        style={{
-                          border: isUnassigned
-                            ? `2px dashed ${GOLD}66`
-                            : `1px solid var(--border)`,
-                        }}
-                        data-testid={`assignment-card-${round.roundNumber}-${m.id}`}
-                      >
-                        {/* Card header: room + teams + edit */}
-                        <div
-                          className="flex items-center gap-2 px-3 py-2.5"
-                          style={{
-                            background: `linear-gradient(135deg, ${CYAN}1A 0%, ${PURPLE}14 100%)`,
-                            borderBottom: `1px solid ${PURPLE}1A`,
-                          }}
-                        >
-                          <div
-                            className="w-9 h-9 rounded-xl flex items-center justify-center text-white font-bold text-xs flex-shrink-0"
-                            style={{ backgroundColor: CYAN }}
-                          >
-                            <Home className="w-4 h-4" />
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="font-extrabold text-sm">
-                              {m.roomLabel?.trim() || `القاعة ${m.roomNumber}`}
-                            </div>
-                            <div className="text-[11px] text-muted-foreground truncate">
-                              <span style={{ color: CYAN, fontWeight: 600 }}>
-                                {teamMap.get(m.team1.teamId)}
-                              </span>
-                              <span className="mx-1.5 text-muted-foreground">
-                                ⚔
-                              </span>
-                              <span style={{ color: PURPLE, fontWeight: 600 }}>
-                                {teamMap.get(m.team2.teamId)}
-                              </span>
-                            </div>
-                          </div>
-                          <button
-                            onClick={() =>
-                              onEditAssignment(round.roundNumber, m.id)
-                            }
-                            className="p-2 rounded-lg hover:bg-background/60 flex-shrink-0"
-                            style={{ color: PURPLE }}
-                            data-testid={`button-assign-${round.roundNumber}-${m.id}`}
-                            title="تعديل التعيين"
-                          >
-                            <Pencil className="w-4 h-4" />
-                          </button>
-                        </div>
-
-                        {/* Body: chair + panelists */}
-                        <div className="p-3 space-y-3">
-                          {isUnassigned ? (
-                            <div
-                              className="text-center py-4 px-3 rounded-xl"
-                              style={{
-                                backgroundColor: GOLD + "12",
-                                border: `1px dashed ${GOLD}55`,
-                              }}
-                            >
-                              <UserCheck
-                                className="w-7 h-7 mx-auto mb-1.5"
-                                style={{ color: GOLD }}
-                              />
-                              <div
-                                className="text-xs font-bold"
-                                style={{ color: GOLD }}
-                              >
-                                لم يُعيَّن محكمون بعد
-                              </div>
-                              <div className="text-[10px] text-muted-foreground mt-0.5">
-                                اضغط على القلم أو زر "توزيع تلقائي"
-                              </div>
-                            </div>
-                          ) : (
-                            <>
-                              {/* Chair card — full-width, gold accent */}
-                              <div
-                                className="rounded-xl p-3 flex items-center gap-3"
-                                style={{
-                                  background: chair
-                                    ? `linear-gradient(135deg, ${GOLD}1F 0%, ${GOLD}0A 100%)`
-                                    : "transparent",
-                                  border: chair
-                                    ? `1.5px solid ${GOLD}66`
-                                    : `1px dashed var(--border)`,
-                                }}
-                              >
-                                <div
-                                  className="w-11 h-11 rounded-full flex items-center justify-center flex-shrink-0 shadow-sm"
-                                  style={{
-                                    background: chair
-                                      ? `linear-gradient(135deg, ${GOLD}, #E6A800)`
-                                      : "var(--muted)",
-                                    color: "#fff",
-                                  }}
-                                >
-                                  <Crown className="w-5 h-5" />
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                  <div
-                                    className="text-[10px] font-extrabold uppercase tracking-wider mb-0.5"
-                                    style={{ color: GOLD }}
-                                  >
-                                    رئيس الجلسة
-                                  </div>
-                                  <div className="text-sm font-bold truncate">
-                                    {chair?.name ?? (
-                                      <span className="text-muted-foreground font-normal">
-                                        — بدون رئيس —
-                                      </span>
-                                    )}
-                                  </div>
-                                  {chair?.institution && (
-                                    <div className="text-[10px] text-muted-foreground truncate">
-                                      {chair.institution}
-                                    </div>
-                                  )}
-                                </div>
-                              </div>
-
-                              {/* Panelists — avatar chips */}
-                              {panel.length > 0 && (
-                                <div>
-                                  <div
-                                    className="text-[10px] font-extrabold uppercase tracking-wider mb-2 flex items-center gap-1"
-                                    style={{ color: CYAN }}
-                                  >
-                                    <UserCheck className="w-3 h-3" />
-                                    المحكمون ({panel.length})
-                                  </div>
-                                  <div className="flex flex-wrap gap-1.5">
-                                    {panel.map((j) => {
-                                      const initials = j.name
-                                        .trim()
-                                        .split(/\s+/)
-                                        .slice(0, 2)
-                                        .map((p) => p[0])
-                                        .join("");
-                                      return (
-                                        <div
-                                          key={j.id}
-                                          className="flex items-center gap-1.5 ps-1 pe-2.5 py-1 rounded-full"
-                                          style={{
-                                            backgroundColor: CYAN + "14",
-                                            border: `1px solid ${CYAN}40`,
-                                          }}
-                                        >
-                                          <div
-                                            className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-extrabold flex-shrink-0"
-                                            style={{
-                                              backgroundColor: CYAN,
-                                              color: "#fff",
-                                            }}
-                                          >
-                                            {initials}
-                                          </div>
-                                          <span
-                                            className="text-xs font-semibold"
-                                            style={{ color: CYAN }}
-                                          >
-                                            {j.name}
-                                          </span>
-                                        </div>
-                                      );
-                                    })}
-                                  </div>
-                                </div>
-                              )}
-                            </>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
     </div>
   );
 }
