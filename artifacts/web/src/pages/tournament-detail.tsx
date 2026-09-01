@@ -1008,6 +1008,7 @@ export default function TournamentDetail() {
     autoAssignJudges,
     setRoundLocked,
     markResultAnnounced,
+    setPublicVisible,
     logAction,
     tournaments,
   } = useTournament();
@@ -2922,6 +2923,9 @@ export default function TournamentDetail() {
             tournament={tournament}
             hideScores={hideScores}
             onToggleHideScores={() => setHideScores((v) => !v)}
+            onTogglePublicVisible={() =>
+              setPublicVisible(tournament.id, !tournament.publicVisible)
+            }
             onOpenProtection={() => setProtectionOpen(true)}
             onToggleSemifinal={() => {
               const next = !tournament.semifinalEnabled;

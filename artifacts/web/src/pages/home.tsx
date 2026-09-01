@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useLocation } from "wouter";
 import { useTournament } from "@/context/TournamentContext";
+import ShareLinkDialog from "@/components/tournament/ShareLinkDialog";
 import { useGroups } from "@/context/GroupContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,6 +15,7 @@ import {
 import {
   Archive,
   ChevronDown,
+  Eye,
   FolderPlus,
   Plus,
   Search,
@@ -51,6 +53,8 @@ export default function Home() {
 
   // Create-folder dialog
   const [groupDialogOpen, setGroupDialogOpen] = useState(false);
+  /** Shows the shareable وضع الجمهور link of the whole platform. */
+  const [publicLinkOpen, setPublicLinkOpen] = useState(false);
   const [groupName, setGroupName] = useState("");
   const [groupDesc, setGroupDesc] = useState("");
   const [groupIsArchive, setGroupIsArchive] = useState(false);
@@ -153,6 +157,14 @@ export default function Home() {
         actions={
           <>
             <button
+              onClick={() => setPublicLinkOpen(true)}
+              className={`${BTN.base} ${BTN.secondary} ${BTN_SIZE.md}`}
+              data-testid="button-public-mode-link"
+            >
+              <Eye className="w-4 h-4" strokeWidth={2.5} />
+              رابط وضع الجمهور
+            </button>
+            <button
               onClick={() => setGroupDialogOpen(true)}
               className={`${BTN.base} ${BTN.primary} ${BTN_SIZE.md} shadow-lg`}
               style={BTN_PRIMARY_STYLE}
@@ -172,6 +184,14 @@ export default function Home() {
             </button>
           </>
         }
+      />
+
+      <ShareLinkDialog
+        open={publicLinkOpen}
+        onOpenChange={setPublicLinkOpen}
+        title="رابط وضع الجمهور"
+        description="رابط المنصة للجمهور: مشاهدة فقط للبطولات التي سُمح للجمهور بمتابعتها، مع الجولات والقضايا والفرق ونتائج الجولات المعلنة."
+        url={`${window.location.origin}${import.meta.env.BASE_URL.replace(/\/$/, "")}/public`}
       />
 
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 md:px-6 py-5 md:py-7">

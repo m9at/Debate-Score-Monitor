@@ -848,6 +848,7 @@ interface TournamentContextType {
   finishTournament: (tournamentId: string) => void;
   reopenTournament: (tournamentId: string) => void;
   deleteRound: (tournamentId: string, roundNumber: number) => void;
+  setPublicVisible: (tournamentId: string, publicVisible: boolean) => void;
   updateTournamentInfo: (
     tournamentId: string,
     patch: Partial<
@@ -1303,6 +1304,15 @@ export function TournamentProvider({ children }: { children: ReactNode }) {
       const t = stateRef.current.tournaments.find((x) => x.id === tournamentId);
       if (!t) return;
       dispatch({ type: "UPDATE_TOURNAMENT", tournament: { ...t, ...patch } });
+    },
+    []
+  );
+
+  const setPublicVisible = useCallback(
+    (tournamentId: string, publicVisible: boolean) => {
+      const t = stateRef.current.tournaments.find((x) => x.id === tournamentId);
+      if (!t) return;
+      dispatch({ type: "UPDATE_TOURNAMENT", tournament: { ...t, publicVisible } });
     },
     []
   );
@@ -1821,6 +1831,7 @@ export function TournamentProvider({ children }: { children: ReactNode }) {
         setPresentedRound,
         setProtection,
         updateTournamentInfo,
+        setPublicVisible,
         setTournamentArchived,
         duplicateTournament,
         createTournamentFromSetup,
