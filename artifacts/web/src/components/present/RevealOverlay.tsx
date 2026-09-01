@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { RotateCcw, X } from "lucide-react";
+import { ChevronLeft, RotateCcw, X } from "lucide-react";
 import type { Match, Round, Tournament } from "@/types/tournament";
 import { BRAND, BRAND_GRADIENT } from "@/lib/brand";
 import { revealVisibility, roomTitle, roundTitle } from "@/lib/reveal";
@@ -26,6 +26,10 @@ interface RevealOverlayProps {
   match: Match;
   /** Called once the winner is on screen — persists the `revealed` status. */
   onRevealed: () => void;
+  /** Name of the room that follows, shown on the «القاعة التالية» button. */
+  nextRoomLabel?: string | null;
+  /** Moves the show to the next room — only ever by the presenter's press. */
+  onNextRoom?: () => void;
   onClose: () => void;
 }
 
@@ -41,6 +45,8 @@ export default function RevealOverlay({
   roundNumber,
   match,
   onRevealed,
+  nextRoomLabel,
+  onNextRoom,
   onClose,
 }: RevealOverlayProps) {
   const [phase, setPhase] = useState<Phase>("round");
@@ -260,6 +266,22 @@ export default function RevealOverlay({
             transition={{ delay: 2.6 }}
             className="mt-8 flex flex-wrap items-center justify-center gap-3"
           >
+            {onNextRoom && nextRoomLabel && (
+              <button
+                type="button"
+                onClick={onNextRoom}
+                className="h-12 px-8 rounded-2xl text-white text-base md:text-lg font-bold
+                           inline-flex items-center gap-2.5 transition-transform hover:scale-[1.03]"
+                style={{
+                  backgroundColor: `${BRAND.gold}2e`,
+                  border: `2px solid ${BRAND.gold}`,
+                }}
+                data-testid="button-next-room"
+              >
+                <ChevronLeft className="w-5 h-5" />
+                القاعة التالية · {nextRoomLabel}
+              </button>
+            )}
             <button
               type="button"
               onClick={onClose}

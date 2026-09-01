@@ -1,67 +1,38 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-
-/** How long a revealed result stays on screen before the next room. */
-export const HOLD_MS = 5000;
+import { useCallback, useRef, useState } from "react";
 
 /**
- * The auto-play queue of وضع العرض: room → animation → result → 5 full seconds
- * → next room.
- *
- * The timer lives in a ref, so re-rendering the screen (a background refresh,
- * a state update) never restarts the hold and never ends the show. The clock
- * only starts once a result is actually on screen — `revealed()` — never when
- * the page mounts.
+ * The room-by-room walk of وضع العرض: room → animation → result → the presenter
+ * presses «القاعة التالية» himself. Nothing advances on a timer and nothing ends
+ * the show automatically: the presenter leaves with the ✕ button only.
  */
 export function useAnnounceQueue(matchIds: string[]) {
   const [index, setIndex] = useState<number | null>(null);
-  const [done, setDone] = useState(false);
   const idsRef = useRef(matchIds);
   idsRef.current = matchIds;
-  const timerRef = useRef<number | null>(null);
-  /** The room whose hold is already scheduled — keeps repeats harmless. */
-  const scheduledRef = useRef<string | null>(null);
-
-  const clear = () => {
-    if (timerRef.current !== null) window.clearTimeout(timerRef.current);
-    timerRef.current = null;
-  };
-
-  useEffect(() => clear, []);
 
   const active = index !== null;
   const currentId = index !== null ? (idsRef.current[index] ?? null) : null;
+  const nextId =
+    index !== null ? (idsRef.current[index + 1] ?? null) : null;
 
   const start = useCallback(() => {
-    clear();
-    scheduledRef.current = null;
-    setDone(false);
     setIndex(idsRef.current.length > 0 ? 0 : null);
   }, []);
 
-  const stop = useCallback(() => {
-    clear();
-    scheduledRef.current = null;
-    setIndex(null);
-    setDone(false);
+  const stop = useCallback(() => setIndex(null), []);
+
+  /** Moves to the following room; does nothing on the last one. */
+  const next = useCallback(() => {
+    setIndex((prev) =>
+      prev !== null && prev + 1 < idsRef.current.length ? prev + 1 : prev,
+    );
   }, []);
 
-  /** Called by the reveal animation once the winner is on screen. */
-  const revealed = useCallback((matchId: string) => {
-    if (index === null || scheduledRef.current === matchId) return;
-    scheduledRef.current = matchId;
-    clear();
-    timerRef.current = window.setTimeout(() => {
-      timerRef.current = null;
-      setIndex((prev) => {
-        const next = (prev ?? 0) + 1;
-        if (next >= idsRef.current.length) {
-          setDone(true);
-          return null;
-        }
-        return next;
-      });
-    }, HOLD_MS);
-  }, [index]);
+  /** Jumps straight to one room, so a manual إعلان joins the same walk. */
+  const goTo = useCallback((matchId: string) => {
+    const i = idsRef.current.indexOf(matchId);
+    setIndex(i >= 0 ? i : null);
+  }, []);
 
-  return { active, currentId, done, start, stop, revealed };
+  return { active, currentId, nextId, hasNext: nextId !== null, start, stop, next, goTo };
 }

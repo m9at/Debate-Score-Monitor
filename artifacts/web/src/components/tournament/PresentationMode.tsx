@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Play, RotateCcw, X } from "lucide-react";
+import { Play, X } from "lucide-react";
 import type { Tournament } from "@/types/tournament";
 import { BRAND, BRAND_GRADIENT } from "@/lib/brand";
 import { getRoomStatus } from "@/lib/roomStatus";
-import { getRevealStatus, roundTitle } from "@/lib/reveal";
+import { getRevealStatus, roomTitle, roundTitle } from "@/lib/reveal";
 import PresentLogoHero from "@/components/present/PresentLogoHero";
 import PresentRoomCard from "@/components/present/PresentRoomCard";
 import PresentRoomFocus from "@/components/present/PresentRoomFocus";
@@ -107,6 +107,19 @@ export default function PresentationMode({
   const announcingMatch = shownId
     ? (round?.matches.find((m) => m.id === shownId) ?? null)
     : null;
+  /** Name of the room the «القاعة التالية» button moves to, if any. */
+  const nextRoomLabel = queue.nextId
+    ? (() => {
+        const m = round?.matches.find((x) => x.id === queue.nextId);
+        return m ? roomTitle(m) : null;
+      })()
+    : null;
+
+  /** Announcing one room joins the same walk, so «التالية» keeps working. */
+  const announceRoom = (matchId: string) => {
+    queue.goTo(matchId);
+    setAnnouncingId(matchId);
+  };
 
   return (
     <div
@@ -153,8 +166,8 @@ export default function PresentationMode({
               oppName={teamName(focused.match.team2.teamId)}
               canAnnounce={canAnnounce}
               winnerName={revealedWinnerName(focused.match)}
-              onAnnounce={() => setAnnouncingId(focused.match.id)}
-              onReplay={() => setAnnouncingId(focused.match.id)}
+              onAnnounce={() => announceRoom(focused.match.id)}
+              onReplay={() => announceRoom(focused.match.id)}
               onBack={() => setFocusedRoomId(null)}
             />
           </motion.div>
@@ -192,8 +205,8 @@ export default function PresentationMode({
                       canAnnounce={canAnnounce}
                       winnerName={revealedWinnerName(match)}
                       onSelect={() => setFocusedRoomId(match.id)}
-                      onAnnounce={() => setAnnouncingId(match.id)}
-                      onReplay={() => setAnnouncingId(match.id)}
+                      onAnnounce={() => announceRoom(match.id)}
+                      onReplay={() => announceRoom(match.id)}
                     />
                   ))}
                 </div>
@@ -222,53 +235,15 @@ export default function PresentationMode({
       </AnimatePresence>
 
       <AnimatePresence>
-        {queue.done && (
-          <motion.div
-            key="show-done"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-6 px-6 text-center"
-            style={{ backgroundColor: BRAND.ink }}
-            data-testid="show-finished"
-          >
-            <p className="text-white font-bold text-3xl md:text-5xl">
-              انتهى إعلان نتائج {roundLabel}
-            </p>
-            <div className="flex gap-3">
-              <button
-                type="button"
-                onClick={queue.start}
-                className="inline-flex items-center gap-2 h-12 px-6 rounded-2xl text-white font-bold"
-                style={{ backgroundImage: BRAND_GRADIENT }}
-                data-testid="button-replay-show"
-              >
-                <RotateCcw className="w-4 h-4" />
-                إعادة العرض
-              </button>
-              <button
-                type="button"
-                onClick={queue.stop}
-                className="h-12 px-6 rounded-2xl font-bold text-white/70 bg-white/10 hover:bg-white/20"
-                data-testid="button-close-show-finished"
-              >
-                عودة لعرض القاعات
-              </button>
-            </div>
-          </motion.div>
-        )}
-
         {announcingMatch && round && (
           <RevealOverlay
             tournament={tournament}
             round={round}
             roundNumber={presentedRound}
             match={announcingMatch}
-            onRevealed={() => {
-              onMarkRevealed(presentedRound, announcingMatch.id);
-              // Starts the 5-second hold only now, with the result on screen.
-              if (queue.active) queue.revealed(announcingMatch.id);
-            }}
+            onRevealed={() => onMarkRevealed(presentedRound, announcingMatch.id)}
+            nextRoomLabel={nextRoomLabel}
+            onNextRoom={nextRoomLabel ? queue.next : undefined}
             onClose={() => {
               if (queue.active) queue.stop();
               setAnnouncingId(null);
