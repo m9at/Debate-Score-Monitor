@@ -352,9 +352,9 @@ function LinkCard({
       {/* Active constraints, so the organiser sees them without opening the dialog */}
       {link && (
         <ul className="text-[11.5px] space-y-1" style={{ color: `${BRAND.ink}99` }}>
-          {link.maxRegistrants !== null && (
+          {link.maxRegistrants != null && (
             <li data-testid="link-cap-summary">
-              المسجلون: {link.registrantCount} / {link.maxRegistrants}
+              المسجلون: {link.registrantCount ?? 0} / {link.maxRegistrants}
             </li>
           )}
           {link.closesAt && (
@@ -367,10 +367,10 @@ function LinkCard({
               })}
             </li>
           )}
-          {link.requiredFields.length > 0 && (
+          {(link.requiredFields?.length ?? 0) > 0 && (
             <li data-testid="link-required-summary">
               حقول مطلوبة إضافية:{" "}
-              {link.requiredFields.map((f) => labelOf(kind, f)).join("، ")}
+              {(link.requiredFields ?? []).map((f) => labelOf(kind, f)).join("، ")}
             </li>
           )}
         </ul>
