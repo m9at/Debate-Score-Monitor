@@ -13,6 +13,7 @@ import GroupDetail from "@/pages/group-detail";
 import TournamentDetail from "@/pages/tournament-detail";
 import TournamentNewPage from "@/pages/tournament-new";
 import AnnouncePage from "@/pages/announce";
+import PresentPage from "@/pages/present";
 import MatchScoring from "@/pages/match-scoring";
 import Leaderboard from "@/pages/leaderboard";
 import TeamHistory from "@/pages/team-history";
@@ -22,6 +23,9 @@ import JudgeRoundPage from "@/pages/judge-round";
 import RegisterPage from "@/pages/register";
 import JudgeRegisterPage from "@/pages/judge-register";
 import JudgesPublicPage from "@/pages/judges-public";
+import PublicHomePage from "@/pages/public-home";
+import PublicTournamentPage from "@/pages/public-tournament";
+import PublicRoundPage from "@/pages/public-round";
 import ImportPage from "@/pages/import";
 import StatsPage from "@/pages/stats";
 import NotFound from "@/pages/not-found";
@@ -174,8 +178,16 @@ function Router() {
       {/* All routes are now public */}
       <Route path="/register" component={RegisterPage} />
       <Route path="/judge-register" component={JudgeRegisterPage} />
+      {/* Per-tournament join links (the id lives in the path). */}
+      <Route path="/join/teams/:id" component={RegisterPage} />
+      <Route path="/join/judges/:id" component={JudgeRegisterPage} />
       <Route path="/judges-public" component={JudgesPublicPage} />
+      {/* وضع الجمهور — the whole platform, read-only */}
+      <Route path="/public" component={PublicHomePage} />
+      <Route path="/public/:id/round/:round" component={PublicRoundPage} />
+      <Route path="/public/:id" component={PublicTournamentPage} />
       <Route path="/results/:id" component={ResultsPage} />
+      <Route path="/present/:id" component={PresentPage} />
       <Route path="/announce/:id/:round/:matchId" component={AnnouncePage} />
       <Route path="/import" component={ImportPage} />
       <Route path="/judge/round/:sessionId" component={JudgeRoundPage} />

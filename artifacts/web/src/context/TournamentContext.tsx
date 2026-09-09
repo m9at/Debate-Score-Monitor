@@ -848,10 +848,22 @@ interface TournamentContextType {
   finishTournament: (tournamentId: string) => void;
   reopenTournament: (tournamentId: string) => void;
   deleteRound: (tournamentId: string, roundNumber: number) => void;
+  setPublicVisible: (tournamentId: string, publicVisible: boolean) => void;
   updateTournamentInfo: (
     tournamentId: string,
     patch: Partial<
-      Pick<Tournament, "name" | "description" | "startDate" | "endDate" | "totalRounds">
+      Pick<
+        Tournament,
+        | "name"
+        | "description"
+        | "startDate"
+        | "endDate"
+        | "totalRounds"
+        | "logoDataUrl"
+        | "logoWhiteDataUrl"
+        | "coverImageDataUrl"
+        | "countdown"
+      >
     >
   ) => void;
   setTournamentArchived: (tournamentId: string, archived: boolean) => void;
@@ -1130,6 +1142,12 @@ export function TournamentProvider({ children }: { children: ReactNode }) {
   }, [state.tournaments]);
 
   // Poll for updates from other devices.
+  //
+  // The interval is installed ONCE and reads the current tournaments through a
+  // ref: re-creating it on every state change used to restart the clock and
+  // dispatch a fresh array constantly, which re-mounted the whole page while the
+  // organiser was typing. It also dispatches only when the data really changed,
+  // so an unchanged poll is invisible to the UI.
   useEffect(() => {
     let cancelled = false;
     const tick = async () => {
@@ -1137,13 +1155,14 @@ export function TournamentProvider({ children }: { children: ReactNode }) {
       try {
         const rows = await fetchAllShared();
         if (cancelled) return;
+        const current = stateRef.current.tournaments;
         const serverIds = new Set(rows.map((r) => r.id));
         const merged: Tournament[] = [];
         // Keep dirty (in-flight) local versions; otherwise take server.
         for (const r of rows) {
           if (pendingDeletesRef.current.has(r.id)) continue;
           if (dirtyIdsRef.current.has(r.id)) {
-            const localT = state.tournaments.find((x) => x.id === r.id);
+            const localT = current.find((x) => x.id === r.id);
             if (localT) {
               merged.push(localT);
               continue;
@@ -1153,7 +1172,7 @@ export function TournamentProvider({ children }: { children: ReactNode }) {
           lastSerializedRef.current.set(r.id, JSON.stringify(r.data));
         }
         // Preserve any local-only tournaments that are still pending push.
-        for (const t of state.tournaments) {
+        for (const t of current) {
           if (!serverIds.has(t.id) && dirtyIdsRef.current.has(t.id)) {
             merged.push(t);
           }
@@ -1164,7 +1183,11 @@ export function TournamentProvider({ children }: { children: ReactNode }) {
             lastSerializedRef.current.delete(id);
           }
         }
-        dispatch({ type: "LOAD", tournaments: merged });
+        const byId = (a: Tournament, b: Tournament) => a.id.localeCompare(b.id);
+        const same =
+          JSON.stringify([...merged].sort(byId)) ===
+          JSON.stringify([...current].sort(byId));
+        if (!same) dispatch({ type: "LOAD", tournaments: merged });
       } catch {
         // ignore poll errors
       }
@@ -1174,7 +1197,7 @@ export function TournamentProvider({ children }: { children: ReactNode }) {
       cancelled = true;
       clearInterval(handle);
     };
-  }, [state.tournaments]);
+  }, []);
 
   const addTournament = useCallback((
     name: string,
@@ -1286,12 +1309,32 @@ export function TournamentProvider({ children }: { children: ReactNode }) {
     (
       tournamentId: string,
       patch: Partial<
-        Pick<Tournament, "name" | "description" | "startDate" | "endDate" | "totalRounds">
+        Pick<
+        Tournament,
+        | "name"
+        | "description"
+        | "startDate"
+        | "endDate"
+        | "totalRounds"
+        | "logoDataUrl"
+        | "logoWhiteDataUrl"
+        | "coverImageDataUrl"
+        | "countdown"
+      >
       >
     ) => {
       const t = stateRef.current.tournaments.find((x) => x.id === tournamentId);
       if (!t) return;
       dispatch({ type: "UPDATE_TOURNAMENT", tournament: { ...t, ...patch } });
+    },
+    []
+  );
+
+  const setPublicVisible = useCallback(
+    (tournamentId: string, publicVisible: boolean) => {
+      const t = stateRef.current.tournaments.find((x) => x.id === tournamentId);
+      if (!t) return;
+      dispatch({ type: "UPDATE_TOURNAMENT", tournament: { ...t, publicVisible } });
     },
     []
   );
@@ -1389,6 +1432,9 @@ export function TournamentProvider({ children }: { children: ReactNode }) {
       finished: false,
       description: setup.description?.trim() || undefined,
       logoDataUrl: setup.logoDataUrl,
+      // The image uploaded at creation also serves as the tournament's cover,
+      // until the organiser uploads a dedicated one in الهوية والشعارات.
+      coverImageDataUrl: setup.logoDataUrl,
       startDate: setup.startDate,
       endDate: setup.endDate,
       rooms: setup.rooms,
@@ -1810,6 +1856,7 @@ export function TournamentProvider({ children }: { children: ReactNode }) {
         setPresentedRound,
         setProtection,
         updateTournamentInfo,
+        setPublicVisible,
         setTournamentArchived,
         duplicateTournament,
         createTournamentFromSetup,

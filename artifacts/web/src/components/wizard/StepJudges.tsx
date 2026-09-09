@@ -4,8 +4,7 @@ import { BRAND, BTN, BTN_PRIMARY_STYLE, BTN_SIZE } from "@/lib/brand";
 import type { Judge } from "@/types/tournament";
 import type { TournamentSetup } from "@/lib/wizard/types";
 import { Panel, inputClass, inputStyle } from "./ui";
-import RegistrationLinkCard from "@/components/register/RegistrationLinkCard";
-import { buildJudgeRegisterUrl } from "@/lib/judgeRegistrationCodec";
+import JoinLinkPanel from "./JoinLinkPanel";
 
 interface StepJudgesProps {
   setup: TournamentSetup;
@@ -56,6 +55,13 @@ export default function StepJudges({ setup, patch }: StepJudgesProps) {
 
   return (
     <div className="space-y-4">
+      <JoinLinkPanel
+        role="judges"
+        tournamentId={setup.draftId}
+        tournamentName={setup.name}
+        topic={setup.caseText}
+      />
+
       <Panel title="إضافة محكم" hint="اكتب الاسم واضغط Enter لإضافة سريعة">
         <div className="flex gap-2">
           <input

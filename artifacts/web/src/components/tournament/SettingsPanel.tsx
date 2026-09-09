@@ -6,6 +6,8 @@ interface Props {
   tournament: Tournament;
   hideScores: boolean;
   onToggleHideScores: () => void;
+  /** Flips «السماح للجمهور بمتابعة البطولة». */
+  onTogglePublicVisible: () => void;
   onOpenProtection: () => void;
   onToggleSemifinal: () => void;
   onToggleFinal: () => void;
@@ -22,6 +24,7 @@ export default function SettingsPanel({
   tournament,
   hideScores,
   onToggleHideScores,
+  onTogglePublicVisible,
   onOpenProtection,
   onToggleSemifinal,
   onToggleFinal,
@@ -53,6 +56,19 @@ export default function SettingsPanel({
             {hideScores ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
             {hideScores ? "النتائج مخفية" : "النتائج ظاهرة"}
           </button>
+        </Row>
+      </Card>
+
+      <Card title="وضع الجمهور">
+        <Row
+          title="السماح للجمهور بمتابعة البطولة"
+          hint="عند التفعيل تظهر البطولة في وضع الجمهور (مشاهدة فقط) مع الجولات والقضايا والفرق ونتائج الجولات المعلنة."
+        >
+          <Toggle
+            on={!!tournament.publicVisible}
+            onClick={onTogglePublicVisible}
+            testId="settings-toggle-public-visible"
+          />
         </Row>
       </Card>
 

@@ -29,6 +29,7 @@ import {
   Link as LinkIcon,
 } from "lucide-react";
 import { motion } from "framer-motion";
+import RoomDetailsPanel from "@/components/tournament/RoomDetailsPanel";
 import type { Match, MatchTeam, Speaker } from "@/types/tournament";
 import { decodeScores, type JudgeMatchInfo, buildSessionUrl } from "@/lib/judgeCodec";
 import { createMatchSession } from "@/lib/firebaseJudgeApi";
@@ -39,6 +40,12 @@ import {
   REPLY_RANGE_LABEL,
   SPEAKER_RANGE_MESSAGE,
   REPLY_RANGE_MESSAGE,
+  SPEAKER_MIN,
+  SPEAKER_MAX,
+  REPLY_MIN,
+  REPLY_MAX,
+  clampScoreInput,
+  clampScoreOnBlur,
 } from "@/lib/scoreValidation";
 
 const CYAN = "#29ABE2";
@@ -165,10 +172,17 @@ function TeamSection({
               <input
                 type="number"
                 inputMode="decimal"
+                min={SPEAKER_MIN}
+                max={SPEAKER_MAX}
                 value={speakerScores[i] ?? ""}
                 onChange={(e) => {
                   const updated = [...speakerScores];
-                  updated[i] = e.target.value;
+                  updated[i] = clampScoreInput(e.target.value, SPEAKER_MIN, SPEAKER_MAX);
+                  setSpeakerScores(updated);
+                }}
+                onBlur={(e) => {
+                  const updated = [...speakerScores];
+                  updated[i] = clampScoreOnBlur(e.target.value, SPEAKER_MIN, SPEAKER_MAX);
                   setSpeakerScores(updated);
                 }}
                 disabled={disabled}
@@ -255,8 +269,11 @@ function TeamSection({
             <input
               type="number"
               inputMode="decimal"
+              min={REPLY_MIN}
+              max={REPLY_MAX}
               value={replyScore}
-              onChange={(e) => setReplyScore(e.target.value)}
+              onChange={(e) => setReplyScore(clampScoreInput(e.target.value, REPLY_MIN, REPLY_MAX))}
+              onBlur={(e) => setReplyScore(clampScoreOnBlur(e.target.value, REPLY_MIN, REPLY_MAX))}
               disabled={disabled}
               placeholder="--"
               className="w-20 h-10 text-center rounded-xl bg-muted text-foreground font-bold text-base disabled:opacity-60 outline-none"
@@ -602,6 +619,13 @@ export default function MatchScoring() {
       </div>
 
       <main className="max-w-3xl w-full mx-auto px-4 py-4 pb-32 flex-1">
+        {/* تفاصيل القاعة — the full picture before the scoring sheet. */}
+        <RoomDetailsPanel
+          tournament={tournament}
+          roundNumber={roundNumber}
+          match={originalMatch}
+        />
+
         {(() => {
           const round = tournament.rounds.find((r) => r.roundNumber === roundNumber);
           if (!round?.caseText) return null;

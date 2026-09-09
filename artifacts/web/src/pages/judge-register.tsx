@@ -4,17 +4,23 @@ import {
   decodeJudgeRegisterToken,
   type JudgeRegistrationInfo,
 } from "@/lib/judgeRegistrationCodec";
+import { joinTournamentIdFromPath } from "@/lib/joinLink";
 import {
   fetchPublicTournament,
   submitJudgeRegistration,
+  type PublicTournamentRules,
 } from "@/lib/registrationsApi";
 import {
   lookupProfile,
   registerForTournament,
   type JudgeProfileRecord,
 } from "@/lib/profilesApi";
+import { useRequiredFields } from "@/hooks/useRequiredFields";
+import { labelOf } from "@/lib/registrationFields";
 import ContactGate from "@/components/register/ContactGate";
 import ReturningProfileCard from "@/components/register/ReturningProfileCard";
+import ImageUploadField from "@/components/register/ImageUploadField";
+import RulesCard from "@/components/register/RulesCard";
 
 const CYAN = "#29ABE2";
 const PURPLE = "#7B2D8E";
@@ -32,6 +38,7 @@ export default function JudgeRegisterPage() {
   const [info, setInfo] = useState<JudgeRegistrationInfo | null>(null);
   const [topic, setTopic] = useState("");
   const [error, setError] = useState(false);
+  const [rules, setRules] = useState<PublicTournamentRules | undefined>();
 
   const [step, setStep] = useState<Step>("contact");
   const [busy, setBusy] = useState(false);
@@ -47,18 +54,32 @@ export default function JudgeRegisterPage() {
   const [experience, setExperience] = useState("");
   const [photoUrl, setPhotoUrl] = useState("");
   const [canChair, setCanChair] = useState(false);
+  // Fields the organiser marked mandatory for this tournament's judge link.
+  const requiredFields = useRequiredFields(info?.tournamentId, "judge");
 
   useEffect(() => {
+    // Either the per-tournament path link, or an older `?d=` token link.
+    const pathId = joinTournamentIdFromPath("judges");
     const d = new URLSearchParams(window.location.search).get("d");
-    const parsed = d ? decodeJudgeRegisterToken(d) : null;
+    const parsed: JudgeRegistrationInfo | null = pathId
+      ? { tournamentId: pathId, tournamentName: "" }
+      : d
+        ? decodeJudgeRegisterToken(d)
+        : null;
     if (!parsed) {
       setError(true);
       return;
     }
     setInfo(parsed);
     void fetchPublicTournament(parsed.tournamentId).then((pub) => {
-      if (pub?.topic) setTopic(pub.topic);
-      if (pub?.name) setInfo((p) => (p ? { ...p, tournamentName: pub.name } : p));
+      // The server is the authority on whether this tournament exists.
+      if (!pub) {
+        setError(true);
+        return;
+      }
+      if (pub.topic) setTopic(pub.topic);
+      setRules(pub.rules);
+      if (pub.name) setInfo((p) => (p ? { ...p, tournamentName: pub.name } : p));
     });
   }, []);
 
@@ -93,6 +114,19 @@ export default function JudgeRegisterPage() {
     if (!info) return;
     if (!name.trim()) {
       setWarning("الاسم مطلوب");
+      return;
+    }
+    const missing = requiredFields.find((f) =>
+      f === "institution"
+        ? !institution.trim()
+        : f === "experience"
+          ? !experience.trim()
+          : f === "photoUrl"
+            ? !photoUrl.trim()
+            : false,
+    );
+    if (missing) {
+      setWarning(`${labelOf("judge", missing)} مطلوب`);
       return;
     }
     setWarning("");
@@ -185,6 +219,8 @@ export default function JudgeRegisterPage() {
           />
         )}
 
+        <RulesCard rules={rules} kind="judge" />
+
         {step === "form" && (
           <div className="bg-card rounded-2xl p-4 space-y-3">
             <p className="text-muted-foreground text-sm">
@@ -194,12 +230,11 @@ export default function JudgeRegisterPage() {
             </p>
             <Text label="الاسم الكامل" value={name} onChange={setName} testId="input-judge-name" placeholder="مثال: د. سلمى الراشدية" />
             <Text label="المؤسسة" value={institution} onChange={setInstitution} testId="input-judge-institution" placeholder="مثال: جامعة السلطان قابوس" />
-            <Text
-              label="رابط الصورة الشخصية (اختياري)"
+            <ImageUploadField
+              label="الصورة الشخصية (اختياري)"
               value={photoUrl}
               onChange={setPhotoUrl}
               testId="input-judge-photo"
-              placeholder="https://..."
             />
             <div>
               <label className="text-sm font-bold block mb-1.5">الخبرة في التحكيم</label>

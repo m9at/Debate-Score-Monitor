@@ -73,6 +73,8 @@ export interface Team {
   matchesPlayed: number;
   institution?: string;
   documents?: TeamDocument[];
+  /** Team logo uploaded directly into the system (data URL), replaceable. */
+  logoDataUrl?: string;
   registeredAt?: number;
 }
 
@@ -83,6 +85,8 @@ export interface Judge {
   experience?: string;
   canChair: boolean;
   conflictTeamIds: string[];
+  /** Judge photo uploaded directly into the system (data URL), replaceable. */
+  photoDataUrl?: string;
   registeredAt?: number;
   /** Temporarily unavailable — kept in the list but skipped by the draw. */
   disabled?: boolean;
@@ -176,6 +180,8 @@ export interface Tournament {
   protection?: TournamentProtection;
   /** Hidden from the main list until restored. */
   archived?: boolean;
+  /** السماح للجمهور بمتابعة البطولة — shows it in وضع الجمهور (read-only). */
+  publicVisible?: boolean;
   /** Motion entered at creation, applied to the first round once it exists. */
   openingCaseText?: string;
   /** Optional schedule — drives the "قادمة / جارية" status. */
@@ -184,12 +190,26 @@ export interface Tournament {
   description?: string;
   /** Optional tournament logo (data URL), shown next to the brand logo. */
   logoDataUrl?: string;
+  /** الشعار الأبيض — logo variant for dark backgrounds, images and heroes. */
+  logoWhiteDataUrl?: string;
+  /** صورة البطولة — the hero image of وضع الجمهور and the tournament cards. */
+  coverImageDataUrl?: string;
+  /** عداد تنازلي اختياري لموعد يحدده المسؤول (إعلان النتائج، بداية جولة…). */
+  countdown?: TournamentCountdown;
   /** Rooms defined during setup. */
   rooms?: Room[];
   /** Format settings defined during setup. */
   settings?: TournamentSettings;
   /** Trail of important administrative actions. */
   auditLog?: AuditEntry[];
+}
+
+export interface TournamentCountdown {
+  enabled: boolean;
+  /** What the countdown is for — shown above the digits. */
+  label: string;
+  /** Target moment (epoch ms). */
+  at: number;
 }
 
 export interface TournamentProtection {

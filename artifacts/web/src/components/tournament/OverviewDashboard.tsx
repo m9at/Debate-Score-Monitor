@@ -1,22 +1,27 @@
-import { useMemo } from "react";
+import { useMemo, type ReactNode } from "react";
 import {
   Gavel,
   LayoutGrid,
   ListChecks,
   Megaphone,
-  Repeat,
   Trophy,
   Users,
 } from "lucide-react";
 import type { Match, Tournament } from "@/types/tournament";
 import { useRole } from "@/context/RoleContext";
-import { BRAND, BRAND_GRADIENT, BTN, BTN_PRIMARY_STYLE, BTN_SIZE } from "@/lib/brand";
+import { BRAND, BRAND_GRADIENT, BTN, BTN_SIZE } from "@/lib/brand";
 import { getRoomStatus, roomStatusMeta, type RoomStatus } from "@/lib/roomStatus";
+import DisplayRoundCard from "./DisplayRoundCard";
 import PublicRoomCard from "./PublicRoomCard";
 
 interface OverviewDashboardProps {
   tournament: Tournament;
-  onOpenRounds: () => void;
+  /** Round the organiser chose to inspect — all figures below follow it. */
+  displayRound: number;
+  /** Switches the round every figure below follows. */
+  onSelectRound: (roundNumber: number) => void;
+  /** Readiness / start controls, shown right under the summary. */
+  roundControl?: ReactNode;
   onFollowJudging: () => void;
   onRoomDetails: (match: Match) => void;
   onAnnounce: () => void;
@@ -68,12 +73,16 @@ function StatCard({
  */
 export default function OverviewDashboard({
   tournament,
-  onOpenRounds,
+  displayRound,
+  onSelectRound,
+  roundControl,
   onFollowJudging,
   onRoomDetails,
   onAnnounce,
 }: OverviewDashboardProps) {
-  const currentRound = tournament.rounds[tournament.currentRound - 1];
+  const currentRound = tournament.rounds.find(
+    (r) => r.roundNumber === displayRound,
+  );
   const matches = currentRound?.matches ?? [];
 
   const teamMap = useMemo(
@@ -97,11 +106,11 @@ export default function OverviewDashboard({
     return c;
   }, [statuses]);
 
-  const roomsCount = tournament.rooms?.length ?? matches.length;
+  const roomsCount = matches.length || (tournament.rooms?.length ?? 0);
   const judgesCount = (tournament.judges ?? []).filter((j) => !j.disabled).length;
   const progress =
     tournament.totalRounds > 0
-      ? Math.min(100, (tournament.currentRound / tournament.totalRounds) * 100)
+      ? Math.min(100, (displayRound / tournament.totalRounds) * 100)
       : 0;
 
   const { can } = useRole();
@@ -133,7 +142,7 @@ export default function OverviewDashboard({
             </h2>
             <p className="text-white/75 text-[13px] font-semibold mt-1.5">
               {tournament.started
-                ? `الجولة الحالية: ${tournament.currentRound} من ${tournament.totalRounds}`
+                ? `الجولة ${displayRound} من ${tournament.totalRounds}`
                 : "قيد الإعداد — لم تبدأ الجولات بعد"}
             </p>
           </div>
@@ -186,13 +195,14 @@ export default function OverviewDashboard({
         <StatCard icon={LayoutGrid} value={roomsCount} label="القاعات" tone={BRAND.blue} />
         <StatCard icon={Users} value={tournament.teams.length} label="الفِرق" tone={BRAND.purple} />
         <StatCard icon={Gavel} value={judgesCount} label="المحكمون" tone={BRAND.blueDeep} />
-        <StatCard
-          icon={Repeat}
-          value={tournament.started ? `الجولة ${tournament.currentRound}` : "—"}
-          label="الجولة الحالية"
-          tone={BRAND.gold}
+        <DisplayRoundCard
+          tournament={tournament}
+          displayRound={displayRound}
+          onSelectRound={onSelectRound}
         />
       </section>
+
+      {roundControl}
 
       {/* Current round status */}
       {tournament.started && matches.length > 0 && (
@@ -244,18 +254,8 @@ export default function OverviewDashboard({
       <section>
         <div className="flex items-center gap-2.5 mb-3 flex-wrap">
           <h3 className="font-bold text-[15px]" style={{ color: BRAND.ink }}>
-            قاعات الجولة {tournament.started ? tournament.currentRound : ""}
+            قاعات الجولة {tournament.started ? displayRound : ""}
           </h3>
-          <span className="flex-1" />
-          <button
-            type="button"
-            onClick={onOpenRounds}
-            className={`${BTN.base} ${BTN.secondary} ${BTN_SIZE.md}`}
-            data-testid="button-open-rounds"
-          >
-            <Repeat className="w-4 h-4" />
-            إدارة الجولات
-          </button>
         </div>
 
         {matches.length === 0 ? (
@@ -275,18 +275,8 @@ export default function OverviewDashboard({
               لا توجد قاعات في الجولة الحالية
             </p>
             <p className="text-[12.5px] max-w-sm" style={{ color: `${BRAND.ink}8c` }}>
-              ابدأ الجولة الأولى من صفحة الجولات ليتم توزيع الفرق على القاعات.
+              ابدأ الجولة من مركز إدارة الجولة أعلى الصفحة ليتم توزيع الفرق على القاعات.
             </p>
-            <button
-              type="button"
-              onClick={onOpenRounds}
-              className={`${BTN.base} ${BTN.primary} ${BTN_SIZE.lg} mt-2`}
-              style={BTN_PRIMARY_STYLE}
-              data-testid="button-empty-open-rounds"
-            >
-              <Repeat className="w-4 h-4" />
-              الانتقال إلى الجولات
-            </button>
           </div>
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-3.5">

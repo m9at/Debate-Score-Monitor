@@ -124,11 +124,6 @@ export default function StepReview({ setup, folderName }: StepReviewProps) {
           <Row icon={CalendarDays} label="تاريخ النهاية" value={fmtDate(setup.endDate)} />
           <Row icon={Repeat} label="عدد الجولات" value={`${setup.totalRounds} جولات`} />
           <Row
-            icon={Repeat}
-            label="الجولة الابتدائية"
-            value={`الجولة ${setup.startRound}`}
-          />
-          <Row
             icon={Folder}
             label="المجلد"
             value={folderName ?? "البطولات الحالية"}

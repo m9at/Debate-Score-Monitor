@@ -1,8 +1,9 @@
-import { ChevronDown, ChevronUp, LayoutGrid, Plus, Trash2 } from "lucide-react";
-import { BRAND, BTN, BTN_SIZE } from "@/lib/brand";
+import { useEffect } from "react";
+import { ChevronDown, ChevronUp, LayoutGrid } from "lucide-react";
+import { BRAND } from "@/lib/brand";
 import type { Room } from "@/types/tournament";
 import { makeRoom, type TournamentSetup } from "@/lib/wizard/types";
-import { Field, Panel, inputClass, inputStyle } from "./ui";
+import { Panel, inputStyle } from "./ui";
 
 interface StepRoomsProps {
   setup: TournamentSetup;
@@ -14,27 +15,27 @@ function renumber(rooms: Room[]): Room[] {
   return rooms.map((r, i) => ({ ...r, number: i + 1 }));
 }
 
-/** Step 3 — define the rooms up front, name and order them. */
+/**
+ * Step 3 — the rooms themselves. Their COUNT is not a decision: two teams debate
+ * per room, so the tournament needs one room for every two teams. The organiser
+ * only names and orders them.
+ */
 export default function StepRooms({ setup, patch }: StepRoomsProps) {
   const rooms = setup.rooms;
+  const teamsCount = setup.teams.length;
+  const required = Math.ceil(teamsCount / 2);
 
-  const setCount = (count: number) => {
-    const target = Math.max(0, Math.min(40, count));
+  // Keep the room list exactly as long as the teams demand.
+  useEffect(() => {
+    if (rooms.length === required) return;
     const next = [...rooms];
-    while (next.length < target) next.push(makeRoom(next.length + 1));
-    while (next.length > target) next.pop();
+    while (next.length < required) next.push(makeRoom(next.length + 1));
+    while (next.length > required) next.pop();
     patch({ rooms: renumber(next), draw: null, drawApproved: false });
-  };
+  }, [required, rooms, patch]);
 
   const rename = (id: string, label: string) =>
     patch({ rooms: rooms.map((r) => (r.id === id ? { ...r, label } : r)) });
-
-  const remove = (id: string) =>
-    patch({
-      rooms: renumber(rooms.filter((r) => r.id !== id)),
-      draw: null,
-      drawApproved: false,
-    });
 
   const move = (index: number, dir: -1 | 1) => {
     const target = index + dir;
@@ -46,32 +47,13 @@ export default function StepRooms({ setup, patch }: StepRoomsProps) {
 
   return (
     <div className="space-y-4">
-      <Panel title="عدد القاعات" hint="حدد العدد وسيتم إنشاء القاعات تلقائياً، ثم يمكنك تسميتها">
-        <div className="flex items-end gap-3">
-          <div className="w-32">
-            <Field label="العدد">
-              <input
-                type="number"
-                min={0}
-                max={40}
-                value={rooms.length}
-                onChange={(e) => setCount(Number(e.target.value) || 0)}
-                className={inputClass}
-                style={inputStyle}
-                data-testid="input-rooms-count"
-              />
-            </Field>
-          </div>
-          <button
-            type="button"
-            onClick={() => setCount(rooms.length + 1)}
-            className={`${BTN.base} ${BTN.secondary} ${BTN_SIZE.md} mb-0.5`}
-            data-testid="button-add-room"
-          >
-            <Plus className="w-4 h-4" />
-            إضافة قاعة
-          </button>
-        </div>
+      <Panel
+        title="عدد القاعات محسوب تلقائياً"
+        hint="قاعة واحدة لكل فريقين — النظام يحدد العدد من عدد الفرق"
+      >
+        <p className="text-[13.5px] font-bold" style={{ color: BRAND.ink }} data-testid="text-rooms-derived">
+          {teamsCount} فريق ← {required} قاعة
+        </p>
       </Panel>
 
       <Panel
@@ -82,10 +64,10 @@ export default function StepRooms({ setup, patch }: StepRoomsProps) {
           <div className="py-8 flex flex-col items-center gap-2 text-center">
             <LayoutGrid className="w-9 h-9" style={{ color: `${BRAND.purple}59` }} />
             <p className="font-bold text-[14px]" style={{ color: BRAND.ink }}>
-              لم تُضف أي قاعة بعد
+              لا توجد قاعات بعد
             </p>
             <p className="text-[12px]" style={{ color: `${BRAND.ink}8c` }}>
-              حدد عدد القاعات في الأعلى للبدء
+              أضف الفرق أولاً — تُنشأ القاعات تلقائياً حسب عددها
             </p>
           </div>
         ) : (
@@ -140,15 +122,6 @@ export default function StepRooms({ setup, patch }: StepRoomsProps) {
                   </button>
                 </div>
 
-                <button
-                  type="button"
-                  onClick={() => remove(room.id)}
-                  className={`${BTN.base} ${BTN.danger} ${BTN_SIZE.sm} shrink-0`}
-                  data-testid={`button-delete-room-${room.number}`}
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                  حذف
-                </button>
               </li>
             ))}
           </ul>

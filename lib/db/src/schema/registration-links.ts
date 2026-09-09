@@ -1,4 +1,6 @@
 import {
+  integer,
+  jsonb,
   pgTable,
   text,
   timestamp,
@@ -11,6 +13,9 @@ import {
  *
  * `state`: open | closed | archived
  *
+ * Plus the organiser's link settings: which optional form fields are required,
+ * when the link closes by itself, and how many registrants it accepts.
+ *
  * Archiving hides the link from the admin view while every registration made
  * through it stays in `tournament_participations`.
  */
@@ -22,6 +27,12 @@ export const registrationLinks = pgTable(
     /** "team" | "judge" */
     kind: text("kind").notNull(),
     state: text("state").notNull().default("open"),
+    /** Optional form fields the organiser made mandatory (field keys). */
+    requiredFields: jsonb("required_fields").notNull().default([]),
+    /** Auto-close moment, or null for no deadline. */
+    closesAt: timestamp("closes_at", { withTimezone: true }),
+    /** Auto-close after this many registrants, or null for no cap. */
+    maxRegistrants: integer("max_registrants"),
     updatedAt: timestamp("updated_at", { withTimezone: true })
       .notNull()
       .defaultNow(),

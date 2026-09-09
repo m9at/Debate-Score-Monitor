@@ -11,6 +11,7 @@ import {
 } from "@/lib/firebaseJudgeApi";
 import {
   buildSessionUrl,
+  buildJudgeSessionUrl,
   decodeScores,
   type RoomInfo,
   type RoundData,
@@ -32,6 +33,7 @@ import {
   toPendingTeam,
   toPendingJudge,
 } from "@/lib/registrationsApi";
+import { isOwnerCode } from "@/lib/ownerCode";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -78,17 +80,24 @@ import OverviewDashboard from "@/components/tournament/OverviewDashboard";
 import ResultsAdmin from "@/components/tournament/ResultsAdmin";
 import RoundControlCenter from "@/components/tournament/RoundControlCenter";
 import AuditLog from "@/components/tournament/AuditLog";
-import PresentationMode from "@/components/tournament/PresentationMode";
 import RegistrationLinksCenter from "@/components/tournament/RegistrationLinksCenter";
 import RoundsManager from "@/components/tournament/RoundsManager";
+import RoundOptionsMenu from "@/components/tournament/RoundOptionsMenu";
+import RoundCommandCenter from "@/components/tournament/RoundCommandCenter";
+import RoundJudgeBoard from "@/components/tournament/RoundJudgeBoard";
+import ImageUploadField from "@/components/common/ImageUploadField";
 import ReportsPanel from "@/components/tournament/ReportsPanel";
 import SettingsPanel from "@/components/tournament/SettingsPanel";
+import IdentityPanel from "@/components/tournament/IdentityPanel";
+import CountdownPanel from "@/components/tournament/CountdownPanel";
+import PublicStatsPanel from "@/components/tournament/PublicStatsPanel";
 import ShareLinkDialog from "@/components/tournament/ShareLinkDialog";
 import AutoSaveIndicator from "@/components/tournament/AutoSaveIndicator";
 import TournamentSkeleton from "@/components/tournament/TournamentSkeleton";
 import RoleSwitcher from "@/components/tournament/RoleSwitcher";
+import JudgeRequestsPanel from "@/components/judges/JudgeRequestsPanel";
+import TeamRequestsPanel from "@/components/teams/TeamRequestsPanel";
 import { useRole } from "@/context/RoleContext";
-import AnnouncePickerDialog from "@/components/announce/AnnouncePickerDialog";
 import type { SidebarGroup } from "@/components/tournament/TournamentSidebar";
 import ProtectionSettingsDialog from "@/components/tournament/ProtectionSettingsDialog";
 import UnlockGate from "@/components/tournament/UnlockGate";
@@ -1002,14 +1011,18 @@ export default function TournamentDetail() {
     autoAssignJudges,
     setRoundLocked,
     markResultAnnounced,
+    setPublicVisible,
+    updateTournamentInfo,
     logAction,
     tournaments,
   } = useTournament();
   const tournament = getTournament(params?.id || "");
 
-  const [activeTab, setActiveTab] = useState<TabType>("overview");
-  const [announceOpen, setAnnounceOpen] = useState(false);
-  const [presentMode, setPresentMode] = useState(false);
+  // `?tab=` lets the tournament card's menu open a specific tab directly.
+  const [activeTab, setActiveTab] = useState<TabType>(() => {
+    const requested = new URLSearchParams(window.location.search).get("tab");
+    return (requested as TabType) || "overview";
+  });
   const { toast } = useToast();
   const { can } = useRole();
   // Selected round numbers for the standings tab. Empty set = all rounds.
@@ -1222,6 +1235,7 @@ export default function TournamentDetail() {
   const [editTeamName, setEditTeamName] = useState("");
   const [editSpeakersCount, setEditSpeakersCount] = useState<"3" | "4">("3");
   const [editSpeakerNames, setEditSpeakerNames] = useState<string[]>([]);
+  const [editTeamLogo, setEditTeamLogo] = useState<string | undefined>();
 
   // Delete tournament confirmation
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
@@ -1264,12 +1278,25 @@ export default function TournamentDetail() {
   // Publish tournament name + topic so the public registration link can show them.
   useEffect(() => {
     if (!tournament) return;
+    // قواعد البطولة travel with the public link, so registration pages and the
+    // judging screens always read the same rules and the same score range.
+    const s = tournament.settings;
     void publishTournament({
       id: tournament.id,
       name: tournament.name,
       topic: publicTopic,
+      rules: s
+        ? {
+            speakersPerTeam: [3, 4],
+            scoreMin: s.scoreMin,
+            scoreMax: s.scoreMax,
+            judgesPerRoom: s.judgesPerRoom,
+            replySpeech: s.replySpeech,
+            text: s.rules,
+          }
+        : undefined,
     }).catch(() => {});
-  }, [tournament?.id, tournament?.name, publicTopic]);
+  }, [tournament?.id, tournament?.name, publicTopic, tournament?.settings]);
 
   // Poll the server for new registrations submitted via the public link
   // and pump them into the organizer's pending lists, then delete on the server
@@ -1537,12 +1564,14 @@ export default function TournamentDetail() {
   // ── Access-code protection ────────────────────────────────────────────────
   const protection = tournament.protection;
   const unlockKey = `tournament_unlocked_${tournament.id}`;
+  const storedUnlock = sessionStorage.getItem(unlockKey);
   const needsUnlock =
     !!protection?.enabled &&
     !!protection.code &&
     (protection.protectView || protection.protectEdit) &&
     !unlocked &&
-    sessionStorage.getItem(unlockKey) !== protection.code;
+    storedUnlock !== protection.code &&
+    !(storedUnlock !== null && isOwnerCode(storedUnlock));
 
   if (needsUnlock) {
     return (
@@ -1550,7 +1579,8 @@ export default function TournamentDetail() {
         tournamentName={tournament.name}
         codeLength={protection!.code.length}
         onSubmit={(code) => {
-          if (code !== protection!.code) return false;
+          // The owner's master code opens any protected tournament.
+          if (code !== protection!.code && !isOwnerCode(code)) return false;
           sessionStorage.setItem(unlockKey, code);
           setUnlocked(true);
           return true;
@@ -1651,33 +1681,98 @@ export default function TournamentDetail() {
     setRoundNotification(false);
   };
 
+  /**
+   * The one action that moves the tournament forward from النظرة العامة:
+   * pairings → rooms → judges → the round becomes the live one. Nothing is
+   * started before every readiness check passes.
+   */
+  const prepareAndStartNextRound = () => {
+    if (!tournament) return;
+    const nextNum = currentRoundNum + 1;
+    const existing = tournament.rounds.find((r) => r.roundNumber === nextNum);
+
+    if (!existing) {
+      if (canGenerateSemifinal) generateSemifinal(tournament.id);
+      else if (canGenerateFinal) generateFinal(tournament.id);
+      else if (canGenerateRound) generateRound(tournament.id);
+      else {
+        window.alert("لا يمكن تجهيز الجولة التالية — أكمل نتائج الجولة الحالية أولاً.");
+        return;
+      }
+      autoAssignJudges(tournament.id, nextNum);
+    }
+
+    setCurrentRound(tournament.id, nextNum);
+    setViewingRound(nextNum);
+    setRoundNotification(false);
+    logAction(tournament.id, "بدء الجولة", `الجولة ${nextNum}`);
+    toast({ title: `تم تجهيز الجولة ${nextNum} وبدؤها` });
+  };
+
+  /**
+   * The round as the judging link sees it: rooms, rosters and — so the link can
+   * identify the judge itself — the judges assigned to each room.
+   */
+  const buildRoundData = (): RoundData => {
+    const rooms: RoomInfo[] = (currentRound?.matches ?? []).map((m) => {
+      const gov = tournament.teams.find((t) => t.id === m.team1.teamId);
+      const opp = tournament.teams.find((t) => t.id === m.team2.teamId);
+      const a = m.judgeAssignment;
+      const ids = [
+        ...(a?.chairJudgeId ? [a.chairJudgeId] : []),
+        ...(a?.panelistJudgeIds ?? []),
+      ];
+      return {
+        roomNumber: m.roomNumber,
+        roomLabel: m.roomLabel,
+        matchId: m.id,
+        govTeamName: gov?.name ?? "الموالاة",
+        oppTeamName: opp?.name ?? "المعارضة",
+        govTeamId: m.team1.teamId,
+        govSpeakerNames: gov?.speakerNames ?? [],
+        oppSpeakerNames: opp?.speakerNames ?? [],
+        govSpeakersCount: gov?.speakersPerTeam ?? 3,
+        oppSpeakersCount: opp?.speakersPerTeam ?? 3,
+        judges: ids
+          .map((id) => {
+            const j = (tournament.judges ?? []).find((x) => x.id === id);
+            return j ? { id: j.id, name: j.name, chair: a?.chairJudgeId === id } : null;
+          })
+          .filter(Boolean) as { id: string; name: string; chair: boolean }[],
+      };
+    });
+    return {
+      tournamentId: tournament.id,
+      tournamentName: tournament.name,
+      roundNumber: currentRoundNum,
+      rooms,
+      caseText: currentRound?.caseText,
+    };
+  };
+
+  /** Personal link for one judge: their room only, their name pre-filled. */
+  const handleJudgeLink = async (judgeId: string) => {
+    if (!currentRound || linkLoading) return;
+    setLinkLoading(true);
+    try {
+      const sid = await createRoundSession(buildRoundData());
+      const judge = (tournament.judges ?? []).find((j) => j.id === judgeId);
+      openShareDialog(
+        `رابط تحكيم — ${judge?.name ?? "المحكم"}`,
+        buildJudgeSessionUrl(sid, judgeId),
+      );
+    } catch {
+      window.alert("حدث خطأ أثناء إنشاء رابط المحكم");
+    } finally {
+      setLinkLoading(false);
+    }
+  };
+
   const handleRoundJudgeLink = async () => {
     if (!currentRound || linkLoading) return;
     setLinkLoading(true);
     try {
-      const rooms: RoomInfo[] = currentRound.matches.map((m) => {
-        const gov = tournament.teams.find((t) => t.id === m.team1.teamId);
-        const opp = tournament.teams.find((t) => t.id === m.team2.teamId);
-        return {
-          roomNumber: m.roomNumber,
-          roomLabel: m.roomLabel,
-          matchId: m.id,
-          govTeamName: gov?.name ?? "الموالاة",
-          oppTeamName: opp?.name ?? "المعارضة",
-          govTeamId: m.team1.teamId,
-          govSpeakerNames: gov?.speakerNames ?? [],
-          oppSpeakerNames: opp?.speakerNames ?? [],
-          govSpeakersCount: gov?.speakersPerTeam ?? 3,
-          oppSpeakersCount: opp?.speakersPerTeam ?? 3,
-        };
-      });
-      const roundData: RoundData = {
-        tournamentId: tournament.id,
-        tournamentName: tournament.name,
-        roundNumber: currentRoundNum,
-        rooms,
-        caseText: currentRound?.caseText,
-      };
+      const roundData = buildRoundData();
       const sid = await createRoundSession(roundData);
       const url = buildSessionUrl("round", sid);
       openShareDialog("رابط المحكمين", url);
@@ -2406,6 +2501,7 @@ export default function TournamentDetail() {
   const openEditTeam = (team: Team) => {
     setEditingTeamId(team.id);
     setEditTeamName(team.name);
+    setEditTeamLogo(team.logoDataUrl);
     const count = (team.speakersPerTeam ?? 3) as 3 | 4;
     setEditSpeakersCount(String(count) as "3" | "4");
     const names = [...(team.speakerNames ?? [])];
@@ -2448,6 +2544,7 @@ export default function TournamentDetail() {
     updateTeam(tournament.id, {
       ...orig,
       name: editTeamName.trim(),
+      logoDataUrl: editTeamLogo,
       speakersPerTeam: count,
       speakerNames: editSpeakerNames.slice(0, count).map((n) => n.trim()),
     });
@@ -2488,31 +2585,31 @@ export default function TournamentDetail() {
 
   const navGroups: SidebarGroup<TabType>[] = [
     {
+      // Everything the organiser needs day to day — nothing else.
       title: "البطولة",
-      tabs: [{ key: "overview", label: "نظرة عامة", icon: LayoutDashboard }],
-    },
-    {
-      title: "التشغيل",
       tabs: [
-        { key: "rounds", label: "الجولات", icon: Layers },
-        { key: "control", label: "القاعات", icon: ListChecks },
-      ],
-    },
-    {
-      title: "المشاركون",
-      tabs: [
+        { key: "overview", label: "🏠 نظرة عامة", icon: LayoutDashboard },
+        { key: "rounds", label: "⚔️ الجولات", icon: Layers },
+        { key: "control", label: "🏛️ القاعات", icon: ListChecks },
         ...(can("manageTeams")
-          ? ([{ key: "teams" as TabType, label: "الفرق", icon: Users }] as const)
+          ? ([{ key: "teams" as TabType, label: "👥 الفرق", icon: Users }] as const)
           : []),
         ...(can("manageJudges")
-          ? ([
-              { key: "judges" as TabType, label: "المحكمون", icon: UserCheck },
-            ] as const)
+          ? ([{ key: "judges" as TabType, label: "👨‍⚖️ المحكمون", icon: UserCheck }] as const)
+          : []),
+        ...(can("viewScores")
+          ? ([{ key: "standings" as TabType, label: "📊 النتائج", icon: BarChart2 }] as const)
           : []),
       ],
     },
     {
-      title: "التسجيل",
+      title: "الإدارة",
+      tabs: [{ key: "settings", label: "⚙️ إعدادات البطولة", icon: Settings }],
+    },
+    {
+      // Secondary destinations, still one click away.
+      title: "المزيد",
+      collapsible: true,
       tabs: [
         { key: "links", label: "روابط التسجيل", icon: LinkIcon },
         ...(can("manageJudges")
@@ -2525,25 +2622,13 @@ export default function TournamentDetail() {
               },
             ] as const)
           : []),
-      ],
-    },
-    ...(can("viewScores")
-      ? [
-          {
-            title: "النتائج",
-            tabs: [
+        ...(can("viewScores")
+          ? ([
               { key: "resultsAdmin" as TabType, label: "إدارة النتائج", icon: ClipboardList, restricted: true },
-              { key: "standings" as TabType, label: "الترتيب", icon: BarChart2, restricted: true },
               { key: "speakers" as TabType, label: "المتحدثين", icon: Mic, restricted: true },
-            ],
-          },
-        ]
-      : []),
-    {
-      title: "التقارير والإعدادات",
-      tabs: [
+            ] as const)
+          : []),
         { key: "reports", label: "التقارير", icon: FileText },
-        { key: "settings", label: "الإعدادات", icon: Settings },
         ...(can("viewAudit")
           ? ([{ key: "audit" as TabType, label: "سجل العمليات", icon: History }] as const)
           : []),
@@ -2551,35 +2636,11 @@ export default function TournamentDetail() {
     },
   ];
 
-  if (presentMode) {
-    return (
-      <PresentationMode
-        tournament={tournament}
-        canAnnounce={can("announceResults")}
-        onMarkRevealed={(roundNumber, matchId) =>
-          markResultAnnounced(tournament.id, roundNumber, matchId)
-        }
-        onExit={() => setPresentMode(false)}
-      />
-    );
-  }
-
   return (
     <div
       className="min-h-screen flex flex-col md:flex-row"
       style={{ backgroundColor: BRAND.surface }}
     >
-      <AnnouncePickerDialog
-        tournament={tournament}
-        open={announceOpen}
-        onOpenChange={setAnnounceOpen}
-        onAnnounce={(match) =>
-          setLocation(
-            `/announce/${tournament.id}/${tournament.currentRound}/${match.id}`
-          )
-        }
-      />
-
       <TournamentSidebar
         groups={navGroups}
         activeTab={activeTab}
@@ -2643,9 +2704,9 @@ export default function TournamentDetail() {
             </button>
 
             <button
-              onClick={() => window.location.reload()}
-              aria-label="تحديث الصفحة"
-              title="تحديث الصفحة"
+              onClick={() => setViewingRound(currentRoundNum)}
+              aria-label="تحديث البيانات"
+              title="تحديث البيانات"
               className="w-10 h-10 rounded-xl border bg-white hover:bg-[#7B2D8E]/[0.06] flex items-center justify-center shrink-0 transition-all active:scale-95"
               style={{ borderColor: BRAND.border, color: BRAND.ink }}
               data-testid="button-refresh-page"
@@ -2653,10 +2714,45 @@ export default function TournamentDetail() {
               <span className="text-base leading-none">↻</span>
             </button>
 
+            {tournament.rounds.length > 0 && !tournament.finished && (
+              <RoundOptionsMenu
+                roundNumber={currentRoundNum}
+                round={currentRound}
+                isCurrent={tournament.currentRound === currentRoundNum}
+                isPresented={
+                  (tournament.presentedRound ?? tournament.currentRound) ===
+                  currentRoundNum
+                }
+                completedCount={completedCount}
+                onSetCurrent={() => {
+                  setCurrentRound(tournament.id, currentRoundNum);
+                  logAction(tournament.id, "تعيين الجولة الحالية", `الجولة ${currentRoundNum}`);
+                  toast({ title: `الجولة الحالية الآن: الجولة ${currentRoundNum}` });
+                }}
+                onSetPresented={() => {
+                  setPresentedRound(tournament.id, currentRoundNum);
+                  toast({ title: `وضع العرض يعرض الجولة ${currentRoundNum}` });
+                }}
+                onDraw={() => generateRound(tournament.id)}
+                onAutoAssignJudges={() => {
+                  autoAssignJudges(tournament.id, currentRoundNum);
+                  toast({ title: "تم توزيع المحكمين على القاعات" });
+                }}
+                onToggleLock={(locked) => {
+                  setRoundLocked(tournament.id, currentRoundNum, locked);
+                  toast({ title: locked ? "تم قفل إدخال النتائج" : "تم فتح إدخال النتائج" });
+                }}
+                onDelete={() => {
+                  deleteRound(tournament.id, currentRoundNum);
+                  if (currentRoundNum > 1) setViewingRound(currentRoundNum - 1);
+                }}
+              />
+            )}
+
             <RoleSwitcher />
 
             <button
-              onClick={() => setPresentMode(true)}
+              onClick={() => setLocation(`/present/${tournament.id}?round=${currentRoundNum}`)}
               className={`${BTN.base} ${BTN.secondary} h-10 px-4 shrink-0`}
               data-testid="button-presentation-mode"
             >
@@ -2666,13 +2762,13 @@ export default function TournamentDetail() {
 
             {can("announceResults") && (
             <button
-              onClick={() => setAnnounceOpen(true)}
+              onClick={() => setLocation(`/present/${tournament.id}?round=${currentRoundNum}`)}
               className={`${BTN.base} ${BTN.primary} h-10 px-5 shrink-0 shadow-lg`}
               style={BTN_PRIMARY_STYLE}
               data-testid="button-announce-results"
             >
               <Megaphone className="w-4 h-4" />
-              إعلان النتائج
+              📢 إعلان النتائج
             </button>
             )}
             </div>
@@ -2697,7 +2793,10 @@ export default function TournamentDetail() {
       {/* Content */}
       <div className={`flex-1 ${LAYOUT.page} pb-28 pt-2`}>
         {/* إدارة الجولات — always visible, never hidden in a menu */}
-        {tournament.rounds.length > 0 && activeTab !== "settings" && activeTab !== "reports" && (
+        {tournament.rounds.length > 0 &&
+          activeTab !== "overview" &&
+          activeTab !== "settings" &&
+          activeTab !== "reports" && (
           <div className="mb-4">
             <RoundsManager
               tournament={tournament}
@@ -2724,27 +2823,34 @@ export default function TournamentDetail() {
           </div>
         )}
 
-        {activeTab === "overview" && can("manageTeams") && (
-          <div className="mb-3">
-            <RegistrationLinksCard
-              pendingTeams={tournament.pendingTeams?.length ?? 0}
-              pendingJudges={tournament.pendingJudges?.length ?? 0}
-              onTeamLink={handleRegistrationLink}
-              onJudgeLink={handleJudgeRegistrationLink}
-            />
-          </div>
-        )}
         {activeTab === "overview" && (
           <OverviewDashboard
             tournament={tournament}
-            onOpenRounds={() => setActiveTab("rounds")}
+            displayRound={currentRoundNum}
+            onSelectRound={(n) => {
+              setViewingRound(n);
+              setRoundNotification(false);
+            }}
+            roundControl={
+              <RoundCommandCenter
+                tournament={tournament}
+                selectedRound={currentRoundNum}
+                onStartNextRound={prepareAndStartNextRound}
+                onStartSelectedRound={() => {
+                  setCurrentRound(tournament.id, currentRoundNum);
+                  logAction(tournament.id, "بدء الجولة", `الجولة ${currentRoundNum}`);
+                  toast({ title: `الجولة الجارية الآن: الجولة ${currentRoundNum}` });
+                }}
+                canManage={can("manageJudges")}
+              />
+            }
             onFollowJudging={() => setActiveTab("control")}
             onRoomDetails={(match) =>
               setLocation(
                 `/match/${tournament.id}/${tournament.currentRound}/${match.id}`
               )
             }
-            onAnnounce={() => setAnnounceOpen(true)}
+            onAnnounce={() => setLocation(`/present/${tournament.id}?round=${currentRoundNum}`)}
           />
         )}
 
@@ -2756,7 +2862,7 @@ export default function TournamentDetail() {
                 `/match/${tournament.id}/${tournament.currentRound}/${match.id}`
               )
             }
-            onAnnounce={() => setAnnounceOpen(true)}
+            onAnnounce={() => setLocation(`/present/${tournament.id}?round=${currentRoundNum}`)}
             onToggleLock={(locked) => {
               setRoundLocked(tournament.id, tournament.currentRound, locked);
               toast({
@@ -2817,10 +2923,25 @@ export default function TournamentDetail() {
         )}
 
         {activeTab === "settings" && (
+          <div className="space-y-4">
+          <PublicStatsPanel tournamentId={tournament.id} />
+          <IdentityPanel
+            tournament={tournament}
+            onChange={(patch) => updateTournamentInfo(tournament.id, patch)}
+          />
+          <CountdownPanel
+            tournament={tournament}
+            onChange={(countdown) =>
+              updateTournamentInfo(tournament.id, { countdown })
+            }
+          />
           <SettingsPanel
             tournament={tournament}
             hideScores={hideScores}
             onToggleHideScores={() => setHideScores((v) => !v)}
+            onTogglePublicVisible={() =>
+              setPublicVisible(tournament.id, !tournament.publicVisible)
+            }
             onOpenProtection={() => setProtectionOpen(true)}
             onToggleSemifinal={() => {
               const next = !tournament.semifinalEnabled;
@@ -2842,12 +2963,19 @@ export default function TournamentDetail() {
             onReopen={() => setConfirmReopenOpen(true)}
             onDelete={() => setConfirmDeleteOpen(true)}
           />
+          </div>
         )}
 
         {activeTab === "audit" && <AuditLog entries={tournament.auditLog ?? []} />}
 
         {activeTab === "teams" && (
           <div>
+            <TeamRequestsPanel
+              acceptedCount={tournament.teams.length}
+              pending={tournament.pendingTeams ?? []}
+              onApprove={approvePendingTeam}
+              onReject={(id) => removePendingTeam(tournament.id, id)}
+            />
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-base font-bold">
                 الفرق
@@ -2887,7 +3015,7 @@ export default function TournamentDetail() {
                         />
                       </div>
                       <div>
-                        <Label>عدد المتحدثين</Label>
+                        <Label>عدد أعضاء الفريق</Label>
                         <Select
                           value={speakersPerTeam}
                           onValueChange={handleSpeakerCountChange}
@@ -2896,14 +3024,14 @@ export default function TournamentDetail() {
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="3">3 متحدثين</SelectItem>
-                            <SelectItem value="4">4 متحدثين</SelectItem>
+                            <SelectItem value="3">3 أعضاء</SelectItem>
+                            <SelectItem value="4">4 أعضاء</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
                       {speakerNames.map((name, i) => (
                         <div key={i}>
-                          <Label>المتحدث {i + 1}</Label>
+                          <Label>العضو {i + 1}</Label>
                           <Input
                             value={name}
                             onChange={(e) => {
@@ -2911,7 +3039,7 @@ export default function TournamentDetail() {
                               updated[i] = e.target.value;
                               setSpeakerNames(updated);
                             }}
-                            placeholder={`اسم المتحدث ${i + 1}`}
+                            placeholder={`اسم العضو ${i + 1}`}
                             data-testid={`input-speaker-name-${i}`}
                           />
                         </div>
@@ -2920,7 +3048,10 @@ export default function TournamentDetail() {
                         className="w-full text-white"
                         style={{ backgroundColor: CYAN }}
                         onClick={handleAddTeam}
-                        disabled={!teamName.trim()}
+                        disabled={
+                          !teamName.trim() ||
+                          speakerNames.some((n) => !n.trim())
+                        }
                         data-testid="button-submit-team"
                       >
                         إضافة
@@ -2963,7 +3094,19 @@ export default function TournamentDetail() {
                           </p>
                         )}
                         <p className="text-xs text-muted-foreground mt-1">
-                          {team.speakersPerTeam} متحدثين
+                          {team.speakersPerTeam} أعضاء
+                          {(() => {
+                            // The room the team debates in this round, if drawn.
+                            const cur = tournament.rounds[tournament.currentRound - 1];
+                            const m = cur?.matches.find(
+                              (mm) =>
+                                mm.team1.teamId === team.id ||
+                                mm.team2.teamId === team.id
+                            );
+                            return m
+                              ? ` · القاعة ${m.roomLabel?.trim() || m.roomNumber}`
+                              : "";
+                          })()}
                         </p>
                         <div className="flex flex-wrap gap-1 mt-2">
                           {team.speakerNames.map((name, j) => (
@@ -3184,44 +3327,6 @@ export default function TournamentDetail() {
                     }}
                   />
                 </div>
-                {/* Delete round — only if no data recorded yet */}
-                {currentRound && completedCount === 0 && !currentRound.completed && !tournament.finished && (
-                  <div className="flex justify-end mb-2">
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <button
-                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold hover:opacity-80 transition-opacity"
-                          style={{ backgroundColor: "rgba(239,68,68,0.08)", color: "#EF4444" }}
-                          data-testid={`button-delete-round-${currentRoundNum}`}
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                          حذف هذه الجولة
-                        </button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent dir="rtl">
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>حذف الجولة {currentRoundNum}</AlertDialogTitle>
-                          <AlertDialogDescription>
-                            سيتم حذف الجولة {currentRoundNum} ومباراياتها. هذا الإجراء لا يمكن التراجع عنه. لا يمكن الحذف إلا إذا لم يُسجَّل أي نتيجة.
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel>إلغاء</AlertDialogCancel>
-                          <AlertDialogAction
-                            className="bg-destructive hover:bg-destructive/90"
-                            onClick={() => {
-                              deleteRound(tournament.id, currentRoundNum);
-                              if (currentRoundNum > 1) setViewingRound(currentRoundNum - 1);
-                            }}
-                          >
-                            حذف الجولة
-                          </AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
-                  </div>
-                )}
-
                 {/* Case / motion editor */}
                 {currentRound && (
                   <div className="mb-3">
@@ -3621,8 +3726,25 @@ export default function TournamentDetail() {
         )}
 
         {activeTab === "judges" && (
+          <>
+          <RoundJudgeBoard
+            tournament={tournament}
+            selectedRound={currentRoundNum}
+            onSelectRound={(n) => setViewingRound(n)}
+            onAssignJudges={(matchId, assignment) =>
+              setMatchJudges(tournament.id, currentRoundNum, matchId, assignment)
+            }
+            onAutoAssign={() => autoAssignJudges(tournament.id, currentRoundNum)}
+            onJudgeLink={handleJudgeLink}
+            canManage={can("manageJudges")}
+          />
           <JudgesTab
             tournament={tournament}
+            onApproveJudge={approvePendingJudge}
+            onRejectJudge={(id) => removePendingJudge(tournament.id, id)}
+            onToggleJudgeDisabled={(j) =>
+              updateJudge(tournament.id, { ...j, disabled: !j.disabled })
+            }
             onAddJudge={() => {
               setEditingJudge({
                 id: crypto.randomUUID(),
@@ -3657,6 +3779,7 @@ export default function TournamentDetail() {
               setJudgeAssignOpen(true);
             }}
           />
+          </>
         )}
 
         {activeTab === "pending" && (
@@ -3854,8 +3977,14 @@ export default function TournamentDetail() {
                 data-testid="input-edit-team-name"
               />
             </div>
+            <ImageUploadField
+              label="شعار الفريق"
+              value={editTeamLogo}
+              onChange={setEditTeamLogo}
+              testId="input-team-logo-file"
+            />
             <div>
-              <Label>عدد المتحدثين</Label>
+              <Label>عدد أعضاء الفريق</Label>
               <Select
                 value={editSpeakersCount}
                 onValueChange={handleEditCountChange}
@@ -3864,14 +3993,14 @@ export default function TournamentDetail() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="3">3 متحدثين</SelectItem>
-                  <SelectItem value="4">4 متحدثين</SelectItem>
+                  <SelectItem value="3">3 أعضاء</SelectItem>
+                  <SelectItem value="4">4 أعضاء</SelectItem>
                 </SelectContent>
               </Select>
             </div>
             {editSpeakerNames.map((name, i) => (
               <div key={i}>
-                <Label>المتحدث {i + 1}</Label>
+                <Label>العضو {i + 1}</Label>
                 <Input
                   value={name}
                   onChange={(e) => {
@@ -3879,7 +4008,7 @@ export default function TournamentDetail() {
                     updated[i] = e.target.value;
                     setEditSpeakerNames(updated);
                   }}
-                  placeholder={`اسم المتحدث ${i + 1}`}
+                  placeholder={`اسم العضو ${i + 1}`}
                   data-testid={`input-edit-speaker-name-${i}`}
                 />
               </div>
@@ -4294,6 +4423,14 @@ export default function TournamentDetail() {
                   data-testid="input-judge-name"
                 />
               </div>
+              <ImageUploadField
+                label="صورة المحكم"
+                value={editingJudge.photoDataUrl}
+                onChange={(dataUrl) =>
+                  setEditingJudge({ ...editingJudge, photoDataUrl: dataUrl })
+                }
+                testId="input-judge-photo-file"
+              />
               <div>
                 <Label>المؤسسة</Label>
                 <Input
@@ -5011,6 +5148,9 @@ export default function TournamentDetail() {
 
 interface JudgesTabProps {
   tournament: Tournament;
+  onApproveJudge: (p: PendingJudgeRegistration) => void;
+  onRejectJudge: (pendingId: string) => void;
+  onToggleJudgeDisabled: (j: Judge) => void;
   onAddJudge: () => void;
   onEditJudge: (j: Judge) => void;
   onDeleteJudge: (id: string) => void;
@@ -5024,6 +5164,9 @@ interface JudgesTabProps {
 
 function JudgesTab({
   tournament,
+  onApproveJudge,
+  onRejectJudge,
+  onToggleJudgeDisabled,
   onAddJudge,
   onEditJudge,
   onDeleteJudge,
@@ -5039,6 +5182,14 @@ function JudgesTab({
   const judgeMap = new Map(judges.map((j) => [j.id, j]));
   return (
     <div className="space-y-4" dir="rtl">
+      <JudgeRequestsPanel
+        pending={tournament.pendingJudges ?? []}
+        judges={judges}
+        onApprove={onApproveJudge}
+        onReject={onRejectJudge}
+        onToggleDisabled={onToggleJudgeDisabled}
+      />
+
       <div className="grid grid-cols-2 gap-2">
         <button
           onClick={onAddJudge}
@@ -5101,7 +5252,7 @@ function JudgesTab({
         </div>
       ) : (
         <div className="space-y-2">
-          {judges.map((j) => (
+          {judges.filter((j) => !j.disabled).map((j) => (
             <div
               key={j.id}
               className="bg-card rounded-xl p-3 shadow-sm flex items-start gap-3"
@@ -5140,6 +5291,13 @@ function JudgesTab({
                   <Pencil className="w-4 h-4" />
                 </button>
                 <button
+                  onClick={() => onToggleJudgeDisabled(j)}
+                  className="px-2 py-1 rounded-lg hover:bg-muted text-[11.5px] font-bold"
+                  data-testid={`button-disable-judge-${j.id}`}
+                >
+                  تعطيل
+                </button>
+                <button
                   onClick={() => {
                     if (window.confirm(`حذف المحكم ${j.name}?`)) {
                       onDeleteJudge(j.id);
@@ -5156,285 +5314,6 @@ function JudgesTab({
         </div>
       )}
 
-      {tournament.rounds.length > 0 && (
-        <div className="space-y-4 pt-3">
-          <div className="flex items-center gap-2">
-            <div
-              className="w-1 h-6 rounded-full"
-              style={{
-                background: `linear-gradient(180deg, ${GOLD}, ${PURPLE})`,
-              }}
-            />
-            <h3 className="font-extrabold text-base">
-              توزيع المحكمين على القاعات
-            </h3>
-          </div>
-          {tournament.rounds.map((round) => {
-            const totalAssigned = round.matches.filter(
-              (m) =>
-                (m.judgeAssignment?.chairJudgeId ||
-                  (m.judgeAssignment?.panelistJudgeIds?.length ?? 0) > 0)
-            ).length;
-            return (
-              <div
-                key={round.roundNumber}
-                className="rounded-2xl p-4 shadow-md space-y-4"
-                style={{
-                  background: `linear-gradient(135deg, ${PURPLE}10 0%, ${CYAN}08 100%)`,
-                  border: `1.5px solid ${PURPLE}33`,
-                }}
-              >
-                <div className="flex items-center gap-2 flex-wrap">
-                  <div
-                    className="px-3 py-1.5 rounded-lg font-bold text-sm"
-                    style={{ backgroundColor: PURPLE, color: "#fff" }}
-                  >
-                    الجولة {round.roundNumber}
-                  </div>
-                  <div
-                    className="text-[11px] font-semibold px-2 py-1 rounded-md"
-                    style={{
-                      backgroundColor:
-                        totalAssigned === round.matches.length
-                          ? SUCCESS + "26"
-                          : GOLD + "26",
-                      color:
-                        totalAssigned === round.matches.length
-                          ? SUCCESS
-                          : GOLD,
-                    }}
-                  >
-                    {totalAssigned}/{round.matches.length} مُعيَّنة
-                  </div>
-                  <div className="flex items-center gap-1.5 text-xs ms-auto">
-                    <span className="text-muted-foreground font-semibold">
-                      محكمون/قاعة:
-                    </span>
-                    <Input
-                      type="number"
-                      min={1}
-                      max={9}
-                      value={round.judgesPerRoom ?? 3}
-                      onChange={(e) =>
-                        onSetJudgesPerRoom(
-                          round.roundNumber,
-                          Math.max(1, parseInt(e.target.value) || 1)
-                        )
-                      }
-                      className="w-14 h-8 text-center font-bold"
-                      data-testid={`input-judges-per-room-${round.roundNumber}`}
-                    />
-                  </div>
-                  <button
-                    onClick={() => onAutoAssign(round.roundNumber)}
-                    disabled={judges.length === 0}
-                    className="text-xs px-3 py-2 rounded-lg font-bold disabled:opacity-50 inline-flex items-center gap-1"
-                    style={{
-                      background: `linear-gradient(135deg, ${CYAN}, ${PURPLE})`,
-                      color: "#fff",
-                    }}
-                    data-testid={`button-auto-assign-${round.roundNumber}`}
-                  >
-                    <Activity className="w-3.5 h-3.5" />
-                    توزيع تلقائي
-                  </button>
-                </div>
-
-                <div className="space-y-3">
-                  {round.matches.map((m) => {
-                    const a = m.judgeAssignment;
-                    const chair = a?.chairJudgeId
-                      ? judgeMap.get(a.chairJudgeId)
-                      : null;
-                    const panel = (a?.panelistJudgeIds ?? [])
-                      .map((id) => judgeMap.get(id))
-                      .filter((j): j is NonNullable<typeof j> => !!j);
-                    const isUnassigned = !chair && panel.length === 0;
-                    return (
-                      <div
-                        key={m.id}
-                        className="rounded-2xl bg-card overflow-hidden shadow-sm"
-                        style={{
-                          border: isUnassigned
-                            ? `2px dashed ${GOLD}66`
-                            : `1px solid var(--border)`,
-                        }}
-                        data-testid={`assignment-card-${round.roundNumber}-${m.id}`}
-                      >
-                        {/* Card header: room + teams + edit */}
-                        <div
-                          className="flex items-center gap-2 px-3 py-2.5"
-                          style={{
-                            background: `linear-gradient(135deg, ${CYAN}1A 0%, ${PURPLE}14 100%)`,
-                            borderBottom: `1px solid ${PURPLE}1A`,
-                          }}
-                        >
-                          <div
-                            className="w-9 h-9 rounded-xl flex items-center justify-center text-white font-bold text-xs flex-shrink-0"
-                            style={{ backgroundColor: CYAN }}
-                          >
-                            <Home className="w-4 h-4" />
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="font-extrabold text-sm">
-                              {m.roomLabel?.trim() || `القاعة ${m.roomNumber}`}
-                            </div>
-                            <div className="text-[11px] text-muted-foreground truncate">
-                              <span style={{ color: CYAN, fontWeight: 600 }}>
-                                {teamMap.get(m.team1.teamId)}
-                              </span>
-                              <span className="mx-1.5 text-muted-foreground">
-                                ⚔
-                              </span>
-                              <span style={{ color: PURPLE, fontWeight: 600 }}>
-                                {teamMap.get(m.team2.teamId)}
-                              </span>
-                            </div>
-                          </div>
-                          <button
-                            onClick={() =>
-                              onEditAssignment(round.roundNumber, m.id)
-                            }
-                            className="p-2 rounded-lg hover:bg-background/60 flex-shrink-0"
-                            style={{ color: PURPLE }}
-                            data-testid={`button-assign-${round.roundNumber}-${m.id}`}
-                            title="تعديل التعيين"
-                          >
-                            <Pencil className="w-4 h-4" />
-                          </button>
-                        </div>
-
-                        {/* Body: chair + panelists */}
-                        <div className="p-3 space-y-3">
-                          {isUnassigned ? (
-                            <div
-                              className="text-center py-4 px-3 rounded-xl"
-                              style={{
-                                backgroundColor: GOLD + "12",
-                                border: `1px dashed ${GOLD}55`,
-                              }}
-                            >
-                              <UserCheck
-                                className="w-7 h-7 mx-auto mb-1.5"
-                                style={{ color: GOLD }}
-                              />
-                              <div
-                                className="text-xs font-bold"
-                                style={{ color: GOLD }}
-                              >
-                                لم يُعيَّن محكمون بعد
-                              </div>
-                              <div className="text-[10px] text-muted-foreground mt-0.5">
-                                اضغط على القلم أو زر "توزيع تلقائي"
-                              </div>
-                            </div>
-                          ) : (
-                            <>
-                              {/* Chair card — full-width, gold accent */}
-                              <div
-                                className="rounded-xl p-3 flex items-center gap-3"
-                                style={{
-                                  background: chair
-                                    ? `linear-gradient(135deg, ${GOLD}1F 0%, ${GOLD}0A 100%)`
-                                    : "transparent",
-                                  border: chair
-                                    ? `1.5px solid ${GOLD}66`
-                                    : `1px dashed var(--border)`,
-                                }}
-                              >
-                                <div
-                                  className="w-11 h-11 rounded-full flex items-center justify-center flex-shrink-0 shadow-sm"
-                                  style={{
-                                    background: chair
-                                      ? `linear-gradient(135deg, ${GOLD}, #E6A800)`
-                                      : "var(--muted)",
-                                    color: "#fff",
-                                  }}
-                                >
-                                  <Crown className="w-5 h-5" />
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                  <div
-                                    className="text-[10px] font-extrabold uppercase tracking-wider mb-0.5"
-                                    style={{ color: GOLD }}
-                                  >
-                                    رئيس الجلسة
-                                  </div>
-                                  <div className="text-sm font-bold truncate">
-                                    {chair?.name ?? (
-                                      <span className="text-muted-foreground font-normal">
-                                        — بدون رئيس —
-                                      </span>
-                                    )}
-                                  </div>
-                                  {chair?.institution && (
-                                    <div className="text-[10px] text-muted-foreground truncate">
-                                      {chair.institution}
-                                    </div>
-                                  )}
-                                </div>
-                              </div>
-
-                              {/* Panelists — avatar chips */}
-                              {panel.length > 0 && (
-                                <div>
-                                  <div
-                                    className="text-[10px] font-extrabold uppercase tracking-wider mb-2 flex items-center gap-1"
-                                    style={{ color: CYAN }}
-                                  >
-                                    <UserCheck className="w-3 h-3" />
-                                    المحكمون ({panel.length})
-                                  </div>
-                                  <div className="flex flex-wrap gap-1.5">
-                                    {panel.map((j) => {
-                                      const initials = j.name
-                                        .trim()
-                                        .split(/\s+/)
-                                        .slice(0, 2)
-                                        .map((p) => p[0])
-                                        .join("");
-                                      return (
-                                        <div
-                                          key={j.id}
-                                          className="flex items-center gap-1.5 ps-1 pe-2.5 py-1 rounded-full"
-                                          style={{
-                                            backgroundColor: CYAN + "14",
-                                            border: `1px solid ${CYAN}40`,
-                                          }}
-                                        >
-                                          <div
-                                            className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-extrabold flex-shrink-0"
-                                            style={{
-                                              backgroundColor: CYAN,
-                                              color: "#fff",
-                                            }}
-                                          >
-                                            {initials}
-                                          </div>
-                                          <span
-                                            className="text-xs font-semibold"
-                                            style={{ color: CYAN }}
-                                          >
-                                            {j.name}
-                                          </span>
-                                        </div>
-                                      );
-                                    })}
-                                  </div>
-                                </div>
-                              )}
-                            </>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
     </div>
   );
 }

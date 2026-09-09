@@ -4,8 +4,7 @@ import { BRAND, BTN, BTN_PRIMARY_STYLE, BTN_SIZE } from "@/lib/brand";
 import type { Team } from "@/types/tournament";
 import type { TournamentSetup } from "@/lib/wizard/types";
 import { Panel, inputClass, inputStyle } from "./ui";
-import RegistrationLinkCard from "@/components/register/RegistrationLinkCard";
-import { buildRegisterUrl } from "@/lib/registrationCodec";
+import JoinLinkPanel from "./JoinLinkPanel";
 
 interface StepTeamsProps {
   setup: TournamentSetup;
@@ -67,6 +66,13 @@ export default function StepTeams({ setup, patch }: StepTeamsProps) {
 
   return (
     <div className="space-y-4">
+      <JoinLinkPanel
+        role="teams"
+        tournamentId={setup.draftId}
+        tournamentName={setup.name}
+        topic={setup.caseText}
+      />
+
       <Panel title="إضافة فريق" hint="اسم الفريق فقط كافٍ للإضافة — يمكن استكمال المتحدثين لاحقاً">
         <div className="space-y-3">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

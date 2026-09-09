@@ -32,6 +32,13 @@ export interface JudgeScores {
   roomNumber?: number;
 }
 
+/** A judge assigned to a room, as carried by the judging link. */
+export interface RoomJudge {
+  id: string;
+  name: string;
+  chair?: boolean;
+}
+
 export interface RoomInfo {
   roomNumber: number;
   roomLabel?: string;
@@ -43,6 +50,8 @@ export interface RoomInfo {
   oppSpeakerNames: string[];
   govSpeakersCount: number;
   oppSpeakersCount: number;
+  /** Judges assigned to this room — lets the link greet the judge by name. */
+  judges?: RoomJudge[];
 }
 
 export interface RoundData {
@@ -70,4 +79,12 @@ export function decodeScores(encoded: string): JudgeScores | null {
 export function buildSessionUrl(kind: "match" | "round", sessionId: string): string {
   const base = window.location.origin + import.meta.env.BASE_URL.replace(/\/$/, "");
   return kind === "match" ? `${base}/judge/${sessionId}` : `${base}/judge/round/${sessionId}`;
+}
+
+/**
+ * A judging link bound to one judge: the page identifies them from the link and
+ * never asks for a name, so nobody can score under a colleague's identity.
+ */
+export function buildJudgeSessionUrl(sessionId: string, judgeId: string): string {
+  return `${buildSessionUrl("round", sessionId)}?j=${encodeURIComponent(judgeId)}`;
 }

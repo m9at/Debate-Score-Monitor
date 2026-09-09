@@ -1,5 +1,6 @@
+import { useState } from "react";
 import type { LucideIcon } from "lucide-react";
-import { Home } from "lucide-react";
+import { ChevronDown, Home } from "lucide-react";
 import { BRAND, BRAND_GRADIENT, BRAND_GLOW } from "@/lib/brand";
 
 export interface SidebarTab<T extends string = string> {
@@ -15,6 +16,8 @@ export interface SidebarTab<T extends string = string> {
 export interface SidebarGroup<T extends string = string> {
   title: string;
   tabs: SidebarTab<T>[];
+  /** Secondary destinations — folded away behind the group title. */
+  collapsible?: boolean;
 }
 
 interface TournamentSidebarProps<T extends string> {
@@ -34,6 +37,7 @@ export default function TournamentSidebar<T extends string>({
   onTabChange,
   onHome,
 }: TournamentSidebarProps<T>) {
+  const [openExtra, setOpenExtra] = useState(false);
   let order = 0;
 
   const renderTab = (tab: SidebarTab<T>) => {
@@ -137,20 +141,43 @@ export default function TournamentSidebar<T extends string>({
 
       {/* Grouped destinations */}
       <nav className="relative flex md:flex-col gap-1 px-2 md:px-2.5 py-2 md:pb-6 overflow-x-auto md:overflow-visible flex-1">
-        {groups.map((group) => (
-          <div
-            key={group.title}
-            className="flex md:flex-col gap-1 md:mb-3 shrink-0"
-          >
-            <p
-              className="hidden md:block px-3 mb-1 text-[9.5px] font-bold uppercase tracking-wider
-                         text-white/30"
-            >
-              {group.title}
-            </p>
-            {group.tabs.map(renderTab)}
-          </div>
-        ))}
+        {groups
+          .filter((g) => g.tabs.length > 0)
+          .map((group) => {
+            // A collapsible group stays folded until asked for, and opens by
+            // itself when the active tab lives inside it.
+            const holdsActive = group.tabs.some((t) => t.key === activeTab);
+            const expanded = !group.collapsible || openExtra || holdsActive;
+            return (
+              <div
+                key={group.title}
+                className="flex md:flex-col gap-1 md:mb-3 shrink-0"
+              >
+                {group.collapsible ? (
+                  <button
+                    type="button"
+                    onClick={() => setOpenExtra((v) => !v)}
+                    className="flex items-center gap-1 px-3 mb-1 text-[9.5px] font-bold uppercase
+                               tracking-wider text-white/30 hover:text-white/60 transition-colors"
+                    data-testid="button-sidebar-more"
+                  >
+                    {group.title}
+                    <ChevronDown
+                      className={`w-3 h-3 transition-transform ${expanded ? "rotate-180" : ""}`}
+                    />
+                  </button>
+                ) : (
+                  <p
+                    className="hidden md:block px-3 mb-1 text-[9.5px] font-bold uppercase tracking-wider
+                               text-white/30"
+                  >
+                    {group.title}
+                  </p>
+                )}
+                {expanded && group.tabs.map(renderTab)}
+              </div>
+            );
+          })}
       </nav>
     </aside>
   );

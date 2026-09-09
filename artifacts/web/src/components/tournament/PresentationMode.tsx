@@ -1,20 +1,23 @@
 import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { X } from "lucide-react";
+import { Play, X } from "lucide-react";
 import type { Tournament } from "@/types/tournament";
 import { BRAND, BRAND_GRADIENT } from "@/lib/brand";
 import { getRoomStatus } from "@/lib/roomStatus";
-import { getRevealStatus, roundTitle } from "@/lib/reveal";
+import { getRevealStatus, roomTitle, roundTitle } from "@/lib/reveal";
 import PresentLogoHero from "@/components/present/PresentLogoHero";
 import PresentRoomCard from "@/components/present/PresentRoomCard";
 import PresentRoomFocus from "@/components/present/PresentRoomFocus";
 import PresentCaseText from "@/components/present/PresentCaseText";
 import RevealOverlay from "@/components/present/RevealOverlay";
+import { useAnnounceQueue } from "@/hooks/useAnnounceQueue";
 
 interface PresentationModeProps {
   tournament: Tournament;
   /** Persists a room's result as `revealed`. */
   onMarkRevealed: (roundNumber: number, matchId: string) => void;
+  /** The round to present — overrides the tournament's own presented round. */
+  roundNumber?: number;
   /** True for the admin who opened the mode — gates the announce action. */
   canAnnounce: boolean;
   onExit: () => void;
@@ -31,12 +34,13 @@ interface PresentationModeProps {
  */
 export default function PresentationMode({
   tournament,
+  roundNumber,
   onMarkRevealed,
   canAnnounce,
   onExit,
 }: PresentationModeProps) {
   const presentedRound = Math.max(
-    tournament.presentedRound ?? tournament.currentRound ?? 1,
+    roundNumber ?? tournament.presentedRound ?? tournament.currentRound ?? 1,
     1,
   );
   const [focusedRoomId, setFocusedRoomId] = useState<string | null>(null);
@@ -54,18 +58,15 @@ export default function PresentationMode({
     setAnnouncingId(null);
   }, [presentedRound]);
 
-  // Real full screen; leaving it exits the mode.
+  // Ask for real full screen ONCE, on mount. Leaving full screen (or a browser
+  // that refuses it) never ends the show: only the ✕ button does, so a reveal
+  // animation or a re-render can no longer drop the organiser out of the mode.
   useEffect(() => {
-    document.documentElement.requestFullscreen?.().catch(() => {});
-    const onChange = () => {
-      if (!document.fullscreenElement) onExit();
-    };
-    document.addEventListener("fullscreenchange", onChange);
+    void document.documentElement.requestFullscreen?.().catch(() => {});
     return () => {
-      document.removeEventListener("fullscreenchange", onChange);
       if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {});
     };
-  }, [onExit]);
+  }, []);
 
   const teamName = useMemo(() => {
     const byId = new Map(tournament.teams.map((t) => [t.id, t.name]));
@@ -99,9 +100,29 @@ export default function PresentationMode({
   const focused = focusedRoomId
     ? (rooms.find(({ match }) => match.id === focusedRoomId) ?? null)
     : null;
-  const announcingMatch = announcingId
-    ? (round?.matches.find((m) => m.id === announcingId) ?? null)
+  /** Rooms whose result exists — the auto-play show runs through these. */
+  const showableIds = rooms
+    .filter(({ status }) => status === "ready" || status === "announced")
+    .map(({ match }) => match.id);
+  const queue = useAnnounceQueue(showableIds);
+
+  const shownId = queue.currentId ?? announcingId;
+  const announcingMatch = shownId
+    ? (round?.matches.find((m) => m.id === shownId) ?? null)
     : null;
+  /** Name of the room the «القاعة التالية» button moves to, if any. */
+  const nextRoomLabel = queue.nextId
+    ? (() => {
+        const m = round?.matches.find((x) => x.id === queue.nextId);
+        return m ? roomTitle(m) : null;
+      })()
+    : null;
+
+  /** Announcing one room joins the same walk, so «التالية» keeps working. */
+  const announceRoom = (matchId: string) => {
+    queue.goTo(matchId);
+    setAnnouncingId(matchId);
+  };
 
   return (
     <div
@@ -148,8 +169,8 @@ export default function PresentationMode({
               oppName={teamName(focused.match.team2.teamId)}
               canAnnounce={canAnnounce}
               winnerName={revealedWinnerName(focused.match)}
-              onAnnounce={() => setAnnouncingId(focused.match.id)}
-              onReplay={() => setAnnouncingId(focused.match.id)}
+              onAnnounce={() => announceRoom(focused.match.id)}
+              onReplay={() => announceRoom(focused.match.id)}
               onBack={() => setFocusedRoomId(null)}
             />
           </motion.div>
@@ -187,14 +208,29 @@ export default function PresentationMode({
                       canAnnounce={canAnnounce}
                       winnerName={revealedWinnerName(match)}
                       onSelect={() => setFocusedRoomId(match.id)}
-                      onAnnounce={() => setAnnouncingId(match.id)}
-                      onReplay={() => setAnnouncingId(match.id)}
+                      onAnnounce={() => announceRoom(match.id)}
+                      onReplay={() => announceRoom(match.id)}
                     />
                   ))}
                 </div>
-                <p className="text-center text-white/35 text-base md:text-xl font-bold">
-                  أُعلنت {revealedCount} من {rooms.length} قاعة
-                </p>
+                <div className="flex flex-col items-center gap-4">
+                  <p className="text-center text-white/35 text-base md:text-xl font-bold">
+                    أُعلنت {revealedCount} من {rooms.length} قاعة
+                  </p>
+                  {canAnnounce && showableIds.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={queue.start}
+                      className="inline-flex items-center gap-2 h-12 px-6 rounded-2xl text-white
+                                 font-bold text-[15px] transition-transform hover:scale-[1.03]"
+                      style={{ backgroundImage: BRAND_GRADIENT }}
+                      data-testid="button-start-auto-show"
+                    >
+                      <Play className="w-4 h-4" />
+                      بدء العرض التلقائي ({showableIds.length} قاعة)
+                    </button>
+                  )}
+                </div>
               </>
             )}
           </motion.div>
@@ -209,7 +245,10 @@ export default function PresentationMode({
             roundNumber={presentedRound}
             match={announcingMatch}
             onRevealed={() => onMarkRevealed(presentedRound, announcingMatch.id)}
+            nextRoomLabel={nextRoomLabel}
+            onNextRoom={nextRoomLabel ? queue.next : undefined}
             onClose={() => {
+              if (queue.active) queue.stop();
               setAnnouncingId(null);
               setFocusedRoomId(null);
             }}
