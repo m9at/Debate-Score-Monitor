@@ -27,6 +27,15 @@ pnpm monorepo — "Oman Debates" debate tournament scoring system. Three runtime
 - `pnpm-workspace.yaml` has `minimumReleaseAge: 1440` — `--frozen-lockfile` bypasses this since resolution is skipped.
 - Workspace packages: `artifacts/*`, `lib/*`, `lib/integrations/*`, `scripts`.
 
+## PWA
+- `public/manifest.webmanifest` defines the existing Arabic app identity and standalone display. HTML uses Vite's `%BASE_URL%` so icons/manifest work from deep links.
+- `src/lib/registerServiceWorker.ts` registers `public/sw.js` only in production. Dev unregisters only this app's worker and clears only `oman-debates-*` caches to prevent stale live source.
+- The worker precaches an Arabic offline fallback and existing icons only; navigations stay network-first and API/auth data are never cached. This is an online PWA, not offline tournament editing.
+- `InstallAppButton` in the home header uses the browser install prompt when offered, otherwise shows Arabic manual instructions. Native installation must be checked outside the embedded preview on HTTPS.
+- Deployment and post-publish install checks are in `DEPLOY.md`. Production Express explicitly revalidates worker and manifest responses (`Cache-Control: no-cache`).
+- Original PWA PNGs were actually 2000×2000 despite their filenames; corrected to 192×192, 512×512 and Apple 180×180. Preserve these actual dimensions when replacing artwork.
+- Verified production in headless Chromium: no installability errors, worker controls the page, deep-link manifest resolves, offline navigation shows fallback, API requests are not cached, and clicking retry online restores the page. Native OS installation still requires a real device.
+
 ## Verification
 1. `docker compose -f docker-compose.base44.yml ps` — db healthy, setup/migrate exited 0, api + web up.
 2. `curl -sf http://localhost:3000/` — returns the Vite-served HTML.
