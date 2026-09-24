@@ -88,6 +88,8 @@ import RoundJudgeBoard from "@/components/tournament/RoundJudgeBoard";
 import ImageUploadField from "@/components/common/ImageUploadField";
 import ReportsPanel from "@/components/tournament/ReportsPanel";
 import SettingsPanel from "@/components/tournament/SettingsPanel";
+import DebateSettingsPanel from "@/components/tournament/DebateSettingsPanel";
+import { SPEAKER_MAX, SPEAKER_MIN } from "@/lib/scoreValidation";
 import IdentityPanel from "@/components/tournament/IdentityPanel";
 import CountdownPanel from "@/components/tournament/CountdownPanel";
 import PublicStatsPanel from "@/components/tournament/PublicStatsPanel";
@@ -161,6 +163,7 @@ import type {
   PendingTeamRegistration,
   PendingJudgeRegistration,
   PendingMatchResult,
+  TournamentSettings,
 } from "@/types/tournament";
 
 const CYAN = "#29ABE2";
@@ -1013,6 +1016,7 @@ export default function TournamentDetail() {
     markResultAnnounced,
     setPublicVisible,
     updateTournamentInfo,
+    resetRound,
     logAction,
     tournaments,
   } = useTournament();
@@ -1024,6 +1028,23 @@ export default function TournamentDetail() {
     return (requested as TabType) || "overview";
   });
   const { toast } = useToast();
+
+  // Older tournaments may have no settings yet — fill in the fixed defaults.
+  const updateTournamentSettings = (patch: Partial<TournamentSettings>) => {
+    if (!tournament) return;
+    updateTournamentInfo(tournament.id, {
+      settings: {
+        replySpeech: true,
+        sides: true,
+        scoreMin: SPEAKER_MIN,
+        scoreMax: SPEAKER_MAX,
+        judgesPerRoom: 3,
+        showScoresOnAnnounce: false,
+        ...tournament.settings,
+        ...patch,
+      },
+    });
+  };
   const { can } = useRole();
   // Selected round numbers for the standings tab. Empty set = all rounds.
   const [standingsRoundFilter, setStandingsRoundFilter] = useState<Set<number>>(
@@ -2842,6 +2863,7 @@ export default function TournamentDetail() {
                   toast({ title: `الجولة الجارية الآن: الجولة ${currentRoundNum}` });
                 }}
                 canManage={can("manageJudges")}
+                onGoToJudges={() => setActiveTab("judges")}
               />
             }
             onFollowJudging={() => setActiveTab("control")}
@@ -2934,6 +2956,22 @@ export default function TournamentDetail() {
             onChange={(countdown) =>
               updateTournamentInfo(tournament.id, { countdown })
             }
+          />
+          <DebateSettingsPanel
+            tournament={tournament}
+            onToggleReplySpeech={() =>
+              updateTournamentSettings({
+                replySpeech: tournament.settings?.replySpeech === false,
+              })
+            }
+            onSaveRules={(rules) => {
+              updateTournamentSettings({ rules });
+              toast({ title: "تم حفظ قواعد البطولة" });
+            }}
+            onResetDraw={(roundNumber) => {
+              resetRound(tournament.id, roundNumber);
+              toast({ title: `أُعيد ضبط قرعة الجولة ${roundNumber}` });
+            }}
           />
           <SettingsPanel
             tournament={tournament}

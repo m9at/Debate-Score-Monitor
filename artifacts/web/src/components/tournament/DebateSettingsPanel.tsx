@@ -54,7 +54,7 @@ export default function DebateSettingsPanel({
           hint="ثابت وفق الروابط المعتمدة — أرقام صحيحة فقط دون كسور."
         >
           <span
-            className="h-9 px-3.5 rounded-xl text-[12.5px] font-bold inline-flex items-center"
+            className="h-9 px-3.5 rounded-xl text-[12.5px] font-bold inline-flex items-center whitespace-nowrap shrink-0"
             style={{ backgroundColor: `${BRAND.purple}12`, color: BRAND.purple }}
             data-testid="settings-score-range"
           >
