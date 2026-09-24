@@ -1693,28 +1693,17 @@ export default function TournamentDetail() {
    * pairings → rooms → judges → the round becomes the live one. Nothing is
    * started before every readiness check passes.
    */
-  /** Re-pairs a round from scratch with every current team, then reassigns judges. */
+  /** Empties a round's draw; the organiser draws it again and assigns judges manually. */
   const handleRedraw = (roundNumber: number) => {
     if (!tournament) return;
-    if (!window.confirm(`إعادة قرعة الجولة ${roundNumber}؟ سيتم توزيع الفرق والمحكمين من جديد على قاعات بعدد الفرق.`)) return;
+    if (!window.confirm(`إعادة قرعة الجولة ${roundNumber} من الصفر؟ سيتم حذف المواجهات والقاعات وتوزيع المحكمين الحاليين (دون المساس بالفرق المسجلة).`)) return;
     redrawRound(tournament.id, roundNumber);
     logAction(tournament.id, "إعادة القرعة", `الجولة ${roundNumber}`);
     setViewingRound(roundNumber);
-    const round = tournament.rounds.find((r) => r.roundNumber === roundNumber);
-    const perRoom = round?.judgesPerRoom ?? tournament.settings?.judgesPerRoom ?? 3;
-    const rooms = Math.floor(tournament.teams.length / 2);
-    const available = (tournament.judges ?? []).filter((j) => !j.disabled).length;
-    const short = available < rooms * perRoom;
+    setActiveTab("overview");
     toast({
-      title: `تمت إعادة القرعة — ${rooms} قاعة`,
-      description: short
-        ? `تم توزيع الجولة، لكن توجد قاعات ينقصها محكمون (${available} محكم لـ ${rooms * perRoom} مقعد).`
-        : "تم توزيع الفرق والمحكمين من جديد.",
-      action: short ? (
-        <ToastAction altText="توزيع المحكمين" onClick={() => setActiveTab("judges")}>
-          توزيع المحكمين
-        </ToastAction>
-      ) : undefined,
+      title: `تم تصفير قرعة الجولة ${roundNumber}`,
+      description: "اضغط «بدء القرعة» لإجراء القرعة من جديد، ثم وزّع المحكمين بنفسك.",
     });
   };
 
@@ -2876,6 +2865,11 @@ export default function TournamentDetail() {
                   setCurrentRound(tournament.id, currentRoundNum);
                   logAction(tournament.id, "بدء الجولة", `الجولة ${currentRoundNum}`);
                   toast({ title: `الجولة الجارية الآن: الجولة ${currentRoundNum}` });
+                }}
+                onDraw={() => {
+                  generateRound(tournament.id);
+                  logAction(tournament.id, "إجراء القرعة", `الجولة ${currentRoundNum}`);
+                  toast({ title: "تمت القرعة", description: "وزّع المحكمين على القاعات من تبويب المحكمين." });
                 }}
                 onOpenJudges={() => setActiveTab("judges")}
                 canManage={can("manageJudges")}

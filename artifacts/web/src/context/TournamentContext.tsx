@@ -603,14 +603,9 @@ function reducer(state: TournamentState, action: Action): TournamentState {
           if (t.id !== action.tournamentId) return t;
           const target = t.rounds.find((r) => r.roundNumber === action.roundNumber);
           if (!canRedrawRound(t, action.roundNumber) || !target) return t;
-          // Pair as if this round were being drawn for the first time.
-          const earlier = t.rounds.filter(
-            (r) => r.roundNumber < action.roundNumber && r.matches.length > 0,
-          );
-          const fresh = generateRound({ ...t, rounds: earlier });
-          if (!fresh) return t;
-          const redrawn: Round = { ...target, matches: fresh.matches, completed: false };
-          redrawn.matches = assignJudgesToRound(t, redrawn);
+          // Empties the round (pairings, rooms, judges). The organiser draws it
+          // again with "بدء القرعة" and assigns judges manually.
+          const redrawn: Round = { ...target, matches: [], completed: false };
           return {
             ...t,
             rounds: t.rounds.map((r) =>

@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { AlertTriangle, CheckCircle2, Gavel, Play } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Gavel, Play, Shuffle } from "lucide-react";
 import type { Tournament } from "@/types/tournament";
 import { BRAND, BTN, BTN_PRIMARY_STYLE, BTN_SIZE } from "@/lib/brand";
 import { roundTitle } from "@/lib/reveal";
@@ -16,6 +16,8 @@ interface RoundCommandCenterProps {
   onStartNextRound: () => void;
   /** Makes the selected (already prepared) round the live one. */
   onStartSelectedRound: () => void;
+  /** Draws the selected round when it has no pairings yet (judges are not assigned). */
+  onDraw: () => void;
   /** Opens the judge distribution page. */
   onOpenJudges: () => void;
   canManage: boolean;
@@ -31,6 +33,7 @@ export default function RoundCommandCenter({
   selectedRound,
   onStartNextRound,
   onStartSelectedRound,
+  onDraw,
   onOpenJudges,
   canManage,
 }: RoundCommandCenterProps) {
@@ -76,7 +79,19 @@ export default function RoundCommandCenter({
         ) : (
           canManage &&
           !roundFinished &&
-          round && (
+          round &&
+          (round.matches.length === 0 ? (
+            <button
+              type="button"
+              onClick={onDraw}
+              className={`${BTN.base} ${BTN.primary} ${BTN_SIZE.lg}`}
+              style={BTN_PRIMARY_STYLE}
+              data-testid="button-draw-round"
+            >
+              <Shuffle className="w-4 h-4" />
+              بدء القرعة
+            </button>
+          ) : (
             <button
               type="button"
               onClick={onStartSelectedRound}
@@ -88,7 +103,7 @@ export default function RoundCommandCenter({
               <Play className="w-4 h-4" />
               بدء {roundTitle(round, selectedRound)}
             </button>
-          )
+          ))
         )}
 
         {canPrepareNext && (
