@@ -35,6 +35,8 @@ type Action =
   | { type: "ADD_TOURNAMENT"; tournament: Tournament }
   | { type: "DELETE_TOURNAMENT"; id: string }
   | { type: "UPDATE_TOURNAMENT"; tournament: Tournament }
+  /** Applies an update to the latest state (never to a stale snapshot). */
+  | { type: "PATCH_TOURNAMENT"; tournamentId: string; update: (t: Tournament) => Tournament }
   | { type: "ADD_TEAM"; tournamentId: string; team: Team }
   | { type: "DELETE_TEAM"; tournamentId: string; teamId: string }
   | { type: "UPDATE_TEAM"; tournamentId: string; team: Team }
@@ -91,6 +93,12 @@ function reducer(state: TournamentState, action: Action): TournamentState {
       return {
         tournaments: state.tournaments.map((t) =>
           t.id === action.tournament.id ? action.tournament : t
+        ),
+      };
+    case "PATCH_TOURNAMENT":
+      return {
+        tournaments: state.tournaments.map((t) =>
+          t.id === action.tournamentId ? action.update(t) : t
         ),
       };
     case "ADD_TEAM": {
@@ -1239,16 +1247,21 @@ export function TournamentProvider({ children }: { children: ReactNode }) {
       setSaveState("saving");
       if (pushTimerRef.current) clearTimeout(pushTimerRef.current);
       pushTimerRef.current = setTimeout(async () => {
+        // Ids stay dirty until the server confirms, so a poll landing mid-push
+        // can't replace the local edit with the older server copy.
         const ids = Array.from(dirtyIdsRef.current);
-        dirtyIdsRef.current.clear();
         let failed = false;
         for (const id of ids) {
-          const t = state.tournaments.find((x) => x.id === id);
-          if (!t) continue;
+          const t = stateRef.current.tournaments.find((x) => x.id === id);
+          if (!t) {
+            dirtyIdsRef.current.delete(id);
+            continue;
+          }
+          const sent = JSON.stringify(t);
           try {
             await pushShared(t);
+            if (lastSerializedRef.current.get(id) === sent) dirtyIdsRef.current.delete(id);
           } catch {
-            dirtyIdsRef.current.add(id);
             failed = true;
           }
         }
@@ -1447,7 +1460,7 @@ export function TournamentProvider({ children }: { children: ReactNode }) {
     ) => {
       const t = stateRef.current.tournaments.find((x) => x.id === tournamentId);
       if (!t) return;
-      dispatch({ type: "UPDATE_TOURNAMENT", tournament: { ...t, ...patch } });
+      dispatch({ type: "PATCH_TOURNAMENT", tournamentId, update: (t) => ({ ...t, ...patch }) });
     },
     []
   );
@@ -1456,7 +1469,7 @@ export function TournamentProvider({ children }: { children: ReactNode }) {
     (tournamentId: string, publicVisible: boolean) => {
       const t = stateRef.current.tournaments.find((x) => x.id === tournamentId);
       if (!t) return;
-      dispatch({ type: "UPDATE_TOURNAMENT", tournament: { ...t, publicVisible } });
+      dispatch({ type: "PATCH_TOURNAMENT", tournamentId, update: (t) => ({ ...t, publicVisible }) });
     },
     []
   );
@@ -1465,7 +1478,7 @@ export function TournamentProvider({ children }: { children: ReactNode }) {
     (tournamentId: string, archived: boolean) => {
       const t = stateRef.current.tournaments.find((x) => x.id === tournamentId);
       if (!t) return;
-      dispatch({ type: "UPDATE_TOURNAMENT", tournament: { ...t, archived } });
+      dispatch({ type: "PATCH_TOURNAMENT", tournamentId, update: (t) => ({ ...t, archived }) });
     },
     []
   );
@@ -1891,8 +1904,9 @@ export function TournamentProvider({ children }: { children: ReactNode }) {
         detail,
       };
       dispatch({
-        type: "UPDATE_TOURNAMENT",
-        tournament: { ...t, auditLog: [entry, ...(t.auditLog ?? [])].slice(0, 300) },
+        type: "PATCH_TOURNAMENT",
+        tournamentId,
+        update: (t) => ({ ...t, auditLog: [entry, ...(t.auditLog ?? [])].slice(0, 300) }),
       });
     },
     []
@@ -1918,8 +1932,9 @@ export function TournamentProvider({ children }: { children: ReactNode }) {
       };
 
       dispatch({
-        type: "UPDATE_TOURNAMENT",
-        tournament: {
+        type: "PATCH_TOURNAMENT",
+        tournamentId,
+        update: (t) => ({
           ...t,
           rounds: t.rounds.map((r) =>
             r.roundNumber === roundNumber
@@ -1932,7 +1947,7 @@ export function TournamentProvider({ children }: { children: ReactNode }) {
               : r
           ),
           auditLog: [entry, ...(t.auditLog ?? [])].slice(0, 300),
-        },
+        }),
       });
     },
     []
@@ -1950,14 +1965,15 @@ export function TournamentProvider({ children }: { children: ReactNode }) {
         detail: `الجولة ${roundNumber}`,
       };
       dispatch({
-        type: "UPDATE_TOURNAMENT",
-        tournament: {
+        type: "PATCH_TOURNAMENT",
+        tournamentId,
+        update: (t) => ({
           ...t,
           rounds: t.rounds.map((r) =>
             r.roundNumber === roundNumber ? { ...r, locked } : r
           ),
           auditLog: [entry, ...(t.auditLog ?? [])].slice(0, 300),
-        },
+        }),
       });
     },
     []

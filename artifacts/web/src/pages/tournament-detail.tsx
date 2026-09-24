@@ -1247,6 +1247,7 @@ export default function TournamentDetail() {
   // Delete tournament confirmation
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   const [confirmFinishOpen, setConfirmFinishOpen] = useState(false);
+  const [confirmRedrawRound, setConfirmRedrawRound] = useState<number | null>(null);
   const [confirmReopenOpen, setConfirmReopenOpen] = useState(false);
 
   // Switch default tab to "rounds" when tournament starts
@@ -1694,9 +1695,11 @@ export default function TournamentDetail() {
    * started before every readiness check passes.
    */
   /** Empties a round's draw; the organiser draws it again and assigns judges manually. */
-  const handleRedraw = (roundNumber: number) => {
+  const handleRedraw = (roundNumber: number) => setConfirmRedrawRound(roundNumber);
+
+  const confirmRedraw = (roundNumber: number) => {
     if (!tournament) return;
-    if (!window.confirm(`إعادة قرعة الجولة ${roundNumber} من الصفر؟ سيتم حذف المواجهات والقاعات وتوزيع المحكمين الحاليين (دون المساس بالفرق المسجلة).`)) return;
+    setConfirmRedrawRound(null);
     redrawRound(tournament.id, roundNumber);
     logAction(tournament.id, "إعادة القرعة", `الجولة ${roundNumber}`);
     setViewingRound(roundNumber);
@@ -4093,6 +4096,31 @@ export default function TournamentDetail() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Redraw Round Confirmation */}
+      <AlertDialog
+        open={confirmRedrawRound !== null}
+        onOpenChange={(open) => !open && setConfirmRedrawRound(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>إعادة قرعة الجولة {confirmRedrawRound} من الصفر</AlertDialogTitle>
+            <AlertDialogDescription>
+              سيتم حذف جميع القاعات والمواجهات والمحكمين في هذه الجولة (دون المساس
+              بالفرق المسجلة). بعدها اضغط «بدء القرعة» لإجراء القرعة من جديد.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>إلغاء</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => confirmRedrawRound !== null && confirmRedraw(confirmRedrawRound)}
+              data-testid="button-confirm-redraw"
+            >
+              حذف القاعات وإعادة القرعة
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Finish Tournament Confirmation */}
       <AlertDialog open={confirmFinishOpen} onOpenChange={setConfirmFinishOpen}>

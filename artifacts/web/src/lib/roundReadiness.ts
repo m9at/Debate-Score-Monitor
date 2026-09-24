@@ -66,6 +66,16 @@ export function evaluateRoundReadiness(
   }
   passed.push(`المواجهات جاهزة (${round.matches.length} قاعة)`);
 
+  // فرق مسجلة لم تدخل القرعة (مثلاً أُضيفت بعد إجراء القرعة)
+  const placed = new Set(round.matches.flatMap((m) => [m.team1.teamId, m.team2.teamId]));
+  const unplaced = tournament.teams.filter((t) => !placed.has(t.id)).length;
+  if (unplaced > 0) {
+    warnings.push({
+      key: "unplaced-teams",
+      message: `${unplaced} فريق غير موزّع على أي قاعة (القاعات ${round.matches.length} من ${Math.floor(tournament.teams.length / 2)}) — أعد القرعة من الصفر لتوزيع جميع الفرق.`,
+    });
+  }
+
   for (const m of round.matches) {
     // فرق القاعة
     const t1 = tournament.teams.find((t) => t.id === m.team1.teamId);

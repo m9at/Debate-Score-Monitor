@@ -43,7 +43,11 @@ export default function RoundCommandCenter({
     [tournament, round],
   );
 
-  const isLive = tournament.started && tournament.currentRound === selectedRound;
+  // A round without a draw isn't running yet, even if it is the current one.
+  const isLive =
+    tournament.started &&
+    tournament.currentRound === selectedRound &&
+    (round?.matches.length ?? 0) > 0;
   const roundFinished = !!round?.completed;
   const nextRoundExists = tournament.rounds.some(
     (r) => r.roundNumber === selectedRound + 1,
@@ -167,7 +171,7 @@ export default function RoundCommandCenter({
             data-testid="round-judge-warnings"
           >
             <p className="text-[13px] font-bold" style={{ color: "#92400E" }}>
-              ⚠️ توجد قاعات ينقصها محكمون — يمكنك بدء الجولة رغم ذلك
+              ⚠️ تنبيهات — يمكنك بدء الجولة رغم ذلك
             </p>
             <ul className="mt-1.5 space-y-1">
               {readiness.warnings.map((w) => (
