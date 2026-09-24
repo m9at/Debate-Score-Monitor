@@ -137,6 +137,8 @@ export interface Room {
   id: string;
   number: number;
   label: string;
+  /** Disabled rooms are kept in the list but skipped by the draw. */
+  disabled?: boolean;
 }
 
 /** Format rules chosen while creating the tournament. */

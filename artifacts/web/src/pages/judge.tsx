@@ -19,6 +19,7 @@ import {
   clampScoreOnBlur,
 } from "@/lib/scoreValidation";
 import { getMatchSession, submitMatchResult } from "@/lib/firebaseJudgeApi";
+import JudgeRulesNote from "@/components/judge/JudgeRulesNote";
 
 type SubmitStatus = "idle" | "sending" | "sent" | "failed";
 
@@ -129,6 +130,8 @@ export default function JudgePage() {
     );
   }
 
+  // Off when the organiser disabled خطاب الرد — the form drops it entirely.
+  const replySpeech = matchInfo.replySpeech !== false;
   const govTotal = govScores.reduce((s, v) => s + (parseFloat(v) || 0), 0) + (parseFloat(govReplyScore) || 0);
   const oppTotal = oppScores.reduce((s, v) => s + (parseFloat(v) || 0), 0) + (parseFloat(oppReplyScore) || 0);
   const tied = govTotal > 0 && oppTotal > 0 && govTotal === oppTotal;
@@ -139,8 +142,7 @@ export default function JudgePage() {
   const allScoresValid =
     govScores.every((s, i) => i === 3 || isSpeakerScoreValid(s)) &&
     oppScores.every((s, i) => i === 3 || isSpeakerScoreValid(s)) &&
-    isReplyScoreValid(govReplyScore) &&
-    isReplyScoreValid(oppReplyScore);
+    (!replySpeech || (isReplyScoreValid(govReplyScore) && isReplyScoreValid(oppReplyScore)));
 
   const handleSubmit = () => {
     if (tied) return;
@@ -153,7 +155,7 @@ export default function JudgePage() {
     if (!allGov || !allOpp) { setWarning("يجب إدخال جميع درجات المتحدثين"); return; }
     if (govTotal === 0 && oppTotal === 0) { setWarning("يجب إدخال الدرجات أولاً"); return; }
     if (!allScoresValid) {
-      setWarning(`${SPEAKER_RANGE_MESSAGE} • ${REPLY_RANGE_MESSAGE}`);
+      setWarning(replySpeech ? `${SPEAKER_RANGE_MESSAGE} • ${REPLY_RANGE_MESSAGE}` : SPEAKER_RANGE_MESSAGE);
       return;
     }
 
@@ -164,14 +166,14 @@ export default function JudgePage() {
         score: parseFloat(s) || 0,
       })),
       govReplySpeakerNumber: govReplyNum,
-      govReplyScore: parseFloat(govReplyScore) || 0,
+      govReplyScore: replySpeech ? parseFloat(govReplyScore) || 0 : 0,
       oppSpeakers: oppScores.map((s, i) => ({
         speakerNumber: i + 1,
         name: oppNames[i] || matchInfo.oppSpeakerNames[i] || `المتحدث ${i + 1}`,
         score: parseFloat(s) || 0,
       })),
       oppReplySpeakerNumber: oppReplyNum,
-      oppReplyScore: parseFloat(oppReplyScore) || 0,
+      oppReplyScore: replySpeech ? parseFloat(oppReplyScore) || 0 : 0,
       govTeamId: matchInfo.govTeamId,
       judgeName,
       chairName,
@@ -223,8 +225,9 @@ export default function JudgePage() {
           background: "#7B2D8E0d", border: "1px solid #7B2D8E33", color: "#5D1F6D",
           borderRadius: 10, padding: "8px 12px", marginBottom: 12, fontSize: 12, lineHeight: 1.6,
         }}>
-          <strong>قواعد الدرجات (ثابتة):</strong> درجة المتحدث يجب أن تكون بين {SPEAKER_MIN} و{SPEAKER_MAX} • درجة الرد بين {REPLY_MIN} و{REPLY_MAX}
+          <strong>قواعد الدرجات (ثابتة):</strong> درجة المتحدث رقم صحيح بين {SPEAKER_MIN} و{SPEAKER_MAX}{replySpeech && <> • درجة الرد بين {REPLY_MIN} و{REPLY_MAX}</>}
         </div>
+        <JudgeRulesNote rules={matchInfo.rules} />
 
         <div className="judge-card judge-card-gov">
           <div className="judge-row">
@@ -248,9 +251,9 @@ export default function JudgePage() {
               onChangeScore={(v) => { const n = [...govScores]; n[i] = v; setGovScores(n); setWarning(""); }}
             />
           ))}
-          <ReplySection role="gov" speakerNames={govNames.slice(0, 2)}
+          {replySpeech && <ReplySection role="gov" speakerNames={govNames.slice(0, 2)}
             replyNum={govReplyNum} setReplyNum={setGovReplyNum}
-            replyScore={govReplyScore} setReplyScore={(v) => { setGovReplyScore(v); setWarning(""); }} />
+            replyScore={govReplyScore} setReplyScore={(v) => { setGovReplyScore(v); setWarning(""); }} />}
         </div>
 
         <div className="judge-card judge-card-opp">
@@ -275,9 +278,9 @@ export default function JudgePage() {
               onChangeScore={(v) => { const n = [...oppScores]; n[i] = v; setOppScores(n); setWarning(""); }}
             />
           ))}
-          <ReplySection role="opp" speakerNames={oppNames.slice(0, 2)}
+          {replySpeech && <ReplySection role="opp" speakerNames={oppNames.slice(0, 2)}
             replyNum={oppReplyNum} setReplyNum={setOppReplyNum}
-            replyScore={oppReplyScore} setReplyScore={(v) => { setOppReplyScore(v); setWarning(""); }} />
+            replyScore={oppReplyScore} setReplyScore={(v) => { setOppReplyScore(v); setWarning(""); }} />}
         </div>
 
         <div className="judge-card judge-card-info">
@@ -491,10 +494,10 @@ function ScoreInput({ value, cls, valid, hint, onChange, disabled, min, max }: {
     <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 2 }}>
       <input
         type="text"
-        inputMode="decimal"
+        inputMode="numeric"
         enterKeyHint="next"
         autoComplete="off"
-        pattern="[0-9]*\.?[0-9]*"
+        pattern="[0-9]*"
         value={value}
         onChange={(e) => handleChange(e.target.value)}
         placeholder="--"

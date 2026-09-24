@@ -65,6 +65,8 @@ interface TeamSectionProps {
   setReplyScore: (v: string) => void;
   total: number;
   disabled: boolean;
+  /** Off when the organiser disabled خطاب الرد. */
+  showReply: boolean;
 }
 
 function TeamSection({
@@ -81,6 +83,7 @@ function TeamSection({
   setReplyScore,
   total,
   disabled,
+  showReply,
 }: TeamSectionProps) {
   const accent = side === "gov" ? CYAN : PURPLE;
   const Icon = side === "gov" ? Shield : ShieldOff;
@@ -171,9 +174,10 @@ function TeamSection({
             <div className="flex flex-col items-end">
               <input
                 type="number"
-                inputMode="decimal"
+                inputMode="numeric"
                 min={SPEAKER_MIN}
                 max={SPEAKER_MAX}
+                step={1}
                 value={speakerScores[i] ?? ""}
                 onChange={(e) => {
                   const updated = [...speakerScores];
@@ -206,6 +210,7 @@ function TeamSection({
       })}
 
       {/* Reply section */}
+      {showReply && (
       <div
         className="mt-3 pt-3"
         style={{
@@ -268,9 +273,10 @@ function TeamSection({
           <div className="flex flex-col items-end">
             <input
               type="number"
-              inputMode="decimal"
+              inputMode="numeric"
               min={REPLY_MIN}
               max={REPLY_MAX}
+              step={1}
               value={replyScore}
               onChange={(e) => setReplyScore(clampScoreInput(e.target.value, REPLY_MIN, REPLY_MAX))}
               onBlur={(e) => setReplyScore(clampScoreOnBlur(e.target.value, REPLY_MIN, REPLY_MAX))}
@@ -300,6 +306,7 @@ function TeamSection({
           </div>
         </div>
       </div>
+      )}
     </div>
   );
 }
@@ -313,6 +320,8 @@ export default function MatchScoring() {
   const tournament = getTournament(params?.tournamentId || "");
   const roundNumber = parseInt(params?.roundNumber || "0");
   const matchId = params?.matchId || "";
+  // خطاب الرد can be switched off from the tournament settings.
+  const replyEnabled = tournament?.settings?.replySpeech !== false;
 
   const originalMatch = useMemo(() => {
     if (!tournament) return null;
@@ -492,6 +501,8 @@ export default function MatchScoring() {
         oppSpeakersCount: oppTeam.speakersPerTeam ?? 3,
         speakersPerTeam: govTeam.speakersPerTeam ?? 3,
         caseText: tournament.rounds.find((r) => r.roundNumber === roundNumber)?.caseText,
+        replySpeech: replyEnabled,
+        rules: tournament.settings?.rules,
       };
       const sid = await createMatchSession(matchInfo);
       const url = buildSessionUrl("match", sid);
@@ -522,7 +533,7 @@ export default function MatchScoring() {
     const t1: MatchTeam = {
       ...originalMatch.team1,
       speakers: govSpeakers,
-      replyScore: parseFloat(govReplyScore) || 0,
+      replyScore: replyEnabled ? parseFloat(govReplyScore) || 0 : 0,
       replySpeakerNumber:
         govReplyIdx >= 0 ? govReplyIdx + 1 : govReplySpeaker,
       replySpeakerName: govReplyName || undefined,
@@ -531,7 +542,7 @@ export default function MatchScoring() {
     const t2: MatchTeam = {
       ...originalMatch.team2,
       speakers: oppSpeakers,
-      replyScore: parseFloat(oppReplyScore) || 0,
+      replyScore: replyEnabled ? parseFloat(oppReplyScore) || 0 : 0,
       replySpeakerNumber:
         oppReplyIdx >= 0 ? oppReplyIdx + 1 : oppReplySpeaker,
       replySpeakerName: oppReplyName || undefined,
@@ -574,8 +585,7 @@ export default function MatchScoring() {
   const allScoresValid =
     govScores.every((s) => isSpeakerScoreValid(s)) &&
     oppScores.every((s) => isSpeakerScoreValid(s)) &&
-    isReplyScoreValid(govReplyScore) &&
-    isReplyScoreValid(oppReplyScore);
+    (!replyEnabled || (isReplyScoreValid(govReplyScore) && isReplyScoreValid(oppReplyScore)));
   const tied = govTotal === oppTotal && govTotal > 0;
 
   return (
@@ -706,6 +716,7 @@ export default function MatchScoring() {
             setReplyScore={setGovReplyScore}
             total={govTotal}
             disabled={!canEdit}
+            showReply={replyEnabled}
           />
           <TeamSection
             side="opp"
@@ -721,6 +732,7 @@ export default function MatchScoring() {
             setReplyScore={setOppReplyScore}
             total={oppTotal}
             disabled={!canEdit}
+            showReply={replyEnabled}
           />
         </div>
 
@@ -831,7 +843,7 @@ export default function MatchScoring() {
                   border: "1px solid #FFC2C2",
                 }}
               >
-                {SPEAKER_RANGE_MESSAGE} • {REPLY_RANGE_MESSAGE}
+                {replyEnabled ? `${SPEAKER_RANGE_MESSAGE} • ${REPLY_RANGE_MESSAGE}` : SPEAKER_RANGE_MESSAGE}
               </div>
             )}
             <AlertDialog>

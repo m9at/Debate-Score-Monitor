@@ -1,5 +1,6 @@
 import type { Judge, Room, Team, TournamentSettings } from "@/types/tournament";
 import type { DrawPairing } from "./draw";
+import { SPEAKER_MAX, SPEAKER_MIN } from "@/lib/scoreValidation";
 
 /** Everything the creation wizard collects before the tournament exists. */
 export interface TournamentSetup {
@@ -38,9 +39,9 @@ export const WIZARD_STEPS = [
   { key: "info", label: "معلومات البطولة" },
   { key: "organise", label: "المجلد والقضية" },
   { key: "protection", label: "الحماية" },
-  { key: "rooms", label: "القاعات" },
-  { key: "judges", label: "المحكمون" },
   { key: "teams", label: "الفِرق" },
+  { key: "judges", label: "المحكمون" },
+  { key: "rooms", label: "القاعات" },
   { key: "system", label: "نظام البطولة" },
   { key: "draw", label: "التوزيع" },
   { key: "review", label: "المراجعة" },
@@ -63,8 +64,8 @@ export function emptySetup(): TournamentSetup {
     settings: {
       replySpeech: true,
       sides: true,
-      scoreMin: 60,
-      scoreMax: 100,
+      scoreMin: SPEAKER_MIN,
+      scoreMax: SPEAKER_MAX,
       judgesPerRoom: 3,
       showScoresOnAnnounce: false,
     },
