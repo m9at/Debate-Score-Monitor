@@ -40,6 +40,8 @@ interface RoundOptionsMenuProps {
   onSetCurrent: () => void;
   onSetPresented: () => void;
   onDraw: () => void;
+  /** Replaces the round's pairings (only before any result is recorded). */
+  onRedraw: () => void;
   onAutoAssignJudges: () => void;
   onToggleLock: (locked: boolean) => void;
   onDelete: () => void;
@@ -58,6 +60,7 @@ export default function RoundOptionsMenu({
   onSetCurrent,
   onSetPresented,
   onDraw,
+  onRedraw,
   onAutoAssignJudges,
   onToggleLock,
   onDelete,
@@ -111,13 +114,13 @@ export default function RoundOptionsMenu({
           <DropdownMenuSeparator />
 
           <DropdownMenuItem
-            disabled={hasMatches}
-            onSelect={onDraw}
+            disabled={hasMatches && !canDelete}
+            onSelect={hasMatches ? onRedraw : onDraw}
             className="gap-2"
             data-testid="option-round-draw"
           >
             <Dices className="w-4 h-4" />
-            {hasMatches ? "القرعة أُجريت" : "إجراء القرعة"}
+            {!hasMatches ? "إجراء القرعة" : canDelete ? "إعادة القرعة" : "القرعة أُجريت — سُجّلت نتائج"}
           </DropdownMenuItem>
 
           <DropdownMenuItem

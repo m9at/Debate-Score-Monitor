@@ -88,6 +88,7 @@ import RoundJudgeBoard from "@/components/tournament/RoundJudgeBoard";
 import ImageUploadField from "@/components/common/ImageUploadField";
 import ReportsPanel from "@/components/tournament/ReportsPanel";
 import SettingsPanel from "@/components/tournament/SettingsPanel";
+import RoundDrawSettings from "@/components/tournament/RoundDrawSettings";
 import IdentityPanel from "@/components/tournament/IdentityPanel";
 import CountdownPanel from "@/components/tournament/CountdownPanel";
 import PublicStatsPanel from "@/components/tournament/PublicStatsPanel";
@@ -1009,6 +1010,10 @@ export default function TournamentDetail() {
     setRoundJudgesPerRoom,
     setMatchJudges,
     autoAssignJudges,
+    clearRoundJudges,
+    redrawRound,
+    setJudgesPerRoom,
+    createTestCopy,
     setRoundLocked,
     markResultAnnounced,
     setPublicVisible,
@@ -1679,6 +1684,30 @@ export default function TournamentDetail() {
     generateRound(tournament.id);
     setViewingRound(null);
     setRoundNotification(false);
+  };
+
+  const handleRedraw = () => {
+    if (!tournament) return;
+    if (!window.confirm(`إعادة القرعة للجولة ${currentRoundNum}؟ ستُستبدل المواجهات الحالية وتوزيع المحكمين.`)) return;
+    if (redrawRound(tournament.id, currentRoundNum)) {
+      logAction(tournament.id, "إعادة القرعة", `الجولة ${currentRoundNum}`);
+      toast({ title: `تمت إعادة القرعة للجولة ${currentRoundNum}` });
+    } else {
+      toast({ title: "لا يمكن إعادة القرعة — سُجّلت نتائج في هذه الجولة", variant: "destructive" });
+    }
+  };
+
+  const handleAutoAssign = () => {
+    if (!tournament) return;
+    autoAssignJudges(tournament.id, currentRoundNum);
+    toast({ title: "تم توزيع المحكمين على القاعات" });
+  };
+
+  const handleClearJudges = () => {
+    if (!tournament) return;
+    if (!window.confirm("إزالة جميع المحكمين من قاعات هذه الجولة؟")) return;
+    clearRoundJudges(tournament.id, currentRoundNum);
+    toast({ title: "تم تصفير المحكمين" });
   };
 
   /**
@@ -2734,6 +2763,7 @@ export default function TournamentDetail() {
                   toast({ title: `وضع العرض يعرض الجولة ${currentRoundNum}` });
                 }}
                 onDraw={() => generateRound(tournament.id)}
+                onRedraw={handleRedraw}
                 onAutoAssignJudges={() => {
                   autoAssignJudges(tournament.id, currentRoundNum);
                   toast({ title: "تم توزيع المحكمين على القاعات" });
@@ -2934,6 +2964,23 @@ export default function TournamentDetail() {
             onChange={(countdown) =>
               updateTournamentInfo(tournament.id, { countdown })
             }
+          />
+          <RoundDrawSettings
+            tournament={tournament}
+            roundNumber={currentRoundNum}
+            onSetJudgesPerRoom={(n) => {
+              setJudgesPerRoom(tournament.id, n);
+              toast({ title: `عدد المحكمين في القاعة: ${n}` });
+            }}
+            onRedraw={handleRedraw}
+            onAutoAssign={handleAutoAssign}
+            onClearJudges={handleClearJudges}
+            onCreateTestCopy={() => {
+              const id = createTestCopy(tournament.id);
+              if (!id) return;
+              toast({ title: "تم إنشاء النسخة التجريبية" });
+              setLocation(`/tournament/${id}`);
+            }}
           />
           <SettingsPanel
             tournament={tournament}
@@ -3734,7 +3781,9 @@ export default function TournamentDetail() {
             onAssignJudges={(matchId, assignment) =>
               setMatchJudges(tournament.id, currentRoundNum, matchId, assignment)
             }
-            onAutoAssign={() => autoAssignJudges(tournament.id, currentRoundNum)}
+            onAutoAssign={handleAutoAssign}
+            onClearJudges={handleClearJudges}
+            onSetJudgesPerRoom={(n) => setJudgesPerRoom(tournament.id, n)}
             onJudgeLink={handleJudgeLink}
             canManage={can("manageJudges")}
           />

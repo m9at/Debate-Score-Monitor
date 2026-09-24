@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { Gavel, Link as LinkIcon, Sparkles } from "lucide-react";
+import { Eraser, Gavel, Link as LinkIcon, Sparkles } from "lucide-react";
 import type { Match, MatchJudgeAssignment, Tournament } from "@/types/tournament";
 import { BRAND, BTN, BTN_SIZE } from "@/lib/brand";
 import { roomTitle, roundTitle } from "@/lib/reveal";
@@ -12,6 +12,9 @@ interface RoundJudgeBoardProps {
   onSelectRound: (roundNumber: number) => void;
   onAssignJudges: (matchId: string, assignment: MatchJudgeAssignment) => void;
   onAutoAssign: () => void;
+  /** Removes every judge from this round's rooms. */
+  onClearJudges: () => void;
+  onSetJudgesPerRoom: (n: number) => void;
   /** Personal judging link for one judge of this round. */
   onJudgeLink: (judgeId: string) => void;
   canManage: boolean;
@@ -28,6 +31,8 @@ export default function RoundJudgeBoard({
   onSelectRound,
   onAssignJudges,
   onAutoAssign,
+  onClearJudges,
+  onSetJudgesPerRoom,
   onJudgeLink,
   canManage,
 }: RoundJudgeBoardProps) {
@@ -94,15 +99,40 @@ export default function RoundJudgeBoard({
         </select>
         <span className="flex-1" />
         {canManage && !roundFinished && (round?.matches.length ?? 0) > 0 && (
-          <button
-            type="button"
-            onClick={onAutoAssign}
-            className={`${BTN.base} ${BTN.secondary} ${BTN_SIZE.sm}`}
-            data-testid="button-auto-assign-judges"
-          >
-            <Sparkles className="w-3.5 h-3.5" />
-            توزيع تلقائي
-          </button>
+          <>
+            <select
+              value={judgesPerRoom}
+              onChange={(e) => onSetJudgesPerRoom(Number(e.target.value))}
+              className="h-9 px-3 rounded-xl border bg-white font-bold text-[13px] outline-none"
+              style={{ borderColor: BRAND.border, color: BRAND.ink }}
+              title="عدد المحكمين في القاعة"
+              data-testid="select-judges-per-room"
+            >
+              {[1, 2, 3, 4, 5].map((n) => (
+                <option key={n} value={n}>
+                  {n} {n === 1 ? "محكم" : "محكمين"} لكل قاعة
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              onClick={onClearJudges}
+              className={`${BTN.base} ${BTN.secondary} ${BTN_SIZE.sm}`}
+              data-testid="button-clear-judges"
+            >
+              <Eraser className="w-3.5 h-3.5" />
+              تصفير
+            </button>
+            <button
+              type="button"
+              onClick={onAutoAssign}
+              className={`${BTN.base} ${BTN.secondary} ${BTN_SIZE.sm}`}
+              data-testid="button-auto-assign-judges"
+            >
+              <Sparkles className="w-3.5 h-3.5" />
+              توزيع تلقائي
+            </button>
+          </>
         )}
       </header>
 
