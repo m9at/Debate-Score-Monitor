@@ -32,6 +32,7 @@ export default function StepDraw({ setup, patch }: StepDrawProps) {
 
   const ready = setup.teams.length >= 2 && setup.rooms.length >= 1;
   const leftOut = draw ? unseatedTeams(setup.teams, draw) : [];
+  const emptyRooms = draw ? Math.max(0, setup.rooms.length - draw.length) : 0;
 
   return (
     <div className="space-y-4">
@@ -89,6 +90,19 @@ export default function StepDraw({ setup, patch }: StepDrawProps) {
                 <strong>{leftOut.length} فريق دون قاعة:</strong>{" "}
                 {leftOut.map((t) => t.name).join("، ")} — أضف قاعات أخرى أو عدّل
                 عدد الفرق.
+              </p>
+            </div>
+          )}
+
+          {emptyRooms > 0 && (
+            <div
+              className="flex items-start gap-2 rounded-xl border px-3 py-2.5"
+              style={{ backgroundColor: `${BRAND.warning}10`, borderColor: `${BRAND.warning}40` }}
+              data-testid="warning-empty-rooms"
+            >
+              <AlertTriangle className="w-4 h-4 mt-px shrink-0" style={{ color: BRAND.warning }} />
+              <p className="text-[12px] leading-relaxed" style={{ color: BRAND.ink }}>
+                <strong>{emptyRooms} قاعة بدون فرق</strong> — يمكنك الاستمرار، أو حذف القاعات الزائدة من خطوة القاعات.
               </p>
             </div>
           )}

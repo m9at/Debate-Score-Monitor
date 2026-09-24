@@ -10,6 +10,8 @@ export interface ReadinessIssue {
 export interface RoundReadiness {
   ready: boolean;
   issues: ReadinessIssue[];
+  /** Non-blocking notes (e.g. rooms short of judges) — the round may still start. */
+  warnings: ReadinessIssue[];
   /** Checks that passed — shown as a reassuring checklist. */
   passed: string[];
 }
@@ -28,6 +30,7 @@ export function evaluateRoundReadiness(
   round: Round | undefined,
 ): RoundReadiness {
   const issues: ReadinessIssue[] = [];
+  const warnings: ReadinessIssue[] = [];
   const passed: string[] = [];
   const judges = (tournament.judges ?? []).filter((j) => !j.disabled);
   const expectedJudges =
@@ -59,7 +62,7 @@ export function evaluateRoundReadiness(
       key: "matches",
       message: "لا يمكن بدء الجولة — لم يتم إنشاء المواجهات والقاعات.",
     });
-    return { ready: false, issues, passed };
+    return { ready: false, issues, warnings, passed };
   }
   passed.push(`المواجهات جاهزة (${round.matches.length} قاعة)`);
 
@@ -81,25 +84,26 @@ export function evaluateRoundReadiness(
       ...(a?.panelistJudgeIds ?? []),
     ]);
     const count = [...assigned].filter((id) => judges.some((j) => j.id === id)).length;
-    if (count === 0) {
-      issues.push({
+    const needed = a?.slots ?? expectedJudges;
+    if (count === 0 && needed > 0) {
+      warnings.push({
         key: `judges-${m.id}`,
-        message: `لا يمكن بدء الجولة — ${roomName(m)} لم يتم تعيين محكم لها.`,
+        message: `${roomName(m)} لم يتم تعيين محكم لها.`,
       });
-    } else if (count < expectedJudges) {
-      issues.push({
+    } else if (count < needed) {
+      warnings.push({
         key: `judges-count-${m.id}`,
-        message: `لا يمكن بدء الجولة — ${roomName(m)} لديها ${count} من ${expectedJudges} محكمين.`,
+        message: `${roomName(m)} لديها ${count} من ${needed} محكمين.`,
       });
     }
   }
 
-  if (!issues.some((i) => i.key.startsWith("judges"))) {
-    passed.push(`المحكمون موزّعون (${expectedJudges} لكل قاعة)`);
+  if (warnings.length === 0) {
+    passed.push("المحكمون موزّعون على القاعات");
   }
   if (!issues.some((i) => i.key.startsWith("teams-"))) {
     passed.push("الفرق موزّعة على القاعات");
   }
 
-  return { ready: issues.length === 0, issues, passed };
+  return { ready: issues.length === 0, issues, warnings, passed };
 }

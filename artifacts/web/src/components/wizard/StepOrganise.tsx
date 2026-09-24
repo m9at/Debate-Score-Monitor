@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { FolderPlus, Inbox, Folder, Check, Quote } from "lucide-react";
-import { BRAND } from "@/lib/brand";
+import { FolderPlus, Inbox, Folder, Check, Quote, Upload } from "lucide-react";
+import { BRAND, BTN, BTN_SIZE } from "@/lib/brand";
 import type { TournamentSetup } from "@/lib/wizard/types";
 import { useGroups } from "@/context/GroupContext";
 import { Field, Panel, inputClass, inputStyle } from "./ui";
@@ -142,6 +142,23 @@ export default function StepOrganise({ setup, patch }: Props) {
               data-testid="wizard-input-case-text"
             />
           </div>
+          <label
+            className={`${BTN.base} ${BTN.secondary} ${BTN_SIZE.sm} mt-2 cursor-pointer w-fit`}
+            data-testid="wizard-upload-case-file"
+          >
+            <Upload className="w-3.5 h-3.5" />
+            رفع ملف نص القضية (.txt)
+            <input
+              type="file"
+              accept=".txt,text/plain"
+              className="hidden"
+              onChange={async (e) => {
+                const file = e.target.files?.[0];
+                e.target.value = "";
+                if (file) patch({ caseText: (await file.text()).trim() });
+              }}
+            />
+          </label>
         </Field>
       </Panel>
     </div>

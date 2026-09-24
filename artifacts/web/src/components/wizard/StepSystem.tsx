@@ -1,5 +1,5 @@
-import { Info } from "lucide-react";
 import { BRAND } from "@/lib/brand";
+import { SPEAKER_MAX, SPEAKER_MIN } from "@/lib/scoreValidation";
 import type { TournamentSetup } from "@/lib/wizard/types";
 import { Field, Panel, Toggle, inputClass, inputStyle } from "./ui";
 
@@ -44,11 +44,13 @@ export default function StepSystem({ setup, patch }: StepSystemProps) {
           <Field label="عدد المحكمين لكل قاعة">
             <input
               type="number"
-              min={1}
+              min={0}
               max={9}
               value={s.judgesPerRoom}
               onChange={(e) =>
-                setSettings({ judgesPerRoom: Math.max(1, Number(e.target.value) || 1) })
+                setSettings({
+                  judgesPerRoom: Math.max(0, Math.min(9, Math.floor(Number(e.target.value) || 0))),
+                })
               }
               className={inputClass}
               style={inputStyle}
@@ -84,38 +86,10 @@ export default function StepSystem({ setup, patch }: StepSystemProps) {
         </div>
       </Panel>
 
-      <Panel title="نطاق الدرجات">
-        <div className="grid grid-cols-2 gap-4">
-          <Field label="الحد الأدنى">
-            <input
-              type="number"
-              value={s.scoreMin}
-              onChange={(e) => setSettings({ scoreMin: Number(e.target.value) || 0 })}
-              className={inputClass}
-              style={inputStyle}
-              data-testid="input-score-min"
-            />
-          </Field>
-          <Field label="الحد الأعلى">
-            <input
-              type="number"
-              value={s.scoreMax}
-              onChange={(e) => setSettings({ scoreMax: Number(e.target.value) || 0 })}
-              className={inputClass}
-              style={inputStyle}
-              data-testid="input-score-max"
-            />
-          </Field>
-        </div>
-        {s.scoreMax <= s.scoreMin && (
-          <p
-            className="flex items-center gap-1.5 text-[12px] font-semibold mt-2"
-            style={{ color: BRAND.danger }}
-          >
-            <Info className="w-3.5 h-3.5" />
-            الحد الأعلى يجب أن يكون أكبر من الحد الأدنى
-          </p>
-        )}
+      <Panel title="نطاق الدرجات" hint="ثابت لجميع البطولات ويطابق روابط التحكيم — أرقام صحيحة فقط">
+        <p className="text-[14px] font-bold" style={{ color: BRAND.ink }} data-testid="text-score-range">
+          درجة المتحدث من {SPEAKER_MIN} إلى {SPEAKER_MAX}
+        </p>
       </Panel>
 
       <Panel title="قواعد البطولة" hint="اختياري — تظهر للمحكمين ضمن صفحة التحكيم">

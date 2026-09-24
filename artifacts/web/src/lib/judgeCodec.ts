@@ -60,6 +60,10 @@ export interface RoundData {
   roundNumber: number;
   rooms: RoomInfo[];
   caseText?: string;
+  /** False hides the reply speech from the scoring form. */
+  replySpeech?: boolean;
+  /** قواعد البطولة shown to the judge. */
+  rules?: string;
 }
 
 export function encodeScores(scores: JudgeScores): string {

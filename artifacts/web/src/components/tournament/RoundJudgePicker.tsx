@@ -29,15 +29,27 @@ export default function RoundJudgePicker({
     ...(assignment?.chairJudgeId ? [assignment.chairJudgeId] : []),
     ...(assignment?.panelistJudgeIds ?? []),
   ];
-  const seatCount = Math.max(1, slots, selected.length);
+  const seatCount = Math.max(slots, selected.length);
 
   const setSeat = (seat: number, judgeId: string) => {
     const next = [...selected];
     while (next.length < seat) next.push("");
     next[seat] = judgeId;
     const clean = next.filter(Boolean);
-    onChange({ chairJudgeId: clean[0], panelistJudgeIds: clean.slice(1) });
+    onChange({
+      chairJudgeId: clean[0],
+      panelistJudgeIds: clean.slice(1),
+      slots: assignment?.slots,
+    });
   };
+
+  if (seatCount === 0) {
+    return (
+      <span className="text-[12px] font-semibold" style={{ color: `${BRAND.ink}80` }}>
+        بدون محكمين
+      </span>
+    );
+  }
 
   if (judges.length === 0) {
     return (

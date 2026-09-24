@@ -92,6 +92,8 @@ export default function JudgeRoundPage() {
         sessionId={sessionId!}
         tournamentName={roundData.tournamentName}
         roundNumber={roundData.roundNumber}
+        replySpeech={roundData.replySpeech !== false}
+        rules={roundData.rules}
         identifiedJudge={
           judgeId
             ? ((room.judges ?? []).find((j) => j.id === judgeId) ?? null)
@@ -163,8 +165,11 @@ function Header({ title, subtitle }: { title?: string; subtitle?: string }) {
   );
 }
 
-function RoomScoring({ room, sessionId, tournamentName, roundNumber, identifiedJudge, lockedToRoom, onBack }: {
+function RoomScoring({ room, sessionId, tournamentName, roundNumber, replySpeech, rules, identifiedJudge, lockedToRoom, onBack }: {
   room: RoomInfo; sessionId: string; tournamentName: string; roundNumber: number;
+  /** Reply speech enabled in the tournament settings. */
+  replySpeech: boolean;
+  rules?: string;
   /** Known from the link — the judge never types their own name. */
   identifiedJudge: RoomJudge | null;
   /** A personal link shows only that judge's room. */
@@ -258,8 +263,7 @@ function RoomScoring({ room, sessionId, tournamentName, roundNumber, identifiedJ
   const allScoresValid =
     govScores.every((s, i) => i === 3 || isSpeakerScoreValid(s)) &&
     oppScores.every((s, i) => i === 3 || isSpeakerScoreValid(s)) &&
-    isReplyScoreValid(govReplyScore) &&
-    isReplyScoreValid(oppReplyScore);
+    (!replySpeech || (isReplyScoreValid(govReplyScore) && isReplyScoreValid(oppReplyScore)));
 
   const handleSubmit = () => {
     if (tied) return;
@@ -272,7 +276,7 @@ function RoomScoring({ room, sessionId, tournamentName, roundNumber, identifiedJ
     if (!allGov || !allOpp) { setWarning("يجب إدخال جميع درجات المتحدثين"); return; }
     if (govTotal === 0 && oppTotal === 0) { setWarning("يجب إدخال الدرجات أولاً"); return; }
     if (!allScoresValid) {
-      setWarning(`${SPEAKER_RANGE_MESSAGE} • ${REPLY_RANGE_MESSAGE}`);
+      setWarning(replySpeech ? `${SPEAKER_RANGE_MESSAGE} • ${REPLY_RANGE_MESSAGE}` : SPEAKER_RANGE_MESSAGE);
       return;
     }
 
@@ -283,14 +287,14 @@ function RoomScoring({ room, sessionId, tournamentName, roundNumber, identifiedJ
         score: parseFloat(s) || 0,
       })),
       govReplySpeakerNumber: govReplyNum,
-      govReplyScore: parseFloat(govReplyScore) || 0,
+      govReplyScore: replySpeech ? parseFloat(govReplyScore) || 0 : 0,
       oppSpeakers: oppScores.map((s, i) => ({
         speakerNumber: i + 1,
         name: oppNames[i] || room.oppSpeakerNames[i] || `المتحدث ${i + 1}`,
         score: parseFloat(s) || 0,
       })),
       oppReplySpeakerNumber: oppReplyNum,
-      oppReplyScore: parseFloat(oppReplyScore) || 0,
+      oppReplyScore: replySpeech ? parseFloat(oppReplyScore) || 0 : 0,
       govTeamId: room.govTeamId,
       judgeName,
       judgeNotes,
@@ -354,10 +358,12 @@ function RoomScoring({ room, sessionId, tournamentName, roundNumber, identifiedJ
                 <span style={valStyle}>{sp.score}</span>
               </div>
             ))}
+            {replySpeech && (
             <div style={{ ...rowStyle, borderBottom: "none", background: "#7B2D8E0d" }}>
               <span>💬 خطاب الرد (المتحدث {ps.govReplySpeakerNumber})</span>
               <span style={valStyle}>{ps.govReplyScore}</span>
             </div>
+            )}
           </div>
 
           <div className="judge-card judge-card-opp">
@@ -375,10 +381,12 @@ function RoomScoring({ room, sessionId, tournamentName, roundNumber, identifiedJ
                 <span style={valStyle}>{sp.score}</span>
               </div>
             ))}
+            {replySpeech && (
             <div style={{ ...rowStyle, borderBottom: "none", background: "#7B2D8E0d" }}>
               <span>💬 خطاب الرد (المتحدث {ps.oppReplySpeakerNumber})</span>
               <span style={valStyle}>{ps.oppReplyScore}</span>
             </div>
+            )}
           </div>
 
           <div className="judge-card" style={{
@@ -437,8 +445,19 @@ function RoomScoring({ room, sessionId, tournamentName, roundNumber, identifiedJ
           background: "#7B2D8E0d", border: "1px solid #7B2D8E33", color: "#5D1F6D",
           borderRadius: 10, padding: "8px 12px", marginBottom: 12, fontSize: 12, lineHeight: 1.6,
         }}>
-          <strong>قواعد الدرجات (ثابتة):</strong> درجة المتحدث يجب أن تكون بين {SPEAKER_MIN} و{SPEAKER_MAX} • درجة الرد بين {REPLY_MIN} و{REPLY_MAX}
+          <strong>قواعد الدرجات (ثابتة):</strong> درجة المتحدث يجب أن تكون بين {SPEAKER_MIN} و{SPEAKER_MAX}
+          {replySpeech && <> • درجة الرد بين {REPLY_MIN} و{REPLY_MAX}</>} • أرقام صحيحة فقط
         </div>
+        {rules?.trim() && (
+          <div style={{
+            background: "#fff", border: "1px solid #7B2D8E33", color: "#2B1B45",
+            borderRadius: 10, padding: "8px 12px", marginBottom: 12, fontSize: 12.5, lineHeight: 1.7,
+            whiteSpace: "pre-wrap",
+          }} data-testid="judge-rules">
+            <strong style={{ color: "#7B2D8E" }}>قواعد البطولة</strong>
+            <div>{rules}</div>
+          </div>
+        )}
 
         <div className="judge-card judge-card-gov">
           <div className="judge-row">
@@ -462,9 +481,11 @@ function RoomScoring({ room, sessionId, tournamentName, roundNumber, identifiedJ
               onChangeScore={(v) => { const n = [...govScores]; n[i] = v; setGovScores(n); setWarning(""); }}
             />
           ))}
-          <ReplySection role="gov" speakerNames={govNames.slice(0, 2)}
-            replyNum={govReplyNum} setReplyNum={setGovReplyNum}
-            replyScore={govReplyScore} setReplyScore={(v) => { setGovReplyScore(v); setWarning(""); }} />
+          {replySpeech && (
+            <ReplySection role="gov" speakerNames={govNames.slice(0, 2)}
+              replyNum={govReplyNum} setReplyNum={setGovReplyNum}
+              replyScore={govReplyScore} setReplyScore={(v) => { setGovReplyScore(v); setWarning(""); }} />
+          )}
         </div>
 
         <div className="judge-card judge-card-opp">
@@ -489,9 +510,11 @@ function RoomScoring({ room, sessionId, tournamentName, roundNumber, identifiedJ
               onChangeScore={(v) => { const n = [...oppScores]; n[i] = v; setOppScores(n); setWarning(""); }}
             />
           ))}
-          <ReplySection role="opp" speakerNames={oppNames.slice(0, 2)}
-            replyNum={oppReplyNum} setReplyNum={setOppReplyNum}
-            replyScore={oppReplyScore} setReplyScore={(v) => { setOppReplyScore(v); setWarning(""); }} />
+          {replySpeech && (
+            <ReplySection role="opp" speakerNames={oppNames.slice(0, 2)}
+              replyNum={oppReplyNum} setReplyNum={setOppReplyNum}
+              replyScore={oppReplyScore} setReplyScore={(v) => { setOppReplyScore(v); setWarning(""); }} />
+          )}
         </div>
 
         <div className="judge-card judge-card-info">

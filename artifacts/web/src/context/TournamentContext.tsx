@@ -62,6 +62,9 @@ type Action =
   | { type: "FINISH_TOURNAMENT"; tournamentId: string }
   | { type: "REOPEN_TOURNAMENT"; tournamentId: string }
   | { type: "DELETE_ROUND"; tournamentId: string; roundNumber: number }
+  | { type: "AUTO_ASSIGN_JUDGES"; tournamentId: string; roundNumber: number }
+  | { type: "CLEAR_ROUND_JUDGES"; tournamentId: string; roundNumber: number }
+  | { type: "REDRAW_ROUND"; tournamentId: string; roundNumber: number }
   | { type: "SET_PROTECTION"; tournamentId: string; protection: TournamentProtection };
 
 function reducer(state: TournamentState, action: Action): TournamentState {
@@ -568,9 +571,118 @@ function reducer(state: TournamentState, action: Action): TournamentState {
           };
         }),
       };
+    case "AUTO_ASSIGN_JUDGES":
+    case "CLEAR_ROUND_JUDGES":
+      return {
+        tournaments: state.tournaments.map((t) => {
+          if (t.id !== action.tournamentId) return t;
+          return {
+            ...t,
+            rounds: t.rounds.map((r) => {
+              if (r.roundNumber !== action.roundNumber) return r;
+              if (action.type === "AUTO_ASSIGN_JUDGES") {
+                return { ...r, matches: assignJudgesToRound(t, r) };
+              }
+              return {
+                ...r,
+                matches: r.matches.map((m) => ({
+                  ...m,
+                  judgeAssignment: {
+                    panelistJudgeIds: [],
+                    slots: m.judgeAssignment?.slots,
+                  },
+                })),
+              };
+            }),
+          };
+        }),
+      };
+    case "REDRAW_ROUND":
+      return {
+        tournaments: state.tournaments.map((t) => {
+          if (t.id !== action.tournamentId) return t;
+          const target = t.rounds.find((r) => r.roundNumber === action.roundNumber);
+          if (!canRedrawRound(t, action.roundNumber) || !target) return t;
+          // Pair as if this round were being drawn for the first time.
+          const earlier = t.rounds.filter(
+            (r) => r.roundNumber < action.roundNumber && r.matches.length > 0,
+          );
+          const fresh = generateRound({ ...t, rounds: earlier });
+          if (!fresh) return t;
+          const redrawn: Round = { ...target, matches: fresh.matches, completed: false };
+          redrawn.matches = assignJudgesToRound(t, redrawn);
+          return {
+            ...t,
+            rounds: t.rounds.map((r) =>
+              r.roundNumber === action.roundNumber ? redrawn : r,
+            ),
+            pendingResults: (t.pendingResults ?? []).filter(
+              (p) => p.roundNumber !== action.roundNumber,
+            ),
+          };
+        }),
+      };
     default:
       return state;
   }
+}
+
+/** A regular round can be redrawn while it has no results and nothing follows it. */
+export function canRedrawRound(t: Tournament, roundNumber: number): boolean {
+  const round = t.rounds.find((r) => r.roundNumber === roundNumber);
+  if (!round || (round.kind && round.kind !== "regular")) return false;
+  if (round.matches.some((m) => m.completed)) return false;
+  return !t.rounds.some((r) => r.roundNumber > roundNumber && r.matches.length > 0);
+}
+
+function shuffle<T>(items: T[]): T[] {
+  const a = [...items];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+/**
+ * Spreads the tournament's active judges over the rooms of a round — randomly
+ * each time, while still balancing load, giving each room a chair when
+ * possible and avoiding conflicts. Each room keeps its own seat count.
+ */
+function assignJudgesToRound(t: Tournament, round: Round): Match[] {
+  const judges = shuffle((t.judges ?? []).filter((j) => !j.disabled));
+  const perRoom = round.judgesPerRoom ?? t.settings?.judgesPerRoom ?? 3;
+  const usage = new Map<string, number>(judges.map((j) => [j.id, 0]));
+  const used = new Set<string>();
+  const isConflict = (judge: Judge, match: Match) =>
+    judge.conflictTeamIds.includes(match.team1.teamId) ||
+    judge.conflictTeamIds.includes(match.team2.teamId);
+  const byUsage = (a: Judge, b: Judge) => usage.get(a.id)! - usage.get(b.id)!;
+
+  const assigned = new Map<string, MatchJudgeAssignment>();
+  for (const match of shuffle(round.matches)) {
+    const slots = match.judgeAssignment?.slots ?? perRoom;
+    const free = judges.filter((j) => !used.has(j.id) && !isConflict(j, match));
+    const ids: string[] = [];
+    if (slots > 0) {
+      const chair = free.filter((j) => j.canChair).sort(byUsage)[0] ?? free.sort(byUsage)[0];
+      if (chair) ids.push(chair.id);
+      for (const j of free.sort(byUsage)) {
+        if (ids.length >= slots) break;
+        if (!ids.includes(j.id)) ids.push(j.id);
+      }
+    }
+    ids.forEach((id) => {
+      used.add(id);
+      usage.set(id, usage.get(id)! + 1);
+    });
+    assigned.set(match.id, {
+      chairJudgeId: ids[0],
+      panelistJudgeIds: ids.slice(1),
+      slots: match.judgeAssignment?.slots,
+    });
+  }
+  return round.matches.map((m) => ({ ...m, judgeAssignment: assigned.get(m.id) }));
 }
 
 function recalcTeamStats(teams: Team[], rounds: Round[]): Team[] {
@@ -620,7 +732,10 @@ function pairBucket(
 }
 
 function generateRound(tournament: Tournament): Round | null {
-  const isFirstRound = tournament.rounds.length === 0;
+  // Rounds are pre-created empty, so "first" means no regular round was drawn yet.
+  const isFirstRound = !tournament.rounds.some(
+    (r) => r.matches.length > 0 && (!r.kind || r.kind === "regular")
+  );
   const roundNumber =
     tournament.rounds.reduce((max, r) => Math.max(max, r.roundNumber), 0) + 1;
 
@@ -710,7 +825,11 @@ function generateRound(tournament: Tournament): Round | null {
     const roleA = pickRole(a.id);
     const govTeam = roleA === "gov" ? a : b;
     const oppTeam = roleA === "gov" ? b : a;
-    matches.push(createMatch(govTeam, oppTeam, roomNumber++));
+    const match = createMatch(govTeam, oppTeam, roomNumber);
+    const room = tournament.rooms?.find((r) => r.number === roomNumber);
+    if (room?.label.trim()) match.roomLabel = room.label;
+    matches.push(match);
+    roomNumber++;
   }
 
   return { roundNumber, matches, completed: false };
@@ -844,6 +963,10 @@ interface TournamentContextType {
   setRoundJudgesPerRoom: (tournamentId: string, roundNumber: number, judgesPerRoom: number) => void;
   setMatchJudges: (tournamentId: string, roundNumber: number, matchId: string, assignment: MatchJudgeAssignment) => void;
   autoAssignJudges: (tournamentId: string, roundNumber: number) => void;
+  /** Empties every room's panel in the round (seat counts are kept). */
+  clearRoundJudges: (tournamentId: string, roundNumber: number) => void;
+  /** Re-pairs a round that has no results yet, with all current teams. */
+  redrawRound: (tournamentId: string, roundNumber: number) => void;
   fillDummyData: (tournamentId: string, opts?: { teams?: number; judges?: number }) => void;
   finishTournament: (tournamentId: string) => void;
   reopenTournament: (tournamentId: string) => void;
@@ -863,12 +986,15 @@ interface TournamentContextType {
         | "logoWhiteDataUrl"
         | "coverImageDataUrl"
         | "countdown"
+        | "settings"
       >
     >
   ) => void;
   setTournamentArchived: (tournamentId: string, archived: boolean) => void;
   /** Deep-copies a tournament under a new id and name. Returns the new id. */
   duplicateTournament: (tournamentId: string) => string | undefined;
+  /** A trial copy: same structure, numbered teams/judges, no rounds drawn. */
+  duplicateTournamentForTest: (tournamentId: string) => string | undefined;
   /** Creates a fully configured tournament from the setup wizard. Returns its id. */
   createTournamentFromSetup: (setup: TournamentSetup) => string;
   /** Flags a room's result as publicly announced (idempotent). */
@@ -1320,6 +1446,7 @@ export function TournamentProvider({ children }: { children: ReactNode }) {
         | "logoWhiteDataUrl"
         | "coverImageDataUrl"
         | "countdown"
+        | "settings"
       >
       >
     ) => {
@@ -1357,6 +1484,64 @@ export function TournamentProvider({ children }: { children: ReactNode }) {
       name: `${t.name} (نسخة)`,
       createdAt: Date.now(),
       archived: false,
+    };
+    dispatch({ type: "ADD_TOURNAMENT", tournament: copy });
+    return copy.id;
+  }, []);
+
+  const duplicateTournamentForTest = useCallback((tournamentId: string) => {
+    const t = stateRef.current.tournaments.find((x) => x.id === tournamentId);
+    if (!t) return undefined;
+    const teamIds = new Map<string, string>();
+    const teams: Team[] = t.teams.map((team, i) => {
+      const id = crypto.randomUUID();
+      teamIds.set(team.id, id);
+      return {
+        id,
+        name: `فريق ${i + 1}`,
+        speakersPerTeam: team.speakersPerTeam,
+        speakerNames: team.speakerNames.map((_, s) => `متحدث ${i + 1}-${s + 1}`),
+        totalPoints: 0,
+        wins: 0,
+        losses: 0,
+        matchesPlayed: 0,
+      };
+    });
+    const judges: Judge[] = (t.judges ?? []).map((j, i) => ({
+      id: crypto.randomUUID(),
+      name: `محكم ${i + 1}`,
+      canChair: j.canChair,
+      disabled: j.disabled,
+      conflictTeamIds: j.conflictTeamIds
+        .map((id) => teamIds.get(id))
+        .filter((id): id is string => !!id),
+    }));
+    const copy: Tournament = {
+      id: crypto.randomUUID(),
+      name: `${t.name} (تجريبية)`,
+      createdAt: Date.now(),
+      totalRounds: t.totalRounds,
+      teams,
+      judges,
+      rounds: t.rounds
+        .filter((r) => !r.kind || r.kind === "regular")
+        .map((r) => ({
+          roundNumber: r.roundNumber,
+          matches: [],
+          completed: false,
+          caseText: r.caseText,
+          judgesPerRoom: r.judgesPerRoom,
+          kind: "regular" as const,
+        })),
+      currentRound: 1,
+      presentedRound: 1,
+      started: false,
+      finished: false,
+      semifinalEnabled: t.semifinalEnabled,
+      finalEnabled: t.finalEnabled,
+      rooms: t.rooms ? structuredClone(t.rooms) : undefined,
+      settings: t.settings ? { ...t.settings } : undefined,
+      openingCaseText: t.openingCaseText,
     };
     dispatch({ type: "ADD_TOURNAMENT", tournament: copy });
     return copy.id;
@@ -1595,73 +1780,21 @@ export function TournamentProvider({ children }: { children: ReactNode }) {
 
   const autoAssignJudges = useCallback(
     (tournamentId: string, roundNumber: number) => {
-      const t = state.tournaments.find((x) => x.id === tournamentId);
-      if (!t) return;
-      const round = t.rounds.find((r) => r.roundNumber === roundNumber);
-      if (!round) return;
-      const judges = t.judges ?? [];
-      const perRoom = round.judgesPerRoom ?? 3;
-
-      const usage: Record<string, number> = {};
-      const chairUsage: Record<string, number> = {};
-      judges.forEach((j) => {
-        usage[j.id] = 0;
-        chairUsage[j.id] = 0;
-      });
-
-      const assignedChairs = new Set<string>();
-
-      const isConflict = (judge: Judge, match: Match) =>
-        judge.conflictTeamIds.includes(match.team1.teamId) ||
-        judge.conflictTeamIds.includes(match.team2.teamId);
-
-      const matchesShuffled = [...round.matches];
-
-      for (const match of matchesShuffled) {
-        const usedHere = new Set<string>();
-        // Pick chair: candidate must canChair, no conflict, not yet chair anywhere this round
-        const chairCandidates = judges
-          .filter(
-            (j) =>
-              j.canChair &&
-              !isConflict(j, match) &&
-              !assignedChairs.has(j.id)
-          )
-          .sort((a, b) => {
-            if (chairUsage[a.id] !== chairUsage[b.id])
-              return chairUsage[a.id] - chairUsage[b.id];
-            return usage[a.id] - usage[b.id];
-          });
-        let chairId: string | undefined;
-        if (chairCandidates.length > 0) {
-          chairId = chairCandidates[0].id;
-          assignedChairs.add(chairId);
-          usedHere.add(chairId);
-          usage[chairId]++;
-          chairUsage[chairId]++;
-        }
-        // Pick panelists
-        const panelistIds: string[] = [];
-        const panelistSlots = Math.max(0, perRoom - (chairId ? 1 : 0));
-        const panelCandidates = judges
-          .filter((j) => !usedHere.has(j.id) && !isConflict(j, match))
-          .sort((a, b) => usage[a.id] - usage[b.id]);
-        for (const c of panelCandidates) {
-          if (panelistIds.length >= panelistSlots) break;
-          panelistIds.push(c.id);
-          usedHere.add(c.id);
-          usage[c.id]++;
-        }
-        dispatch({
-          type: "SET_MATCH_JUDGES",
-          tournamentId,
-          roundNumber,
-          matchId: match.id,
-          assignment: { chairJudgeId: chairId, panelistJudgeIds: panelistIds },
-        });
-      }
+      dispatch({ type: "AUTO_ASSIGN_JUDGES", tournamentId, roundNumber });
     },
-    [state.tournaments]
+    []
+  );
+  const clearRoundJudges = useCallback(
+    (tournamentId: string, roundNumber: number) => {
+      dispatch({ type: "CLEAR_ROUND_JUDGES", tournamentId, roundNumber });
+    },
+    []
+  );
+  const redrawRound = useCallback(
+    (tournamentId: string, roundNumber: number) => {
+      dispatch({ type: "REDRAW_ROUND", tournamentId, roundNumber });
+    },
+    []
   );
 
   const fillDummyData = useCallback(
@@ -1859,6 +1992,7 @@ export function TournamentProvider({ children }: { children: ReactNode }) {
         setPublicVisible,
         setTournamentArchived,
         duplicateTournament,
+        duplicateTournamentForTest,
         createTournamentFromSetup,
         markResultAnnounced,
         setRoundLocked,
@@ -1882,6 +2016,8 @@ export function TournamentProvider({ children }: { children: ReactNode }) {
         setRoundJudgesPerRoom,
         setMatchJudges,
         autoAssignJudges,
+        clearRoundJudges,
+        redrawRound,
         finishTournament,
         reopenTournament,
         deleteRound,

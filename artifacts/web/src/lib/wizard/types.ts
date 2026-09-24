@@ -38,15 +38,25 @@ export const WIZARD_STEPS = [
   { key: "info", label: "معلومات البطولة" },
   { key: "organise", label: "المجلد والقضية" },
   { key: "protection", label: "الحماية" },
-  { key: "rooms", label: "القاعات" },
-  { key: "judges", label: "المحكمون" },
   { key: "teams", label: "الفِرق" },
+  { key: "judges", label: "المحكمون" },
+  { key: "rooms", label: "القاعات" },
   { key: "system", label: "نظام البطولة" },
   { key: "draw", label: "التوزيع" },
   { key: "review", label: "المراجعة" },
 ] as const;
 
 export type WizardStepKey = (typeof WIZARD_STEPS)[number]["key"];
+
+/** Score range is fixed platform-wide and matches the judging links (59–82). */
+export const DEFAULT_SETTINGS: TournamentSettings = {
+  replySpeech: true,
+  sides: true,
+  scoreMin: 59,
+  scoreMax: 82,
+  judgesPerRoom: 3,
+  showScoresOnAnnounce: false,
+};
 
 export function emptySetup(): TournamentSetup {
   return {
@@ -60,14 +70,7 @@ export function emptySetup(): TournamentSetup {
     rooms: [],
     judges: [],
     teams: [],
-    settings: {
-      replySpeech: true,
-      sides: true,
-      scoreMin: 60,
-      scoreMax: 100,
-      judgesPerRoom: 3,
-      showScoresOnAnnounce: false,
-    },
+    settings: { ...DEFAULT_SETTINGS },
     draw: null,
     drawApproved: false,
   };

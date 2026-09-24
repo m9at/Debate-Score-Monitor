@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { Gavel, Link as LinkIcon, Sparkles } from "lucide-react";
+import { Eraser, Gavel, Link as LinkIcon, Minus, Plus, Sparkles } from "lucide-react";
 import type { Match, MatchJudgeAssignment, Tournament } from "@/types/tournament";
 import { BRAND, BTN, BTN_SIZE } from "@/lib/brand";
 import { roomTitle, roundTitle } from "@/lib/reveal";
@@ -12,6 +12,10 @@ interface RoundJudgeBoardProps {
   onSelectRound: (roundNumber: number) => void;
   onAssignJudges: (matchId: string, assignment: MatchJudgeAssignment) => void;
   onAutoAssign: () => void;
+  /** Empties every room's panel in this round. */
+  onClearAll: () => void;
+  /** Default number of judges per room for this round. */
+  onSetJudgesPerRoom: (n: number) => void;
   /** Personal judging link for one judge of this round. */
   onJudgeLink: (judgeId: string) => void;
   canManage: boolean;
@@ -28,6 +32,8 @@ export default function RoundJudgeBoard({
   onSelectRound,
   onAssignJudges,
   onAutoAssign,
+  onClearAll,
+  onSetJudgesPerRoom,
   onJudgeLink,
   canManage,
 }: RoundJudgeBoardProps) {
@@ -41,6 +47,22 @@ export default function RoundJudgeBoard({
   const roundFinished = !!round?.completed;
   const judgesPerRoom =
     round?.judgesPerRoom ?? tournament.settings?.judgesPerRoom ?? 1;
+  const slotsOf = (m: Match) => m.judgeAssignment?.slots ?? judgesPerRoom;
+  const needed = (round?.matches ?? []).reduce((s, m) => s + slotsOf(m), 0);
+
+  /** Changes how many judges one room needs, dropping extra seats if lowered. */
+  const setRoomSlots = (m: Match, n: number) => {
+    const slots = Math.max(0, Math.min(9, n));
+    const ids = [
+      ...(m.judgeAssignment?.chairJudgeId ? [m.judgeAssignment.chairJudgeId] : []),
+      ...(m.judgeAssignment?.panelistJudgeIds ?? []),
+    ].slice(0, slots);
+    onAssignJudges(m.id, {
+      chairJudgeId: ids[0],
+      panelistJudgeIds: ids.slice(1),
+      slots,
+    });
+  };
 
   /** Judges already used by the other rooms of this round. */
   const takenBy = (exceptMatchId: string) => {
@@ -94,15 +116,48 @@ export default function RoundJudgeBoard({
         </select>
         <span className="flex-1" />
         {canManage && !roundFinished && (round?.matches.length ?? 0) > 0 && (
-          <button
-            type="button"
-            onClick={onAutoAssign}
-            className={`${BTN.base} ${BTN.secondary} ${BTN_SIZE.sm}`}
-            data-testid="button-auto-assign-judges"
-          >
-            <Sparkles className="w-3.5 h-3.5" />
-            توزيع تلقائي
-          </button>
+          <>
+            <label className="flex items-center gap-1.5 text-[12.5px] font-bold" style={{ color: BRAND.ink }}>
+              محكمون لكل قاعة
+              <input
+                type="number"
+                min={0}
+                max={9}
+                value={judgesPerRoom}
+                onChange={(e) =>
+                  onSetJudgesPerRoom(Math.max(0, Math.min(9, Math.floor(Number(e.target.value) || 0))))
+                }
+                className="w-14 h-9 px-2 rounded-xl border bg-white text-center font-bold outline-none"
+                style={{ borderColor: BRAND.border }}
+                data-testid="input-round-judges-per-room"
+              />
+            </label>
+            <span
+              className="text-[12px] font-semibold"
+              style={{ color: judges.length < needed ? "#B45309" : `${BRAND.ink}8c` }}
+              data-testid="text-judges-needed"
+            >
+              {judges.length} محكم متاح / {needed} مطلوب
+            </span>
+            <button
+              type="button"
+              onClick={onClearAll}
+              className={`${BTN.base} ${BTN.secondary} ${BTN_SIZE.sm}`}
+              data-testid="button-clear-judges"
+            >
+              <Eraser className="w-3.5 h-3.5" />
+              تصفير التوزيع
+            </button>
+            <button
+              type="button"
+              onClick={onAutoAssign}
+              className={`${BTN.base} ${BTN.secondary} ${BTN_SIZE.sm}`}
+              data-testid="button-auto-assign-judges"
+            >
+              <Sparkles className="w-3.5 h-3.5" />
+              توزيع تلقائي
+            </button>
+          </>
         )}
       </header>
 
@@ -136,13 +191,41 @@ export default function RoundJudgeBoard({
                 </td>
                 <td className="px-4 py-3">
                   {canManage && !roundFinished ? (
-                    <RoundJudgePicker
-                      judges={judges}
-                      assignment={m.judgeAssignment}
-                      takenElsewhere={takenBy(m.id)}
-                      slots={judgesPerRoom}
-                      onChange={(a) => onAssignJudges(m.id, a)}
-                    />
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-1.5 text-[11.5px] font-bold" style={{ color: `${BRAND.ink}8c` }}>
+                        عدد المحكمين
+                        <button
+                          type="button"
+                          onClick={() => setRoomSlots(m, slotsOf(m) - 1)}
+                          disabled={slotsOf(m) === 0}
+                          className="w-6 h-6 rounded-lg border flex items-center justify-center disabled:opacity-30"
+                          style={{ borderColor: BRAND.border }}
+                          aria-label="إنقاص محكم"
+                          data-testid={`button-room-slots-minus-${m.id}`}
+                        >
+                          <Minus className="w-3 h-3" />
+                        </button>
+                        <span className="w-4 text-center" style={{ color: BRAND.ink }}>{slotsOf(m)}</span>
+                        <button
+                          type="button"
+                          onClick={() => setRoomSlots(m, slotsOf(m) + 1)}
+                          disabled={slotsOf(m) >= 9}
+                          className="w-6 h-6 rounded-lg border flex items-center justify-center disabled:opacity-30"
+                          style={{ borderColor: BRAND.border }}
+                          aria-label="زيادة محكم"
+                          data-testid={`button-room-slots-plus-${m.id}`}
+                        >
+                          <Plus className="w-3 h-3" />
+                        </button>
+                      </div>
+                      <RoundJudgePicker
+                        judges={judges}
+                        assignment={m.judgeAssignment}
+                        takenElsewhere={takenBy(m.id)}
+                        slots={slotsOf(m)}
+                        onChange={(a) => onAssignJudges(m.id, a)}
+                      />
+                    </div>
                   ) : (
                     <span className="text-[13px] font-semibold" style={{ color: BRAND.ink }}>
                       {judgesOf(m)

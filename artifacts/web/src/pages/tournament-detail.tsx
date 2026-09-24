@@ -150,6 +150,10 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
+import { ToastAction } from "@/components/ui/toast";
+import { canRedrawRound } from "@/context/TournamentContext";
+import { DEFAULT_SETTINGS } from "@/lib/wizard/types";
+import { SPEAKER_MAX, SPEAKER_MIN } from "@/lib/scoreValidation";
 import type * as XLSXType from "@/lib/excel-export";
 import type {
   Tournament,
@@ -1009,6 +1013,9 @@ export default function TournamentDetail() {
     setRoundJudgesPerRoom,
     setMatchJudges,
     autoAssignJudges,
+    clearRoundJudges,
+    redrawRound,
+    duplicateTournamentForTest,
     setRoundLocked,
     markResultAnnounced,
     setPublicVisible,
@@ -1288,8 +1295,8 @@ export default function TournamentDetail() {
       rules: s
         ? {
             speakersPerTeam: [3, 4],
-            scoreMin: s.scoreMin,
-            scoreMax: s.scoreMax,
+            scoreMin: SPEAKER_MIN,
+            scoreMax: SPEAKER_MAX,
             judgesPerRoom: s.judgesPerRoom,
             replySpeech: s.replySpeech,
             text: s.rules,
@@ -1686,6 +1693,31 @@ export default function TournamentDetail() {
    * pairings → rooms → judges → the round becomes the live one. Nothing is
    * started before every readiness check passes.
    */
+  /** Re-pairs a round from scratch with every current team, then reassigns judges. */
+  const handleRedraw = (roundNumber: number) => {
+    if (!tournament) return;
+    if (!window.confirm(`إعادة قرعة الجولة ${roundNumber}؟ سيتم توزيع الفرق والمحكمين من جديد على قاعات بعدد الفرق.`)) return;
+    redrawRound(tournament.id, roundNumber);
+    logAction(tournament.id, "إعادة القرعة", `الجولة ${roundNumber}`);
+    setViewingRound(roundNumber);
+    const round = tournament.rounds.find((r) => r.roundNumber === roundNumber);
+    const perRoom = round?.judgesPerRoom ?? tournament.settings?.judgesPerRoom ?? 3;
+    const rooms = Math.floor(tournament.teams.length / 2);
+    const available = (tournament.judges ?? []).filter((j) => !j.disabled).length;
+    const short = available < rooms * perRoom;
+    toast({
+      title: `تمت إعادة القرعة — ${rooms} قاعة`,
+      description: short
+        ? `تم توزيع الجولة، لكن توجد قاعات ينقصها محكمون (${available} محكم لـ ${rooms * perRoom} مقعد).`
+        : "تم توزيع الفرق والمحكمين من جديد.",
+      action: short ? (
+        <ToastAction altText="توزيع المحكمين" onClick={() => setActiveTab("judges")}>
+          توزيع المحكمين
+        </ToastAction>
+      ) : undefined,
+    });
+  };
+
   const prepareAndStartNextRound = () => {
     if (!tournament) return;
     const nextNum = currentRoundNum + 1;
@@ -1747,6 +1779,8 @@ export default function TournamentDetail() {
       roundNumber: currentRoundNum,
       rooms,
       caseText: currentRound?.caseText,
+      replySpeech: tournament.settings?.replySpeech ?? true,
+      rules: tournament.settings?.rules,
     };
   };
 
@@ -2734,6 +2768,8 @@ export default function TournamentDetail() {
                   toast({ title: `وضع العرض يعرض الجولة ${currentRoundNum}` });
                 }}
                 onDraw={() => generateRound(tournament.id)}
+                canRedraw={canRedrawRound(tournament, currentRoundNum) && (currentRound?.matches.length ?? 0) > 0}
+                onRedraw={() => handleRedraw(currentRoundNum)}
                 onAutoAssignJudges={() => {
                   autoAssignJudges(tournament.id, currentRoundNum);
                   toast({ title: "تم توزيع المحكمين على القاعات" });
@@ -2841,6 +2877,7 @@ export default function TournamentDetail() {
                   logAction(tournament.id, "بدء الجولة", `الجولة ${currentRoundNum}`);
                   toast({ title: `الجولة الجارية الآن: الجولة ${currentRoundNum}` });
                 }}
+                onOpenJudges={() => setActiveTab("judges")}
                 canManage={can("manageJudges")}
               />
             }
@@ -2962,6 +2999,23 @@ export default function TournamentDetail() {
             onFinish={() => setConfirmFinishOpen(true)}
             onReopen={() => setConfirmReopenOpen(true)}
             onDelete={() => setConfirmDeleteOpen(true)}
+            onUpdateSettings={(patch) =>
+              updateTournamentInfo(tournament.id, {
+                settings: { ...DEFAULT_SETTINGS, ...tournament.settings, ...patch },
+              })
+            }
+            redrawRoundNumber={tournament.currentRound}
+            canRedraw={
+              canRedrawRound(tournament, tournament.currentRound) &&
+              (tournament.rounds.find((r) => r.roundNumber === tournament.currentRound)?.matches.length ?? 0) > 0
+            }
+            onRedraw={() => handleRedraw(tournament.currentRound)}
+            onDuplicateForTest={() => {
+              const id = duplicateTournamentForTest(tournament.id);
+              if (!id) return;
+              toast({ title: "تم إنشاء نسخة تجريبية من البطولة" });
+              setLocation(`/tournament/${id}`);
+            }}
           />
           </div>
         )}
@@ -3734,7 +3788,17 @@ export default function TournamentDetail() {
             onAssignJudges={(matchId, assignment) =>
               setMatchJudges(tournament.id, currentRoundNum, matchId, assignment)
             }
-            onAutoAssign={() => autoAssignJudges(tournament.id, currentRoundNum)}
+            onAutoAssign={() => {
+              autoAssignJudges(tournament.id, currentRoundNum);
+              toast({ title: "تم توزيع المحكمين عشوائياً على القاعات" });
+            }}
+            onClearAll={() => {
+              clearRoundJudges(tournament.id, currentRoundNum);
+              toast({ title: "تم تصفير توزيع المحكمين" });
+            }}
+            onSetJudgesPerRoom={(n) =>
+              setRoundJudgesPerRoom(tournament.id, currentRoundNum, n)
+            }
             onJudgeLink={handleJudgeLink}
             canManage={can("manageJudges")}
           />

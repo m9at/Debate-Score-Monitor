@@ -17,6 +17,8 @@ export interface MatchTeam {
 export interface MatchJudgeAssignment {
   chairJudgeId?: string;
   panelistJudgeIds: string[];
+  /** Judges this room needs — overrides the round's judgesPerRoom when set. */
+  slots?: number;
 }
 
 export interface Match {

@@ -1,6 +1,7 @@
-import { Eye, EyeOff, Flag, ShieldCheck, Trash2, Trophy } from "lucide-react";
+import { Copy, Eye, EyeOff, Flag, RotateCcw, ShieldCheck, Trash2, Trophy } from "lucide-react";
 import { BRAND, BTN } from "@/lib/brand";
-import type { Tournament } from "@/types/tournament";
+import type { Tournament, TournamentSettings } from "@/types/tournament";
+import DebateRulesSettings from "./DebateRulesSettings";
 
 interface Props {
   tournament: Tournament;
@@ -14,6 +15,12 @@ interface Props {
   onFinish: () => void;
   onReopen: () => void;
   onDelete: () => void;
+  onUpdateSettings: (patch: Partial<TournamentSettings>) => void;
+  /** The round «إعادة القرعة» applies to (the current round). */
+  redrawRoundNumber: number;
+  canRedraw: boolean;
+  onRedraw: () => void;
+  onDuplicateForTest: () => void;
 }
 
 /**
@@ -31,9 +38,57 @@ export default function SettingsPanel({
   onFinish,
   onReopen,
   onDelete,
+  onUpdateSettings,
+  redrawRoundNumber,
+  canRedraw,
+  onRedraw,
+  onDuplicateForTest,
 }: Props) {
   return (
     <div className="space-y-4" dir="rtl">
+      <Card title="نظام المناظرة">
+        <DebateRulesSettings settings={tournament.settings} onChange={onUpdateSettings} />
+      </Card>
+
+      <Card title="القرعة">
+        <Row
+          title={`إعادة قرعة الجولة ${redrawRoundNumber} من الصفر`}
+          hint={
+            canRedraw
+              ? "يعيد توزيع جميع الفرق الحالية على قاعات بعدد الفرق (قاعة لكل فريقين) ثم يوزّع المحكمين من جديد."
+              : "متاحة فقط لجولة أُجريت قرعتها ولم تُسجّل لها نتائج، ولا تليها جولات موزّعة."
+          }
+        >
+          <button
+            type="button"
+            onClick={onRedraw}
+            disabled={!canRedraw}
+            className={`${BTN.base} ${BTN.secondary} h-9 px-3.5 text-[12.5px] disabled:opacity-40`}
+            data-testid="settings-redraw-round"
+          >
+            <RotateCcw className="w-4 h-4" />
+            إعادة القرعة
+          </button>
+        </Row>
+      </Card>
+
+      <Card title="نسخة تجريبية">
+        <Row
+          title="استنساخ البطولة للتجربة"
+          hint="ينشئ نسخة بنفس الإعدادات وعدد الفرق والمحكمين، بأسماء مرقّمة (فريق 1، محكم 1…) وبدون قرعة أو نتائج."
+        >
+          <button
+            type="button"
+            onClick={onDuplicateForTest}
+            className={`${BTN.base} ${BTN.secondary} h-9 px-3.5 text-[12.5px]`}
+            data-testid="settings-duplicate-test"
+          >
+            <Copy className="w-4 h-4" />
+            إنشاء نسخة تجريبية
+          </button>
+        </Row>
+      </Card>
+
       <Card title="إظهار النتائج">
         <Row
           title="إخفاء النتائج عن الشاشات الإدارية"

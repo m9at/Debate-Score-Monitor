@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { AlertTriangle, CheckCircle2, Play } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Gavel, Play } from "lucide-react";
 import type { Tournament } from "@/types/tournament";
 import { BRAND, BTN, BTN_PRIMARY_STYLE, BTN_SIZE } from "@/lib/brand";
 import { roundTitle } from "@/lib/reveal";
@@ -16,6 +16,8 @@ interface RoundCommandCenterProps {
   onStartNextRound: () => void;
   /** Makes the selected (already prepared) round the live one. */
   onStartSelectedRound: () => void;
+  /** Opens the judge distribution page. */
+  onOpenJudges: () => void;
   canManage: boolean;
 }
 
@@ -29,6 +31,7 @@ export default function RoundCommandCenter({
   selectedRound,
   onStartNextRound,
   onStartSelectedRound,
+  onOpenJudges,
   canManage,
 }: RoundCommandCenterProps) {
   const round = tournament.rounds.find((r) => r.roundNumber === selectedRound);
@@ -140,6 +143,36 @@ export default function RoundCommandCenter({
               </li>
             ))}
           </ul>
+        )}
+
+        {readiness.warnings.length > 0 && (
+          <div
+            className="mt-3 rounded-xl border p-3"
+            style={{ borderColor: `${BRAND.warning}66`, backgroundColor: `${BRAND.warning}12` }}
+            data-testid="round-judge-warnings"
+          >
+            <p className="text-[13px] font-bold" style={{ color: "#92400E" }}>
+              ⚠️ توجد قاعات ينقصها محكمون — يمكنك بدء الجولة رغم ذلك
+            </p>
+            <ul className="mt-1.5 space-y-1">
+              {readiness.warnings.map((w) => (
+                <li key={w.key} className="text-[12.5px] font-semibold" style={{ color: "#92400E" }}>
+                  • {w.message}
+                </li>
+              ))}
+            </ul>
+            {canManage && (
+              <button
+                type="button"
+                onClick={onOpenJudges}
+                className={`${BTN.base} ${BTN.secondary} ${BTN_SIZE.sm} mt-2.5`}
+                data-testid="button-open-judge-distribution"
+              >
+                <Gavel className="w-3.5 h-3.5" />
+                الانتقال إلى توزيع المحكمين
+              </button>
+            )}
+          </div>
         )}
 
         {readiness.passed.length > 0 && (
