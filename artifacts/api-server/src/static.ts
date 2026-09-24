@@ -17,7 +17,15 @@ export const serveWebClient = (app: Express): void => {
     return;
   }
 
-  app.use(express.static(dist, { index: false, maxAge: "1h" }));
+  app.use(express.static(dist, {
+    index: false,
+    maxAge: "1h",
+    setHeaders(res, filePath) {
+      if (["sw.js", "manifest.webmanifest"].includes(path.basename(filePath))) {
+        res.setHeader("Cache-Control", "no-cache");
+      }
+    },
+  }));
 
   // SPA fallback — everything that is not an API route returns index.html.
   app.get(/^\/(?!api\/).*/, (_req: Request, res: Response) => {
