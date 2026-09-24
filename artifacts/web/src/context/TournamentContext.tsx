@@ -15,6 +15,7 @@ import type {
   AuditEntry,
 } from "@/types/tournament";
 import type { TournamentSetup } from "@/lib/wizard/types";
+import { assignJudges } from "@/lib/judgeAssignment";
 import {
   fetchAllShared,
   pushShared,
@@ -620,7 +621,8 @@ function pairBucket(
 }
 
 function generateRound(tournament: Tournament): Round | null {
-  const isFirstRound = tournament.rounds.length === 0;
+  // Empty placeholder rounds (created at setup) don't count as played.
+  const isFirstRound = tournament.rounds.every((r) => r.matches.length === 0);
   const roundNumber =
     tournament.rounds.reduce((max, r) => Math.max(max, r.roundNumber), 0) + 1;
 
@@ -714,6 +716,30 @@ function generateRound(tournament: Tournament): Round | null {
   }
 
   return { roundNumber, matches, completed: false };
+}
+
+/**
+ * Re-draws one regular round from scratch with every current team: random for
+ * the first round, by standings (earlier rounds only) otherwise. Judges are
+ * redistributed. Returns null when the round can't be redrawn.
+ */
+function redrawRoundOf(t: Tournament, roundNumber: number): Round | null {
+  const round = t.rounds.find((r) => r.roundNumber === roundNumber);
+  if (!round || round.completed || round.matches.some((m) => m.completed)) return null;
+  if (round.kind && round.kind !== "regular") return null;
+  const prior = t.rounds.filter((r) => r.roundNumber < roundNumber && r.matches.length > 0);
+  const generated = generateRound({
+    ...t,
+    teams: recalcTeamStats(t.teams, prior),
+    rounds: prior,
+  });
+  if (!generated) return null;
+  const rooms = [...(t.rooms ?? [])].sort((a, b) => a.number - b.number);
+  const matches = generated.matches.map((m, i) =>
+    rooms[i]?.label ? { ...m, roomLabel: rooms[i].label } : m,
+  );
+  const perRoom = round.judgesPerRoom ?? t.settings?.judgesPerRoom ?? 3;
+  return { ...round, matches: assignJudges(t.judges ?? [], matches, perRoom), completed: false };
 }
 
 function generateSemifinal(tournament: Tournament): Round | null {
@@ -844,6 +870,14 @@ interface TournamentContextType {
   setRoundJudgesPerRoom: (tournamentId: string, roundNumber: number, judgesPerRoom: number) => void;
   setMatchJudges: (tournamentId: string, roundNumber: number, matchId: string, assignment: MatchJudgeAssignment) => void;
   autoAssignJudges: (tournamentId: string, roundNumber: number) => void;
+  /** Removes every judge from the not-yet-scored rooms of a round. */
+  clearRoundJudges: (tournamentId: string, roundNumber: number) => void;
+  /** Redraws a round with no recorded results. Returns false when not allowed. */
+  redrawRound: (tournamentId: string, roundNumber: number) => boolean;
+  /** Judges per room for the tournament and all unfinished rounds. */
+  setJudgesPerRoom: (tournamentId: string, judgesPerRoom: number) => void;
+  /** Copy with numbered team/judge names and a fresh first-round draw, for testing. */
+  createTestCopy: (tournamentId: string) => string | undefined;
   fillDummyData: (tournamentId: string, opts?: { teams?: number; judges?: number }) => void;
   finishTournament: (tournamentId: string) => void;
   reopenTournament: (tournamentId: string) => void;
@@ -1593,76 +1627,144 @@ export function TournamentProvider({ children }: { children: ReactNode }) {
     []
   );
 
+  /** Applies a change to one tournament, reading the latest state. */
+  const updateOne = useCallback(
+    (tournamentId: string, fn: (t: Tournament) => Tournament | null) => {
+      const t = stateRef.current.tournaments.find((x) => x.id === tournamentId);
+      if (!t) return false;
+      const next = fn(t);
+      if (!next) return false;
+      stateRef.current = {
+        tournaments: stateRef.current.tournaments.map((x) => (x.id === t.id ? next : x)),
+      };
+      dispatch({ type: "UPDATE_TOURNAMENT", tournament: next });
+      return true;
+    },
+    []
+  );
+
   const autoAssignJudges = useCallback(
     (tournamentId: string, roundNumber: number) => {
-      const t = state.tournaments.find((x) => x.id === tournamentId);
-      if (!t) return;
-      const round = t.rounds.find((r) => r.roundNumber === roundNumber);
-      if (!round) return;
-      const judges = t.judges ?? [];
-      const perRoom = round.judgesPerRoom ?? 3;
-
-      const usage: Record<string, number> = {};
-      const chairUsage: Record<string, number> = {};
-      judges.forEach((j) => {
-        usage[j.id] = 0;
-        chairUsage[j.id] = 0;
-      });
-
-      const assignedChairs = new Set<string>();
-
-      const isConflict = (judge: Judge, match: Match) =>
-        judge.conflictTeamIds.includes(match.team1.teamId) ||
-        judge.conflictTeamIds.includes(match.team2.teamId);
-
-      const matchesShuffled = [...round.matches];
-
-      for (const match of matchesShuffled) {
-        const usedHere = new Set<string>();
-        // Pick chair: candidate must canChair, no conflict, not yet chair anywhere this round
-        const chairCandidates = judges
-          .filter(
-            (j) =>
-              j.canChair &&
-              !isConflict(j, match) &&
-              !assignedChairs.has(j.id)
-          )
-          .sort((a, b) => {
-            if (chairUsage[a.id] !== chairUsage[b.id])
-              return chairUsage[a.id] - chairUsage[b.id];
-            return usage[a.id] - usage[b.id];
-          });
-        let chairId: string | undefined;
-        if (chairCandidates.length > 0) {
-          chairId = chairCandidates[0].id;
-          assignedChairs.add(chairId);
-          usedHere.add(chairId);
-          usage[chairId]++;
-          chairUsage[chairId]++;
-        }
-        // Pick panelists
-        const panelistIds: string[] = [];
-        const panelistSlots = Math.max(0, perRoom - (chairId ? 1 : 0));
-        const panelCandidates = judges
-          .filter((j) => !usedHere.has(j.id) && !isConflict(j, match))
-          .sort((a, b) => usage[a.id] - usage[b.id]);
-        for (const c of panelCandidates) {
-          if (panelistIds.length >= panelistSlots) break;
-          panelistIds.push(c.id);
-          usedHere.add(c.id);
-          usage[c.id]++;
-        }
-        dispatch({
-          type: "SET_MATCH_JUDGES",
-          tournamentId,
-          roundNumber,
-          matchId: match.id,
-          assignment: { chairJudgeId: chairId, panelistJudgeIds: panelistIds },
-        });
-      }
+      updateOne(tournamentId, (t) => ({
+        ...t,
+        rounds: t.rounds.map((r) =>
+          r.roundNumber !== roundNumber
+            ? r
+            : {
+                ...r,
+                matches: assignJudges(
+                  t.judges ?? [],
+                  r.matches,
+                  r.judgesPerRoom ?? t.settings?.judgesPerRoom ?? 3
+                ),
+              }
+        ),
+      }));
     },
-    [state.tournaments]
+    [updateOne]
   );
+
+  const clearRoundJudges = useCallback(
+    (tournamentId: string, roundNumber: number) => {
+      updateOne(tournamentId, (t) => ({
+        ...t,
+        rounds: t.rounds.map((r) =>
+          r.roundNumber !== roundNumber
+            ? r
+            : {
+                ...r,
+                matches: r.matches.map((m) =>
+                  m.completed ? m : { ...m, judgeAssignment: { panelistJudgeIds: [] } }
+                ),
+              }
+        ),
+      }));
+    },
+    [updateOne]
+  );
+
+  const redrawRound = useCallback(
+    (tournamentId: string, roundNumber: number) =>
+      updateOne(tournamentId, (t) => {
+        const round = redrawRoundOf(t, roundNumber);
+        if (!round) return null;
+        return {
+          ...t,
+          rounds: t.rounds.map((r) => (r.roundNumber === roundNumber ? round : r)),
+        };
+      }),
+    [updateOne]
+  );
+
+  const setJudgesPerRoom = useCallback(
+    (tournamentId: string, judgesPerRoom: number) => {
+      updateOne(tournamentId, (t) => ({
+        ...t,
+        settings: t.settings ? { ...t.settings, judgesPerRoom } : t.settings,
+        rounds: t.rounds.map((r) => (r.completed ? r : { ...r, judgesPerRoom })),
+      }));
+    },
+    [updateOne]
+  );
+
+  const createTestCopy = useCallback((tournamentId: string) => {
+    const t = stateRef.current.tournaments.find((x) => x.id === tournamentId);
+    if (!t) return undefined;
+    const src = structuredClone(t);
+    const teams: Team[] = src.teams.map((tm, i) => ({
+      ...tm,
+      name: `فريق ${i + 1}`,
+      institution: undefined,
+      documents: undefined,
+      logoDataUrl: undefined,
+      speakerNames: tm.speakerNames.map((_, k) => `متحدث ${i + 1}-${k + 1}`),
+      wins: 0,
+      losses: 0,
+      totalPoints: 0,
+      matchesPlayed: 0,
+    }));
+    const judges: Judge[] = (src.judges ?? []).map((j, i) => ({
+      ...j,
+      name: `محكم ${i + 1}`,
+      institution: undefined,
+      photoDataUrl: undefined,
+    }));
+    const rounds: Round[] = src.rounds
+      .filter((r) => !r.kind || r.kind === "regular")
+      .map((r) => ({
+        roundNumber: r.roundNumber,
+        matches: [],
+        completed: false,
+        caseText: r.caseText,
+        judgesPerRoom: r.judgesPerRoom,
+        kind: "regular",
+      }));
+    const first = rounds[0]?.roundNumber ?? 1;
+    const copy: Tournament = {
+      ...src,
+      id: crypto.randomUUID(),
+      name: `${t.name} (نسخة تجريبية)`,
+      createdAt: Date.now(),
+      archived: false,
+      publicVisible: false,
+      protection: undefined,
+      teams,
+      judges,
+      rounds,
+      currentRound: first,
+      presentedRound: first,
+      started: true,
+      finished: false,
+      pendingTeams: [],
+      pendingJudges: [],
+      pendingResults: [],
+      auditLog: [],
+    };
+    const drawn = redrawRoundOf(copy, first);
+    if (drawn) copy.rounds = rounds.map((r) => (r.roundNumber === first ? drawn : r));
+    dispatch({ type: "ADD_TOURNAMENT", tournament: copy });
+    return copy.id;
+  }, []);
 
   const fillDummyData = useCallback(
     (tournamentId: string, opts?: { teams?: number; judges?: number }) => {
@@ -1882,6 +1984,10 @@ export function TournamentProvider({ children }: { children: ReactNode }) {
         setRoundJudgesPerRoom,
         setMatchJudges,
         autoAssignJudges,
+        clearRoundJudges,
+        redrawRound,
+        setJudgesPerRoom,
+        createTestCopy,
         finishTournament,
         reopenTournament,
         deleteRound,
