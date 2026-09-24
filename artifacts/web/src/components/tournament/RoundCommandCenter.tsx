@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { AlertTriangle, CheckCircle2, Play } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Gavel, Play } from "lucide-react";
 import type { Tournament } from "@/types/tournament";
 import { BRAND, BTN, BTN_PRIMARY_STYLE, BTN_SIZE } from "@/lib/brand";
 import { roundTitle } from "@/lib/reveal";
@@ -16,6 +16,8 @@ interface RoundCommandCenterProps {
   onStartNextRound: () => void;
   /** Makes the selected (already prepared) round the live one. */
   onStartSelectedRound: () => void;
+  /** Opens the judge distribution page for the selected round. */
+  onGoToJudges: () => void;
   canManage: boolean;
 }
 
@@ -29,6 +31,7 @@ export default function RoundCommandCenter({
   selectedRound,
   onStartNextRound,
   onStartSelectedRound,
+  onGoToJudges,
   canManage,
 }: RoundCommandCenterProps) {
   const round = tournament.rounds.find((r) => r.roundNumber === selectedRound);
@@ -101,6 +104,50 @@ export default function RoundCommandCenter({
           </button>
         )}
       </div>
+
+      {/* Judge shortages warn but never block the round. */}
+      {readiness.warnings.length > 0 && (
+        <div
+          className="rounded-2xl border p-4"
+          style={{ backgroundColor: `${BRAND.warning}0f`, borderColor: `${BRAND.warning}55` }}
+          data-testid="round-warnings"
+        >
+          <div className="flex flex-wrap items-start gap-3">
+            <div className="flex-1 min-w-[14rem]">
+              <h3
+                className="font-bold text-[14px] flex items-center gap-2"
+                style={{ color: BRAND.ink }}
+              >
+                <AlertTriangle className="w-4 h-4" style={{ color: BRAND.warning }} />
+                تنبيه — يمكنك بدء الجولة بشكل طبيعي
+              </h3>
+              <ul className="mt-2 space-y-1">
+                {readiness.warnings.map((w) => (
+                  <li
+                    key={w.key}
+                    className="text-[12.5px] font-semibold"
+                    style={{ color: BRAND.ink }}
+                    data-testid={`readiness-warning-${w.key}`}
+                  >
+                    • {w.message}
+                  </li>
+                ))}
+              </ul>
+            </div>
+            {canManage && readiness.warnings.some((w) => w.key.startsWith("judges")) && (
+              <button
+                type="button"
+                onClick={onGoToJudges}
+                className={`${BTN.base} ${BTN.secondary} h-9 px-3.5 text-[12.5px] shrink-0`}
+                data-testid="button-go-to-judges"
+              >
+                <Gavel className="w-4 h-4" />
+                توزيع المحكمين
+              </button>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Readiness — the round never starts before it can actually run. */}
       <div

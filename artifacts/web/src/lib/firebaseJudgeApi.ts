@@ -59,7 +59,8 @@ export async function createRoundSession(roundData: RoundData): Promise<string> 
 export async function syncRoundSessionsForRound(
   tournamentId: string,
   roundNumber: number,
-  roundData: RoundData,
+  /** Merged into the stored round info — a partial patch is fine. */
+  roundData: Partial<RoundData>,
 ): Promise<{ updated: number }> {
   const r = await http<{ ok: boolean; updated: number }>(
     `/round-sessions/by-tournament/${encodeURIComponent(tournamentId)}/round/${roundNumber}/info`,

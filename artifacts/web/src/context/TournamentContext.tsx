@@ -62,6 +62,7 @@ type Action =
   | { type: "FINISH_TOURNAMENT"; tournamentId: string }
   | { type: "REOPEN_TOURNAMENT"; tournamentId: string }
   | { type: "DELETE_ROUND"; tournamentId: string; roundNumber: number }
+  | { type: "RESET_ROUND"; tournamentId: string; roundNumber: number }
   | { type: "SET_PROTECTION"; tournamentId: string; protection: TournamentProtection };
 
 function reducer(state: TournamentState, action: Action): TournamentState {
@@ -422,6 +423,25 @@ function reducer(state: TournamentState, action: Action): TournamentState {
         }),
       };
     }
+    case "RESET_ROUND": {
+      // Undo the draw: the round keeps its slot, motion and judges-per-room,
+      // but loses its matches so the next draw can refill it from scratch.
+      return {
+        tournaments: state.tournaments.map((t) => {
+          if (t.id !== action.tournamentId) return t;
+          const rounds = t.rounds.map((r) =>
+            r.roundNumber === action.roundNumber
+              ? { ...r, matches: [], completed: false, locked: false }
+              : r
+          );
+          return {
+            ...t,
+            rounds,
+            started: rounds.some((r) => r.matches.length > 0),
+          };
+        }),
+      };
+    }
     case "ADD_JUDGE":
       return {
         tournaments: state.tournaments.map((t) => {
@@ -704,14 +724,20 @@ function generateRound(tournament: Tournament): Round | null {
     return Math.random() > 0.5 ? "gov" : "opp";
   };
 
+  // Seat the pairs in the tournament's own (enabled) rooms, keeping their names.
+  const rooms = (tournament.rooms ?? [])
+    .filter((r) => !r.disabled)
+    .sort((a, b) => a.number - b.number);
   const matches: Match[] = [];
-  let roomNumber = 1;
-  for (const [a, b] of pairList) {
+  pairList.forEach(([a, b], idx) => {
     const roleA = pickRole(a.id);
     const govTeam = roleA === "gov" ? a : b;
     const oppTeam = roleA === "gov" ? b : a;
-    matches.push(createMatch(govTeam, oppTeam, roomNumber++));
-  }
+    const room = rooms[idx];
+    const match = createMatch(govTeam, oppTeam, room?.number ?? idx + 1);
+    if (room) match.roomLabel = room.label;
+    matches.push(match);
+  });
 
   return { roundNumber, matches, completed: false };
 }
@@ -848,6 +874,8 @@ interface TournamentContextType {
   finishTournament: (tournamentId: string) => void;
   reopenTournament: (tournamentId: string) => void;
   deleteRound: (tournamentId: string, roundNumber: number) => void;
+  /** Undoes a round's draw so it can be drawn again from scratch. */
+  resetRound: (tournamentId: string, roundNumber: number) => void;
   setPublicVisible: (tournamentId: string, publicVisible: boolean) => void;
   updateTournamentInfo: (
     tournamentId: string,
@@ -863,6 +891,7 @@ interface TournamentContextType {
         | "logoWhiteDataUrl"
         | "coverImageDataUrl"
         | "countdown"
+        | "settings"
       >
     >
   ) => void;
@@ -1305,6 +1334,13 @@ export function TournamentProvider({ children }: { children: ReactNode }) {
     []
   );
 
+  const resetRound = useCallback(
+    (tournamentId: string, roundNumber: number) => {
+      dispatch({ type: "RESET_ROUND", tournamentId, roundNumber });
+    },
+    []
+  );
+
   const updateTournamentInfo = useCallback(
     (
       tournamentId: string,
@@ -1320,6 +1356,7 @@ export function TournamentProvider({ children }: { children: ReactNode }) {
         | "logoWhiteDataUrl"
         | "coverImageDataUrl"
         | "countdown"
+        | "settings"
       >
       >
     ) => {
@@ -1885,6 +1922,7 @@ export function TournamentProvider({ children }: { children: ReactNode }) {
         finishTournament,
         reopenTournament,
         deleteRound,
+        resetRound,
       }}
     >
       {children}

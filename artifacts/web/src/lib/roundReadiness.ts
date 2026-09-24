@@ -10,6 +10,8 @@ export interface ReadinessIssue {
 export interface RoundReadiness {
   ready: boolean;
   issues: ReadinessIssue[];
+  /** Non-blocking notices (e.g. rooms short of judges) — the round may still start. */
+  warnings: ReadinessIssue[];
   /** Checks that passed — shown as a reassuring checklist. */
   passed: string[];
 }
@@ -20,14 +22,15 @@ const roomName = (m: { roomLabel?: string; roomNumber: number }) =>
 /**
  * Decides whether a round can actually run, and says precisely what is missing.
  *
- * The organiser must never start a round and only then discover that a room has
- * no judge — every blocking condition is reported up front, by room name.
+ * Missing teams or matches block the round. Judge shortages never do — they are
+ * reported as warnings, by room name, so the organiser can start anyway.
  */
 export function evaluateRoundReadiness(
   tournament: Tournament,
   round: Round | undefined,
 ): RoundReadiness {
   const issues: ReadinessIssue[] = [];
+  const warnings: ReadinessIssue[] = [];
   const passed: string[] = [];
   const judges = (tournament.judges ?? []).filter((j) => !j.disabled);
   const expectedJudges =
@@ -59,7 +62,7 @@ export function evaluateRoundReadiness(
       key: "matches",
       message: "لا يمكن بدء الجولة — لم يتم إنشاء المواجهات والقاعات.",
     });
-    return { ready: false, issues, passed };
+    return { ready: false, issues, warnings, passed };
   }
   passed.push(`المواجهات جاهزة (${round.matches.length} قاعة)`);
 
@@ -82,24 +85,34 @@ export function evaluateRoundReadiness(
     ]);
     const count = [...assigned].filter((id) => judges.some((j) => j.id === id)).length;
     if (count === 0) {
-      issues.push({
+      warnings.push({
         key: `judges-${m.id}`,
-        message: `لا يمكن بدء الجولة — ${roomName(m)} لم يتم تعيين محكم لها.`,
+        message: `${roomName(m)} لم يُعيَّن لها أي محكم (المطلوب ${expectedJudges}).`,
       });
     } else if (count < expectedJudges) {
-      issues.push({
+      warnings.push({
         key: `judges-count-${m.id}`,
-        message: `لا يمكن بدء الجولة — ${roomName(m)} لديها ${count} من ${expectedJudges} محكمين.`,
+        message: `${roomName(m)} لديها ${count} محكم بدلاً من ${expectedJudges}.`,
       });
     }
   }
 
-  if (!issues.some((i) => i.key.startsWith("judges"))) {
+  // Enabled rooms that the draw left without teams.
+  const used = new Set(round.matches.map((m) => m.roomNumber));
+  for (const r of tournament.rooms ?? []) {
+    if (r.disabled || used.has(r.number)) continue;
+    warnings.push({
+      key: `empty-room-${r.id}`,
+      message: `${r.label?.trim() || `القاعة ${r.number}`} خالية من الفرق في هذه الجولة.`,
+    });
+  }
+
+  if (!warnings.some((i) => i.key.startsWith("judges"))) {
     passed.push(`المحكمون موزّعون (${expectedJudges} لكل قاعة)`);
   }
   if (!issues.some((i) => i.key.startsWith("teams-"))) {
     passed.push("الفرق موزّعة على القاعات");
   }
 
-  return { ready: issues.length === 0, issues, passed };
+  return { ready: issues.length === 0, issues, warnings, passed };
 }

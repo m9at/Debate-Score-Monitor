@@ -13,6 +13,10 @@ export interface JudgeMatchInfo {
   govSpeakersCount?: number;
   oppSpeakersCount?: number;
   caseText?: string;
+  /** false hides the reply speech from the scoring form (default: enabled). */
+  replySpeech?: boolean;
+  /** قواعد البطولة shown to the judge above the form. */
+  rules?: string;
 }
 
 export interface JudgeScores {
@@ -60,6 +64,10 @@ export interface RoundData {
   roundNumber: number;
   rooms: RoomInfo[];
   caseText?: string;
+  /** false hides the reply speech from the scoring form (default: enabled). */
+  replySpeech?: boolean;
+  /** قواعد البطولة shown to the judge above the form. */
+  rules?: string;
 }
 
 export function encodeScores(scores: JudgeScores): string {
