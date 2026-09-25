@@ -935,8 +935,8 @@ function generateRound(tournament: Tournament): Round | null {
 
 /**
  * Knockout pools: the winners of the previous knockout round, or the regular
- * standings. Quarterfinal pairs by rank (1×2, 3×4…), semifinal 1×4 and 2×3,
- * final 1×2. The higher seed argues government.
+ * standings. Highest seed meets the lowest: 1×8, 2×7, 3×6, 4×5; semifinal
+ * 1×4 and 2×3; final 1×2. The higher seed argues government.
  */
 export function knockoutReady(t: Tournament): boolean {
   const drawn = t.rounds.filter((r) => r.matches.length > 0);
@@ -968,10 +968,11 @@ export function generateKnockout(t: Tournament, kind: KnockoutKind, teamCount: n
   const pool = knockoutPool(t);
   if (size < 2 || size % 2 === 1 || pool.length < size) return null;
   const seeds = pool.slice(0, size);
-  const pairs: [Team, Team][] =
-    kind === "semifinal"
-      ? [[seeds[0], seeds[3]], [seeds[1], seeds[2]]]
-      : Array.from({ length: size / 2 }, (_, i) => [seeds[2 * i], seeds[2 * i + 1]]);
+  // Top seed meets the bottom seed: 1×8, 2×7, 3×6, 4×5 (semifinal 1×4, 2×3).
+  const pairs: [Team, Team][] = Array.from({ length: size / 2 }, (_, i) => [
+    seeds[i],
+    seeds[size - 1 - i],
+  ]);
   const matches = pairs.map(([gov, opp], i) => {
     const match = createMatch(gov, opp, i + 1);
     const room = t.rooms?.find((r) => r.number === i + 1);

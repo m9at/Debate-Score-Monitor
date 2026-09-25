@@ -24,10 +24,11 @@ export default function KnockoutSettings({ tournament, onGenerate }: Props) {
   const ready = knockoutReady(tournament);
   const size = kind === "semifinal" ? 4 : kind === "final" ? 2 : count;
   const seeds = pool.slice(0, size);
-  const pairs =
-    kind === "semifinal" && seeds.length === 4
-      ? [[0, 3], [1, 2]]
-      : Array.from({ length: Math.floor(seeds.length / 2) }, (_, i) => [2 * i, 2 * i + 1]);
+  // Same seeding as generateKnockout: 1×8, 2×7, 3×6, 4×5.
+  const pairs = Array.from({ length: Math.floor(seeds.length / 2) }, (_, i) => [
+    i,
+    seeds.length - 1 - i,
+  ]);
   const valid = ready && size >= 2 && size % 2 === 0 && pool.length >= size;
 
   const reason = !ready

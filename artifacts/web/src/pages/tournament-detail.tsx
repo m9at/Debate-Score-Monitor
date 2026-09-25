@@ -13,9 +13,9 @@ import {
   buildSessionUrl,
   buildJudgeSessionUrl,
   decodeScores,
-  type RoomInfo,
   type RoundData,
 } from "@/lib/judgeCodec";
+import { buildRoundSessionData } from "@/lib/roundSessionData";
 import {
   buildRegisterUrl,
   buildAdminUrl,
@@ -1743,48 +1743,8 @@ export default function TournamentDetail() {
     toast({ title: `تم تجهيز الجولة ${nextNum} وبدؤها` });
   };
 
-  /**
-   * The round as the judging link sees it: rooms, rosters and — so the link can
-   * identify the judge itself — the judges assigned to each room.
-   */
-  const buildRoundData = (): RoundData => {
-    const rooms: RoomInfo[] = (currentRound?.matches ?? []).map((m) => {
-      const gov = tournament.teams.find((t) => t.id === m.team1.teamId);
-      const opp = tournament.teams.find((t) => t.id === m.team2.teamId);
-      const a = m.judgeAssignment;
-      const ids = [
-        ...(a?.chairJudgeId ? [a.chairJudgeId] : []),
-        ...(a?.panelistJudgeIds ?? []),
-      ];
-      return {
-        roomNumber: m.roomNumber,
-        roomLabel: m.roomLabel,
-        matchId: m.id,
-        govTeamName: gov?.name ?? "الموالاة",
-        oppTeamName: opp?.name ?? "المعارضة",
-        govTeamId: m.team1.teamId,
-        govSpeakerNames: gov?.speakerNames ?? [],
-        oppSpeakerNames: opp?.speakerNames ?? [],
-        govSpeakersCount: gov?.speakersPerTeam ?? 3,
-        oppSpeakersCount: opp?.speakersPerTeam ?? 3,
-        judges: ids
-          .map((id) => {
-            const j = (tournament.judges ?? []).find((x) => x.id === id);
-            return j ? { id: j.id, name: j.name, chair: a?.chairJudgeId === id } : null;
-          })
-          .filter(Boolean) as { id: string; name: string; chair: boolean }[],
-      };
-    });
-    return {
-      tournamentId: tournament.id,
-      tournamentName: tournament.name,
-      roundNumber: currentRoundNum,
-      rooms,
-      caseText: currentRound?.caseText,
-      replySpeech: tournament.settings?.replySpeech ?? true,
-      rules: tournament.settings?.rules,
-    };
-  };
+  const buildRoundData = (): RoundData =>
+    buildRoundSessionData(tournament, currentRound!);
 
   /** Personal link for one judge: their room only, their name pre-filled. */
   const handleJudgeLink = async (judgeId: string) => {
@@ -2577,13 +2537,30 @@ export default function TournamentDetail() {
     const orig = tournament.teams.find((t) => t.id === editingTeamId);
     if (!orig) return;
     const count = parseInt(editSpeakersCount) as 3 | 4;
-    updateTeam(tournament.id, {
+    const updated = {
       ...orig,
       name: editTeamName.trim(),
       logoDataUrl: editTeamLogo,
       speakersPerTeam: count,
       speakerNames: editSpeakerNames.slice(0, count).map((n) => n.trim()),
-    });
+    };
+    updateTeam(tournament.id, updated);
+    // Push the new name/roster to judge links of every round still in play.
+    const synced = {
+      ...tournament,
+      teams: tournament.teams.map((t) => (t.id === updated.id ? updated : t)),
+    };
+    for (const round of tournament.rounds) {
+      const involved = round.matches.some(
+        (m) => !m.completed && (m.team1.teamId === updated.id || m.team2.teamId === updated.id),
+      );
+      if (!involved) continue;
+      void syncRoundSessionsForRound(
+        tournament.id,
+        round.roundNumber,
+        buildRoundSessionData(synced, round),
+      ).catch(() => {});
+    }
     setEditingTeamId(null);
   };
 
@@ -4400,28 +4377,11 @@ export default function TournamentDetail() {
                           ? { ...mm, roomNumber: newRoomNum ?? mm.roomNumber, roomLabel: newLabel }
                           : mm,
                       );
-                      const rooms: RoomInfo[] = updatedMatches.map((m) => {
-                        const gov = tournament.teams.find((t) => t.id === m.team1.teamId);
-                        const opp = tournament.teams.find((t) => t.id === m.team2.teamId);
-                        return {
-                          roomNumber: m.roomNumber,
-                          roomLabel: m.roomLabel,
-                          matchId: m.id,
-                          govTeamName: gov?.name ?? "الموالاة",
-                          oppTeamName: opp?.name ?? "المعارضة",
-                          govTeamId: m.team1.teamId,
-                          govSpeakerNames: gov?.speakerNames ?? [],
-                          oppSpeakerNames: opp?.speakerNames ?? [],
-                          govSpeakersCount: gov?.speakersPerTeam ?? 3,
-                          oppSpeakersCount: opp?.speakersPerTeam ?? 3,
-                        };
-                      });
-                      const roundData: RoundData = {
-                        tournamentId: tournament.id,
-                        tournamentName: tournament.name,
-                        roundNumber: targetRoundNum,
-                        rooms,
-                      };
+                      const roundData = buildRoundSessionData(
+                        tournament,
+                        targetRound,
+                        updatedMatches,
+                      );
                       void syncRoundSessionsForRound(
                         tournament.id,
                         targetRoundNum,
