@@ -31,6 +31,7 @@ export function buildRoundSessionData(
       oppSpeakerNames: opp?.speakerNames ?? [],
       govSpeakersCount: gov?.speakersPerTeam ?? 3,
       oppSpeakersCount: opp?.speakersPerTeam ?? 3,
+      completed: m.completed,
       judges: ids
         .map((id) => {
           const j = (tournament.judges ?? []).find((x) => x.id === id);

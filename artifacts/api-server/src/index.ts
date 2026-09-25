@@ -213,7 +213,9 @@ app.put(
     const room = param(req, "room");
     // Stamp the result with the match the room held at submit time, so a later
     // redraw that reuses the room number can't reassign it to another match.
-    await db.execute(sql`
+    // A room's result is final: a second submission for the same match (or a
+    // room the organiser already scored) is refused.
+    const result = await db.execute(sql`
       UPDATE judge_sessions
       SET results = COALESCE(results, '{}'::jsonb) || jsonb_build_object(
         ${room}::text,
@@ -223,7 +225,22 @@ app.put(
         ))
       )
       WHERE id = ${param(req, "id")} AND kind = 'round'
+        AND NOT EXISTS (
+          SELECT 1 FROM jsonb_array_elements(info->'rooms') r
+          WHERE r->>'roomNumber' = ${room}::text
+            AND (
+              (r->>'completed') = 'true'
+              OR (
+                results ? ${room}::text
+                AND COALESCE(results->${room}::text->>'matchId', r->>'matchId') = r->>'matchId'
+              )
+            )
+        )
     `);
+    if (!result.rowCount) {
+      res.status(409).json({ error: "already submitted" });
+      return;
+    }
     res.json({ ok: true });
   }),
 );

@@ -37,26 +37,31 @@ export default function JudgeRoundPage() {
   useEffect(() => {
     if (!sessionId) { setError("الرابط غير صالح"); return; }
     let cancelled = false;
-    getRoundSession(sessionId)
-      .then((s) => {
-        if (cancelled) return;
-        if (!s) { setError("هذا الرابط غير موجود أو انتهت صلاحيته"); return; }
-        setRoundData(s.roundData);
-        if (judgeId) {
-          const mine = s.roundData.rooms.find((r) =>
-            (r.judges ?? []).some((j) => j.id === judgeId),
-          );
-          if (mine) setSelectedRoom(mine.roomNumber);
-        }
-        if (s.results) {
-          setSubmittedRooms(new Set(Object.keys(s.results).map(Number)));
-        }
-      })
-      .catch((e) => {
-        if (cancelled) return;
-        setError(e instanceof Error ? e.message : "تعذّر تحميل الجولة");
-      });
-    return () => { cancelled = true; };
+    let first = true;
+    // Re-read the round every few seconds so a room scored from any device
+    // shows as done (and locked) for everyone holding the link.
+    const load = () =>
+      getRoundSession(sessionId)
+        .then((s) => {
+          if (cancelled) return;
+          if (!s) { if (first) setError("هذا الرابط غير موجود أو انتهت صلاحيته"); return; }
+          setRoundData(s.roundData);
+          if (first && judgeId) {
+            const mine = s.roundData.rooms.find((r) =>
+              (r.judges ?? []).some((j) => j.id === judgeId),
+            );
+            if (mine) setSelectedRoom(mine.roomNumber);
+          }
+          first = false;
+          setSubmittedRooms(new Set(lockedRooms(s.roundData, s.results)));
+        })
+        .catch((e) => {
+          if (cancelled || !first) return;
+          setError(e instanceof Error ? e.message : "تعذّر تحميل الجولة");
+        });
+    void load();
+    const id = setInterval(load, 5000);
+    return () => { cancelled = true; clearInterval(id); };
   }, [sessionId, judgeId]);
 
   if (error) {
@@ -86,6 +91,16 @@ export default function JudgeRoundPage() {
   if (selectedRoom !== null) {
     const room = roundData.rooms.find((r) => r.roomNumber === selectedRoom);
     if (!room) { setSelectedRoom(null); return null; }
+    if (submittedRooms.has(room.roomNumber)) {
+      return (
+        <RoomLocked
+          room={room}
+          tournamentName={roundData.tournamentName}
+          roundNumber={roundData.roundNumber}
+          onBack={judgeId ? undefined : () => setSelectedRoom(null)}
+        />
+      );
+    }
     return (
       <RoomScoring
         room={room}
@@ -133,7 +148,9 @@ export default function JudgeRoundPage() {
             <div
               key={room.roomNumber}
               className="judge-card judge-card-room"
-              onClick={() => setSelectedRoom(room.roomNumber)}
+              onClick={done ? undefined : () => setSelectedRoom(room.roomNumber)}
+              style={done ? { cursor: "default", opacity: 0.75 } : undefined}
+              aria-disabled={done}
             >
               <div className="judge-room-header">
                 <div>
@@ -142,14 +159,53 @@ export default function JudgeRoundPage() {
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                   <span className={`judge-badge ${done ? "judge-badge-done" : "judge-badge-pend"}`}>
-                    {done ? "✅ تم" : "⏳ بانتظار"}
+                    {done ? "✅ تم الإرسال" : "⏳ بانتظار"}
                   </span>
-                  <span className="judge-room-arrow">←</span>
+                  <span className="judge-room-arrow">{done ? "🔒" : "←"}</span>
                 </div>
               </div>
             </div>
           );
         })}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Rooms whose result is final: the organiser already has it, or a judge sent
+ * it for the room's current match (a result left over from an earlier draw of
+ * the same room number doesn't count).
+ */
+function lockedRooms(roundData: RoundData, results?: Record<string, unknown>): number[] {
+  return roundData.rooms
+    .filter((r) => {
+      if (r.completed) return true;
+      const entry = results?.[String(r.roomNumber)] as { matchId?: string | null } | undefined;
+      return !!entry && (!entry.matchId || entry.matchId === r.matchId);
+    })
+    .map((r) => r.roomNumber);
+}
+
+/** A room whose result is final — no form, no scores, just «تم». */
+function RoomLocked({ room, tournamentName, roundNumber, onBack }: {
+  room: RoomInfo; tournamentName: string; roundNumber: number; onBack?: () => void;
+}) {
+  return (
+    <div className="judge-page" dir="rtl">
+      <Header
+        title={room.roomLabel?.trim() || `القاعة ${room.roomNumber}`}
+        subtitle={`${tournamentName} · الجولة ${roundNumber}`}
+      />
+      <div className="judge-wrap">
+        <div className="judge-success">
+          <div className="judge-success-icon">✅</div>
+          <div className="judge-success-title">تم إرسال النتيجة</div>
+          <div className="judge-success-sub">وصلت نتيجة هذه القاعة ولا يمكن تعبئتها أو تعديلها مرة أخرى.</div>
+        </div>
+        {onBack && (
+          <button onClick={onBack} className="judge-btn judge-btn-back">← الرجوع للقاعات</button>
+        )}
       </div>
     </div>
   );
@@ -210,7 +266,13 @@ function RoomScoring({ room, sessionId, tournamentName, roundNumber, replySpeech
     try {
       await submitRoomResult(sessionId, room.roomNumber, scores);
       setSubmitStatus("sent");
-    } catch {
+    } catch (e) {
+      // Another judge already sent this room — it's final.
+      if (e instanceof Error && e.message.startsWith("HTTP 409")) {
+        setAlreadyLocked(true);
+        setSubmitStatus("sent");
+        return;
+      }
       setSubmitStatus("failed");
     }
   };

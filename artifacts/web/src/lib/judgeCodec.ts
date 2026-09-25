@@ -52,6 +52,8 @@ export interface RoomInfo {
   oppSpeakersCount: number;
   /** Judges assigned to this room — lets the link greet the judge by name. */
   judges?: RoomJudge[];
+  /** The organiser already has this room's result — the link shows it as locked. */
+  completed?: boolean;
 }
 
 export interface RoundData {

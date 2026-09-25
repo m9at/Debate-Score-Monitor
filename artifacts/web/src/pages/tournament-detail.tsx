@@ -987,6 +987,8 @@ export default function TournamentDetail() {
   const [, setLocation] = useLocation();
   const {
     getTournament,
+    setTeamDisabled,
+    setRoomDisabled,
     addTeam,
     deleteTeam,
     updateTeam,
@@ -1237,6 +1239,31 @@ export default function TournamentDetail() {
       try { unsubRound(); } catch {}
     };
   }, [tournament?.id]);
+
+  // When a room's result lands (from any link or entered by hand), mark it
+  // locked on the round's judging links so nobody can submit it again.
+  const completedSig = (tournament?.rounds ?? [])
+    .map((r) => `${r.roundNumber}:${r.matches.filter((m) => m.completed).map((m) => m.id).join(",")}`)
+    .join("|");
+  const lastCompletedSigRef = useRef<Map<number, string>>(new Map());
+  useEffect(() => {
+    const t = tournamentRef.current;
+    if (!t) return;
+    const seen = lastCompletedSigRef.current;
+    for (const round of t.rounds) {
+      if (round.matches.length === 0) continue;
+      const sig = round.matches.filter((m) => m.completed).map((m) => m.id).join(",");
+      const first = !seen.has(round.roundNumber);
+      if (seen.get(round.roundNumber) === sig) continue;
+      seen.set(round.roundNumber, sig);
+      if (first && !sig) continue;
+      void syncRoundSessionsForRound(
+        t.id,
+        round.roundNumber,
+        buildRoundSessionData(t, round),
+      ).catch(() => {});
+    }
+  }, [completedSig]);
 
   // Add team dialog state
   const [teamName, setTeamName] = useState("");
@@ -3003,6 +3030,8 @@ export default function TournamentDetail() {
               setActiveTab("overview");
               toast({ title: `تم إنشاء ${label}`, description: "وزّع المحكمين على القاعات ثم ابدأ الجولة." });
             }}
+            onToggleTeam={(teamId, disabled) => setTeamDisabled(tournament.id, teamId, disabled)}
+            onToggleRoom={(roomNumber, disabled) => setRoomDisabled(tournament.id, roomNumber, disabled)}
             onDuplicateForTest={() => {
               const id = duplicateTournamentForTest(tournament.id);
               if (!id) return;

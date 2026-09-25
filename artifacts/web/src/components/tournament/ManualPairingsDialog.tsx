@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/dialog";
 import { BRAND, BTN, BTN_PRIMARY_STYLE } from "@/lib/brand";
 import type { Tournament } from "@/types/tournament";
-import { canEditRoundPairings, type ManualPair } from "@/context/TournamentContext";
+import { activeTeams, canEditRoundPairings, type ManualPair } from "@/context/TournamentContext";
 
 interface Props {
   open: boolean;
@@ -40,7 +40,7 @@ export default function ManualPairingsDialog({ open, onOpenChange, tournament, o
     setPairs(
       round && round.matches.length > 0
         ? round.matches.map((m) => ({ govTeamId: m.team1.teamId, oppTeamId: m.team2.teamId }))
-        : Array.from({ length: Math.max(1, Math.floor(tournament.teams.length / 2)) }, () => ({ ...EMPTY })),
+        : Array.from({ length: Math.max(1, Math.floor(activeTeams(tournament).length / 2)) }, () => ({ ...EMPTY })),
     );
   };
 
@@ -59,7 +59,7 @@ export default function ManualPairingsDialog({ open, onOpenChange, tournament, o
     [p.govTeamId, p.oppTeamId].forEach((id) => id && usage.set(id, (usage.get(id) ?? 0) + 1)),
   );
   const duplicates = tournament.teams.filter((t) => (usage.get(t.id) ?? 0) > 1);
-  const unplaced = tournament.teams.filter((t) => !usage.has(t.id));
+  const unplaced = activeTeams(tournament).filter((t) => !usage.has(t.id));
   // Rooms left fully empty are simply skipped; half-filled ones block saving.
   const filled = pairs.filter((p) => p.govTeamId || p.oppTeamId);
   const incomplete = filled.some((p) => !p.govTeamId || !p.oppTeamId);
@@ -250,7 +250,7 @@ function TeamSelect({
         <option value="">— اختر فريقًا —</option>
         {/* A team picked elsewhere can't be picked again. */}
         {tournament.teams
-          .filter((t) => t.id === value || !usage.has(t.id))
+          .filter((t) => t.id === value || (!t.disabled && !usage.has(t.id)))
           .map((t) => (
             <option key={t.id} value={t.id}>
               {t.name}

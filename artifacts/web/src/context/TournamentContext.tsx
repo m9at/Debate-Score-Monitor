@@ -672,11 +672,12 @@ function reducer(state: TournamentState, action: Action): TournamentState {
           const existing = t.rounds.find((r) => r.roundNumber === action.roundNumber);
           const teamById = new Map(t.teams.map((team) => [team.id, team]));
           const matches: Match[] = [];
+          const roomNumbers = openRoomNumbers(t, action.pairs.length);
           action.pairs.forEach((pair, i) => {
             const gov = teamById.get(pair.govTeamId);
             const opp = teamById.get(pair.oppTeamId);
             if (!gov || !opp || gov.id === opp.id) return;
-            const roomNumber = matches.length + 1;
+            const roomNumber = roomNumbers[matches.length];
             const match = createMatch(gov, opp, roomNumber);
             const room = t.rooms?.find((r) => r.number === roomNumber);
             if (room?.label.trim()) match.roomLabel = room.label;
@@ -829,6 +830,19 @@ function pairBucket(
   return null;
 }
 
+/** Teams that take part in new draws (disabled/withdrawn teams are left out). */
+export function activeTeams(t: Tournament): Team[] {
+  return t.teams.filter((team) => !team.disabled);
+}
+
+/** The first `count` room numbers of a new draw, skipping disabled rooms. */
+export function openRoomNumbers(t: Tournament, count: number): number[] {
+  const closed = new Set((t.rooms ?? []).filter((r) => r.disabled).map((r) => r.number));
+  const out: number[] = [];
+  for (let n = 1; out.length < count; n++) if (!closed.has(n)) out.push(n);
+  return out;
+}
+
 function generateRound(tournament: Tournament): Round | null {
   // Rounds are pre-created empty, so "first" means no regular round was drawn yet.
   const isFirstRound = !tournament.rounds.some(
@@ -850,7 +864,7 @@ function generateRound(tournament: Tournament): Round | null {
     }
   }
 
-  let teams = [...tournament.teams];
+  let teams = activeTeams(tournament);
   if (teams.length < 2) return null;
 
   let pairList: [Team, Team][] = [];
@@ -918,8 +932,9 @@ function generateRound(tournament: Tournament): Round | null {
   };
 
   const matches: Match[] = [];
-  let roomNumber = 1;
-  for (const [a, b] of pairList) {
+  const roomNumbers = openRoomNumbers(tournament, pairList.length);
+  pairList.forEach(([a, b], i) => {
+    const roomNumber = roomNumbers[i];
     const roleA = pickRole(a.id);
     const govTeam = roleA === "gov" ? a : b;
     const oppTeam = roleA === "gov" ? b : a;
@@ -927,8 +942,7 @@ function generateRound(tournament: Tournament): Round | null {
     const room = tournament.rooms?.find((r) => r.number === roomNumber);
     if (room?.label.trim()) match.roomLabel = room.label;
     matches.push(match);
-    roomNumber++;
-  }
+  });
 
   return { roundNumber, matches, completed: false };
 }
@@ -953,7 +967,7 @@ export function knockoutPool(t: Tournament): Team[] {
     .filter((r) => r.matches.length > 0)
     .sort((a, b) => a.roundNumber - b.roundNumber);
   const regular = drawn.filter((r) => !r.kind || r.kind === "regular");
-  const ranked = recalcTeamStats(t.teams, regular).sort(
+  const ranked = recalcTeamStats(activeTeams(t), regular).sort(
     (a, b) => b.wins - a.wins || b.totalPoints - a.totalPoints,
   );
   const last = drawn[drawn.length - 1];
@@ -973,9 +987,10 @@ export function generateKnockout(t: Tournament, kind: KnockoutKind, teamCount: n
     seeds[i],
     seeds[size - 1 - i],
   ]);
+  const roomNumbers = openRoomNumbers(t, pairs.length);
   const matches = pairs.map(([gov, opp], i) => {
-    const match = createMatch(gov, opp, i + 1);
-    const room = t.rooms?.find((r) => r.number === i + 1);
+    const match = createMatch(gov, opp, roomNumbers[i]);
+    const room = t.rooms?.find((r) => r.number === roomNumbers[i]);
     if (room?.label.trim()) match.roomLabel = room.label;
     return match;
   });
@@ -1119,6 +1134,10 @@ interface TournamentContextType {
   generateKnockout: (tournamentId: string, kind: KnockoutKind, teamCount: number) => void;
   /** Replaces a round's rooms with pairings chosen by the organiser. */
   setRoundPairings: (tournamentId: string, roundNumber: number, pairs: ManualPair[]) => void;
+  /** Leaves a team out of (or back into) new draws. */
+  setTeamDisabled: (tournamentId: string, teamId: string, disabled: boolean) => void;
+  /** Closes (or reopens) a room number for new draws. */
+  setRoomDisabled: (tournamentId: string, roomNumber: number, disabled: boolean) => void;
   fillDummyData: (tournamentId: string, opts?: { teams?: number; judges?: number }) => void;
   finishTournament: (tournamentId: string) => void;
   reopenTournament: (tournamentId: string) => void;
@@ -1966,6 +1985,41 @@ export function TournamentProvider({ children }: { children: ReactNode }) {
     []
   );
 
+  const setTeamDisabled = useCallback(
+    (tournamentId: string, teamId: string, disabled: boolean) => {
+      dispatch({
+        type: "PATCH_TOURNAMENT",
+        tournamentId,
+        update: (t) => ({
+          ...t,
+          teams: t.teams.map((team) => (team.id === teamId ? { ...team, disabled } : team)),
+        }),
+      });
+    },
+    []
+  );
+
+  const setRoomDisabled = useCallback(
+    (tournamentId: string, roomNumber: number, disabled: boolean) => {
+      dispatch({
+        type: "PATCH_TOURNAMENT",
+        tournamentId,
+        update: (t) => {
+          const rooms = t.rooms ?? [];
+          const exists = rooms.some((r) => r.number === roomNumber);
+          return {
+            ...t,
+            rooms: exists
+              ? rooms.map((r) => (r.number === roomNumber ? { ...r, disabled } : r))
+              : [...rooms, { id: crypto.randomUUID(), number: roomNumber, label: "", disabled }]
+                  .sort((a, b) => a.number - b.number),
+          };
+        },
+      });
+    },
+    []
+  );
+
   const fillDummyData = useCallback(
     (tournamentId: string, opts?: { teams?: number; judges?: number }) => {
       const target = state.tournaments.find((t) => t.id === tournamentId);
@@ -2191,6 +2245,8 @@ export function TournamentProvider({ children }: { children: ReactNode }) {
         clearRoundJudges,
         redrawRound,
         setRoundPairings,
+        setTeamDisabled,
+        setRoomDisabled,
         generateKnockout: generateKnockoutRound,
         finishTournament,
         reopenTournament,

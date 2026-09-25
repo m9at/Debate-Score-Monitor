@@ -3,6 +3,7 @@ import { BRAND, BTN } from "@/lib/brand";
 import type { Tournament, TournamentSettings } from "@/types/tournament";
 import DebateRulesSettings from "./DebateRulesSettings";
 import KnockoutSettings from "./KnockoutSettings";
+import AvailabilitySettings from "./AvailabilitySettings";
 import type { KnockoutKind } from "@/context/TournamentContext";
 
 interface Props {
@@ -25,6 +26,8 @@ interface Props {
   onOpenManualPairings: () => void;
   onGenerateKnockout: (kind: KnockoutKind, teamCount: number) => void;
   onDuplicateForTest: () => void;
+  onToggleTeam: (teamId: string, disabled: boolean) => void;
+  onToggleRoom: (roomNumber: number, disabled: boolean) => void;
 }
 
 /**
@@ -49,6 +52,8 @@ export default function SettingsPanel({
   onOpenManualPairings,
   onGenerateKnockout,
   onDuplicateForTest,
+  onToggleTeam,
+  onToggleRoom,
 }: Props) {
   return (
     <div className="space-y-4" dir="rtl">
@@ -90,6 +95,14 @@ export default function SettingsPanel({
             تحديد المواجهات
           </button>
         </Row>
+      </Card>
+
+      <Card title="تعطيل الفرق والقاعات">
+        <AvailabilitySettings
+          tournament={tournament}
+          onToggleTeam={onToggleTeam}
+          onToggleRoom={onToggleRoom}
+        />
       </Card>
 
       <Card title="الجولة القادمة — الأدوار الإقصائية">
