@@ -88,6 +88,7 @@ import RoundJudgeBoard from "@/components/tournament/RoundJudgeBoard";
 import ImageUploadField from "@/components/common/ImageUploadField";
 import ReportsPanel from "@/components/tournament/ReportsPanel";
 import SettingsPanel from "@/components/tournament/SettingsPanel";
+import ManualPairingsDialog from "@/components/tournament/ManualPairingsDialog";
 import IdentityPanel from "@/components/tournament/IdentityPanel";
 import CountdownPanel from "@/components/tournament/CountdownPanel";
 import PublicStatsPanel from "@/components/tournament/PublicStatsPanel";
@@ -1015,6 +1016,7 @@ export default function TournamentDetail() {
     autoAssignJudges,
     clearRoundJudges,
     redrawRound,
+    setRoundPairings,
     duplicateTournamentForTest,
     setRoundLocked,
     markResultAnnounced,
@@ -1247,6 +1249,7 @@ export default function TournamentDetail() {
   // Delete tournament confirmation
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   const [confirmFinishOpen, setConfirmFinishOpen] = useState(false);
+  const [manualPairingsOpen, setManualPairingsOpen] = useState(false);
   const [confirmRedrawRound, setConfirmRedrawRound] = useState<number | null>(null);
   const [confirmReopenOpen, setConfirmReopenOpen] = useState(false);
 
@@ -3007,11 +3010,21 @@ export default function TournamentDetail() {
               (tournament.rounds.find((r) => r.roundNumber === tournament.currentRound)?.matches.length ?? 0) > 0
             }
             onRedraw={() => handleRedraw(tournament.currentRound)}
+            onOpenManualPairings={() => setManualPairingsOpen(true)}
             onDuplicateForTest={() => {
               const id = duplicateTournamentForTest(tournament.id);
               if (!id) return;
               toast({ title: "تم إنشاء نسخة تجريبية من البطولة" });
               setLocation(`/tournament/${id}`);
+            }}
+          />
+          <ManualPairingsDialog
+            open={manualPairingsOpen}
+            onOpenChange={setManualPairingsOpen}
+            tournament={tournament}
+            onSave={(roundNumber, pairs) => {
+              setRoundPairings(tournament.id, roundNumber, pairs);
+              toast({ title: `تم حفظ مواجهات الجولة ${roundNumber}` });
             }}
           />
           </div>

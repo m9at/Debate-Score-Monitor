@@ -21,6 +21,12 @@ import {
   deleteShared,
 } from "@/lib/sharedTournamentsApi";
 
+/** One room of a manually set draw: who is government and who is opposition. */
+export interface ManualPair {
+  govTeamId: string;
+  oppTeamId: string;
+}
+
 const STORAGE_KEY = "debate_tournaments_v2";
 const SYNC_POLL_MS = 8000;
 const SYNC_DEBOUNCE_MS = 800;
@@ -67,6 +73,7 @@ type Action =
   | { type: "AUTO_ASSIGN_JUDGES"; tournamentId: string; roundNumber: number }
   | { type: "CLEAR_ROUND_JUDGES"; tournamentId: string; roundNumber: number }
   | { type: "REDRAW_ROUND"; tournamentId: string; roundNumber: number }
+  | { type: "SET_ROUND_PAIRINGS"; tournamentId: string; roundNumber: number; pairs: ManualPair[] }
   | { type: "SET_PROTECTION"; tournamentId: string; protection: TournamentProtection };
 
 function reducer(state: TournamentState, action: Action): TournamentState {
@@ -625,9 +632,65 @@ function reducer(state: TournamentState, action: Action): TournamentState {
           };
         }),
       };
+    case "SET_ROUND_PAIRINGS":
+      return {
+        tournaments: state.tournaments.map((t) => {
+          if (t.id !== action.tournamentId) return t;
+          if (!canEditRoundPairings(t, action.roundNumber)) return t;
+          const existing = t.rounds.find((r) => r.roundNumber === action.roundNumber);
+          const teamById = new Map(t.teams.map((team) => [team.id, team]));
+          const matches: Match[] = [];
+          action.pairs.forEach((pair, i) => {
+            const gov = teamById.get(pair.govTeamId);
+            const opp = teamById.get(pair.oppTeamId);
+            if (!gov || !opp || gov.id === opp.id) return;
+            const roomNumber = matches.length + 1;
+            const match = createMatch(gov, opp, roomNumber);
+            const room = t.rooms?.find((r) => r.number === roomNumber);
+            if (room?.label.trim()) match.roomLabel = room.label;
+            // The room keeps its judges when only the teams change.
+            const prev = existing?.matches[i];
+            if (prev?.judgeAssignment) match.judgeAssignment = prev.judgeAssignment;
+            matches.push(match);
+          });
+          const wasEmpty = !existing || existing.matches.length === 0;
+          const isFirstDraw = !t.rounds.some(
+            (r) => r.matches.length > 0 && (!r.kind || r.kind === "regular"),
+          );
+          const round: Round = {
+            ...(existing ?? { roundNumber: action.roundNumber }),
+            matches,
+            completed: false,
+          };
+          if (isFirstDraw && !round.caseText && t.openingCaseText) {
+            round.caseText = t.openingCaseText;
+          }
+          const rounds = existing
+            ? t.rounds.map((r) => (r.roundNumber === action.roundNumber ? round : r))
+            : [...t.rounds, round].sort((a, b) => a.roundNumber - b.roundNumber);
+          return {
+            ...t,
+            rounds,
+            totalRounds: Math.max(t.totalRounds, action.roundNumber),
+            currentRound: wasEmpty && matches.length > 0 ? action.roundNumber : t.currentRound,
+            finished: false,
+            pendingResults: (t.pendingResults ?? []).filter(
+              (p) => p.roundNumber !== action.roundNumber,
+            ),
+          };
+        }),
+      };
     default:
       return state;
   }
+}
+
+/** A regular round's pairings can be set by hand while it has no results. */
+export function canEditRoundPairings(t: Tournament, roundNumber: number): boolean {
+  const round = t.rounds.find((r) => r.roundNumber === roundNumber);
+  if (!round) return true;
+  if (round.kind && round.kind !== "regular") return false;
+  return !round.matches.some((m) => m.completed);
 }
 
 /** A regular round can be redrawn while it has no results and nothing follows it. */
@@ -970,6 +1033,8 @@ interface TournamentContextType {
   clearRoundJudges: (tournamentId: string, roundNumber: number) => void;
   /** Re-pairs a round that has no results yet, with all current teams. */
   redrawRound: (tournamentId: string, roundNumber: number) => void;
+  /** Replaces a round's rooms with pairings chosen by the organiser. */
+  setRoundPairings: (tournamentId: string, roundNumber: number, pairs: ManualPair[]) => void;
   fillDummyData: (tournamentId: string, opts?: { teams?: number; judges?: number }) => void;
   finishTournament: (tournamentId: string) => void;
   reopenTournament: (tournamentId: string) => void;
@@ -1804,6 +1869,12 @@ export function TournamentProvider({ children }: { children: ReactNode }) {
     },
     []
   );
+  const setRoundPairings = useCallback(
+    (tournamentId: string, roundNumber: number, pairs: ManualPair[]) => {
+      dispatch({ type: "SET_ROUND_PAIRINGS", tournamentId, roundNumber, pairs });
+    },
+    []
+  );
 
   const fillDummyData = useCallback(
     (tournamentId: string, opts?: { teams?: number; judges?: number }) => {
@@ -2029,6 +2100,7 @@ export function TournamentProvider({ children }: { children: ReactNode }) {
         autoAssignJudges,
         clearRoundJudges,
         redrawRound,
+        setRoundPairings,
         finishTournament,
         reopenTournament,
         deleteRound,

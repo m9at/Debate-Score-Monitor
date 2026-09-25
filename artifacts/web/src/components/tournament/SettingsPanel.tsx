@@ -1,4 +1,4 @@
-import { Copy, Eye, EyeOff, Flag, RotateCcw, ShieldCheck, Trash2, Trophy } from "lucide-react";
+import { Copy, Eye, EyeOff, Flag, RotateCcw, ShieldCheck, Swords, Trash2, Trophy } from "lucide-react";
 import { BRAND, BTN } from "@/lib/brand";
 import type { Tournament, TournamentSettings } from "@/types/tournament";
 import DebateRulesSettings from "./DebateRulesSettings";
@@ -20,6 +20,7 @@ interface Props {
   redrawRoundNumber: number;
   canRedraw: boolean;
   onRedraw: () => void;
+  onOpenManualPairings: () => void;
   onDuplicateForTest: () => void;
 }
 
@@ -42,6 +43,7 @@ export default function SettingsPanel({
   redrawRoundNumber,
   canRedraw,
   onRedraw,
+  onOpenManualPairings,
   onDuplicateForTest,
 }: Props) {
   return (
@@ -68,6 +70,20 @@ export default function SettingsPanel({
           >
             <RotateCcw className="w-4 h-4" />
             إعادة القرعة
+          </button>
+        </Row>
+        <Row
+          title="تحديد المواجهات يدويًا"
+          hint="اختر بنفسك من يواجه من في كل قاعة (حكومة ضد معارضة) لأي جولة لم تُسجّل لها نتائج، أو عدّل قرعة موجودة."
+        >
+          <button
+            type="button"
+            onClick={onOpenManualPairings}
+            className={`${BTN.base} ${BTN.secondary} h-9 px-3.5 text-[12.5px]`}
+            data-testid="settings-manual-pairings"
+          >
+            <Swords className="w-4 h-4" />
+            تحديد المواجهات
           </button>
         </Row>
       </Card>
