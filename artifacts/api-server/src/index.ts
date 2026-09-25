@@ -75,6 +75,27 @@ app.post(
       res.status(400).json({ error: "missing tournamentId or roundData" });
       return;
     }
+    // One link per round: reuse the round's existing session (refreshing its
+    // rooms) so every judge submits to the same place.
+    const roundNumber = Number(roundData.roundNumber);
+    const existing = await db.execute<{ id: string }>(sql`
+      SELECT id FROM judge_sessions
+      WHERE tournament_id = ${tournamentId}
+        AND kind = 'round'
+        AND (info->>'roundNumber') ~ '^[0-9]+$'
+        AND (info->>'roundNumber')::int = ${roundNumber}
+      ORDER BY created_at DESC
+      LIMIT 1
+    `);
+    const found = existing.rows[0]?.id;
+    if (found) {
+      await db
+        .update(judgeSessions)
+        .set({ info: roundData })
+        .where(eq(judgeSessions.id, found));
+      res.json({ id: found });
+      return;
+    }
     const id = randomUUID();
     await db.insert(judgeSessions).values({
       id,
@@ -190,9 +211,17 @@ app.put(
     }
     const entry = { ...scores, submittedAt: Date.now() };
     const room = param(req, "room");
+    // Stamp the result with the match the room held at submit time, so a later
+    // redraw that reuses the room number can't reassign it to another match.
     await db.execute(sql`
       UPDATE judge_sessions
-      SET results = COALESCE(results, '{}'::jsonb) || jsonb_build_object(${room}::text, ${JSON.stringify(entry)}::jsonb)
+      SET results = COALESCE(results, '{}'::jsonb) || jsonb_build_object(
+        ${room}::text,
+        ${JSON.stringify(entry)}::jsonb || jsonb_build_object('matchId', (
+          SELECT r->>'matchId' FROM jsonb_array_elements(info->'rooms') r
+          WHERE r->>'roomNumber' = ${room}::text LIMIT 1
+        ))
+      )
       WHERE id = ${param(req, "id")} AND kind = 'round'
     `);
     res.json({ ok: true });
