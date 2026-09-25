@@ -70,6 +70,10 @@ export default defineConfig({
       "/api": {
         target: process.env.API_URL || "http://localhost:5050",
         changeOrigin: true,
+        // Don't let a reset API/client socket crash the dev server.
+        configure: (proxy) => {
+          proxy.on("error", () => {});
+        },
       },
     },
     fs: {

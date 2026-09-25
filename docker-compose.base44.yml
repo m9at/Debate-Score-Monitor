@@ -64,6 +64,8 @@ services:
       - /run/base44/app.env
     ports:
       - "3000:3000"
+    # A dropped client connection (ECONNRESET) can crash the dev server; come back up automatically.
+    restart: unless-stopped
     depends_on:
       setup:
         condition: service_completed_successfully
