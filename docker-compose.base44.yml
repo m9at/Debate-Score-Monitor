@@ -59,6 +59,7 @@ services:
       PORT: "3000"
       BASE_PATH: "/"
       API_URL: "http://api:5050"
+      DISABLE_HMR: "true"
     env_file:
       - /run/base44/app.env
     ports:

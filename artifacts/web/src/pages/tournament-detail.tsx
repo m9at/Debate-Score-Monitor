@@ -366,7 +366,9 @@ function buildPdfHtml(tournament: Tournament): string {
 
   // ───── Round sections (with judges, best speaker, judge notes) ─────
   const roundLabel = (r: { kind?: string; roundNumber: number }) =>
-    r.kind === "semifinal"
+    r.kind === "quarterfinal"
+      ? "ربع النهائي"
+      : r.kind === "semifinal"
       ? "نصف النهائي"
       : r.kind === "final"
       ? "النهائي"
@@ -890,7 +892,9 @@ function StandingRow({ team, rank, rounds, onClick, hideScores }: StandingRowPro
       if (!m || !m.completed) return null;
       const mt = m.team1.teamId === team.id ? m.team1 : m.team2;
       const label =
-        r.kind === "semifinal"
+        r.kind === "quarterfinal"
+          ? "ربع"
+          : r.kind === "semifinal"
           ? "نصف"
           : r.kind === "final"
           ? "نهائي"
@@ -1017,6 +1021,7 @@ export default function TournamentDetail() {
     clearRoundJudges,
     redrawRound,
     setRoundPairings,
+    generateKnockout,
     duplicateTournamentForTest,
     setRoundLocked,
     markResultAnnounced,
@@ -1434,7 +1439,9 @@ export default function TournamentDetail() {
   }, [tournament, sortedTeams, standingsRoundFilter]);
 
   const standingsRoundLabel = (r: { kind?: string; roundNumber: number }) =>
-    r.kind === "semifinal"
+    r.kind === "quarterfinal"
+      ? "ربع النهائي"
+      : r.kind === "semifinal"
       ? "نصف النهائي"
       : r.kind === "final"
       ? "النهائي"
@@ -1616,7 +1623,7 @@ export default function TournamentDetail() {
     regularRounds.length >= tournament.totalRounds &&
     regularRounds.every((r) => r.completed);
   const lastIsKnockout =
-    !!lastRound && (lastRound.kind === "semifinal" || lastRound.kind === "final");
+    !!lastRound && !!lastRound.kind && lastRound.kind !== "regular";
   const canGenerateRound =
     tournament.started &&
     !tournament.finished &&
@@ -3011,6 +3018,14 @@ export default function TournamentDetail() {
             }
             onRedraw={() => handleRedraw(tournament.currentRound)}
             onOpenManualPairings={() => setManualPairingsOpen(true)}
+            onGenerateKnockout={(kind, teamCount) => {
+              generateKnockout(tournament.id, kind, teamCount);
+              const label = kind === "quarterfinal" ? "ربع النهائي" : kind === "semifinal" ? "نصف النهائي" : "النهائي";
+              logAction(tournament.id, "بدء دور إقصائي", label);
+              setViewingRound(null);
+              setActiveTab("overview");
+              toast({ title: `تم إنشاء ${label}`, description: "وزّع المحكمين على القاعات ثم ابدأ الجولة." });
+            }}
             onDuplicateForTest={() => {
               const id = duplicateTournamentForTest(tournament.id);
               if (!id) return;
@@ -3226,7 +3241,9 @@ export default function TournamentDetail() {
                                   const mt =
                                     m.team1.teamId === team.id ? m.team1 : m.team2;
                                   const label =
-                                    r.kind === "semifinal"
+                                    r.kind === "quarterfinal"
+                                      ? "ربع"
+                                      : r.kind === "semifinal"
                                       ? "نصف"
                                       : r.kind === "final"
                                       ? "نهائي"

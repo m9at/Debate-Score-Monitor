@@ -44,7 +44,7 @@ export interface Round {
   completed: boolean;
   caseText?: string;
   judgesPerRoom?: number;
-  kind?: "regular" | "semifinal" | "final";
+  kind?: "regular" | "quarterfinal" | "semifinal" | "final";
   /** Locked rounds cannot have their results edited until reopened. */
   locked?: boolean;
 }

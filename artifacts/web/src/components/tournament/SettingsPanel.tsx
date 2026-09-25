@@ -2,6 +2,8 @@ import { Copy, Eye, EyeOff, Flag, RotateCcw, ShieldCheck, Swords, Trash2, Trophy
 import { BRAND, BTN } from "@/lib/brand";
 import type { Tournament, TournamentSettings } from "@/types/tournament";
 import DebateRulesSettings from "./DebateRulesSettings";
+import KnockoutSettings from "./KnockoutSettings";
+import type { KnockoutKind } from "@/context/TournamentContext";
 
 interface Props {
   tournament: Tournament;
@@ -21,6 +23,7 @@ interface Props {
   canRedraw: boolean;
   onRedraw: () => void;
   onOpenManualPairings: () => void;
+  onGenerateKnockout: (kind: KnockoutKind, teamCount: number) => void;
   onDuplicateForTest: () => void;
 }
 
@@ -44,6 +47,7 @@ export default function SettingsPanel({
   canRedraw,
   onRedraw,
   onOpenManualPairings,
+  onGenerateKnockout,
   onDuplicateForTest,
 }: Props) {
   return (
@@ -86,6 +90,10 @@ export default function SettingsPanel({
             تحديد المواجهات
           </button>
         </Row>
+      </Card>
+
+      <Card title="الجولة القادمة — الأدوار الإقصائية">
+        <KnockoutSettings tournament={tournament} onGenerate={onGenerateKnockout} />
       </Card>
 
       <Card title="نسخة تجريبية">

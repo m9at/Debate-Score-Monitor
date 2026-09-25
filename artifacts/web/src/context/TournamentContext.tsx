@@ -27,6 +27,8 @@ export interface ManualPair {
   oppTeamId: string;
 }
 
+export type KnockoutKind = "quarterfinal" | "semifinal" | "final";
+
 const STORAGE_KEY = "debate_tournaments_v2";
 const SYNC_POLL_MS = 8000;
 const SYNC_DEBOUNCE_MS = 800;
@@ -73,6 +75,7 @@ type Action =
   | { type: "AUTO_ASSIGN_JUDGES"; tournamentId: string; roundNumber: number }
   | { type: "CLEAR_ROUND_JUDGES"; tournamentId: string; roundNumber: number }
   | { type: "REDRAW_ROUND"; tournamentId: string; roundNumber: number }
+  | { type: "GENERATE_KNOCKOUT"; tournamentId: string; kind: KnockoutKind; teamCount: number }
   | { type: "SET_ROUND_PAIRINGS"; tournamentId: string; roundNumber: number; pairs: ManualPair[] }
   | { type: "SET_PROTECTION"; tournamentId: string; protection: TournamentProtection };
 
@@ -632,6 +635,35 @@ function reducer(state: TournamentState, action: Action): TournamentState {
           };
         }),
       };
+    case "GENERATE_KNOCKOUT":
+      return {
+        tournaments: state.tournaments.map((t) => {
+          if (t.id !== action.tournamentId) return t;
+          const round = generateKnockout(t, action.kind, action.teamCount);
+          if (!round) return t;
+          // Fills the first empty (undrawn) slot; any later empty regular slots
+          // are dropped because the organiser moved to the knockout stage.
+          const slot = t.rounds
+            .filter((r) => r.matches.length === 0)
+            .sort((a, b) => a.roundNumber - b.roundNumber)[0];
+          if (slot) {
+            round.roundNumber = slot.roundNumber;
+            round.caseText = slot.caseText;
+            round.judgesPerRoom = slot.judgesPerRoom;
+          }
+          const rounds = [
+            ...t.rounds.filter((r) => r.matches.length > 0 || (r.kind && r.kind !== "regular" && r !== slot)),
+            round,
+          ].sort((a, b) => a.roundNumber - b.roundNumber);
+          return {
+            ...t,
+            rounds,
+            totalRounds: rounds.filter((r) => !r.kind || r.kind === "regular").length,
+            currentRound: round.roundNumber,
+            finished: false,
+          };
+        }),
+      };
     case "SET_ROUND_PAIRINGS":
       return {
         tournaments: state.tournaments.map((t) => {
@@ -901,6 +933,55 @@ function generateRound(tournament: Tournament): Round | null {
   return { roundNumber, matches, completed: false };
 }
 
+/**
+ * Knockout pools: the winners of the previous knockout round, or the regular
+ * standings. Quarterfinal pairs by rank (1×2, 3×4…), semifinal 1×4 and 2×3,
+ * final 1×2. The higher seed argues government.
+ */
+export function knockoutReady(t: Tournament): boolean {
+  const drawn = t.rounds.filter((r) => r.matches.length > 0);
+  return (
+    t.started &&
+    drawn.length > 0 &&
+    drawn.every((r) => r.matches.every((m) => m.completed)) &&
+    drawn[drawn.length - 1].kind !== "final"
+  );
+}
+
+export function knockoutPool(t: Tournament): Team[] {
+  const drawn = [...t.rounds]
+    .filter((r) => r.matches.length > 0)
+    .sort((a, b) => a.roundNumber - b.roundNumber);
+  const regular = drawn.filter((r) => !r.kind || r.kind === "regular");
+  const ranked = recalcTeamStats(t.teams, regular).sort(
+    (a, b) => b.wins - a.wins || b.totalPoints - a.totalPoints,
+  );
+  const last = drawn[drawn.length - 1];
+  if (!last || !last.kind || last.kind === "regular") return ranked;
+  const winners = new Set(last.matches.map((m) => m.winnerId));
+  return ranked.filter((team) => winners.has(team.id));
+}
+
+export function generateKnockout(t: Tournament, kind: KnockoutKind, teamCount: number): Round | null {
+  if (!knockoutReady(t)) return null;
+  const size = kind === "semifinal" ? 4 : kind === "final" ? 2 : teamCount;
+  const pool = knockoutPool(t);
+  if (size < 2 || size % 2 === 1 || pool.length < size) return null;
+  const seeds = pool.slice(0, size);
+  const pairs: [Team, Team][] =
+    kind === "semifinal"
+      ? [[seeds[0], seeds[3]], [seeds[1], seeds[2]]]
+      : Array.from({ length: size / 2 }, (_, i) => [seeds[2 * i], seeds[2 * i + 1]]);
+  const matches = pairs.map(([gov, opp], i) => {
+    const match = createMatch(gov, opp, i + 1);
+    const room = t.rooms?.find((r) => r.number === i + 1);
+    if (room?.label.trim()) match.roomLabel = room.label;
+    return match;
+  });
+  const roundNumber = t.rounds.reduce((max, r) => Math.max(max, r.roundNumber), 0) + 1;
+  return { roundNumber, matches, completed: false, kind };
+}
+
 function generateSemifinal(tournament: Tournament): Round | null {
   const regularRounds = tournament.rounds.filter(
     (r) => !r.kind || r.kind === "regular"
@@ -1033,6 +1114,8 @@ interface TournamentContextType {
   clearRoundJudges: (tournamentId: string, roundNumber: number) => void;
   /** Re-pairs a round that has no results yet, with all current teams. */
   redrawRound: (tournamentId: string, roundNumber: number) => void;
+  /** Starts a knockout round (quarterfinal with N teams, semifinal or final). */
+  generateKnockout: (tournamentId: string, kind: KnockoutKind, teamCount: number) => void;
   /** Replaces a round's rooms with pairings chosen by the organiser. */
   setRoundPairings: (tournamentId: string, roundNumber: number, pairs: ManualPair[]) => void;
   fillDummyData: (tournamentId: string, opts?: { teams?: number; judges?: number }) => void;
@@ -1869,6 +1952,12 @@ export function TournamentProvider({ children }: { children: ReactNode }) {
     },
     []
   );
+  const generateKnockoutRound = useCallback(
+    (tournamentId: string, kind: KnockoutKind, teamCount: number) => {
+      dispatch({ type: "GENERATE_KNOCKOUT", tournamentId, kind, teamCount });
+    },
+    []
+  );
   const setRoundPairings = useCallback(
     (tournamentId: string, roundNumber: number, pairs: ManualPair[]) => {
       dispatch({ type: "SET_ROUND_PAIRINGS", tournamentId, roundNumber, pairs });
@@ -2101,6 +2190,7 @@ export function TournamentProvider({ children }: { children: ReactNode }) {
         clearRoundJudges,
         redrawRound,
         setRoundPairings,
+        generateKnockout: generateKnockoutRound,
         finishTournament,
         reopenTournament,
         deleteRound,

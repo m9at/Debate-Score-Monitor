@@ -62,6 +62,10 @@ export default defineConfig({
     port,
     host: "0.0.0.0",
     allowedHosts: true,
+    // DISABLE_HMR=true stops the dev server from reloading the page by itself
+    // (e.g. after a dropped connection); refresh manually to see code changes.
+    hmr: process.env.DISABLE_HMR === "true" ? false : undefined,
+    ws: process.env.DISABLE_HMR === "true" ? false : undefined,
     proxy: {
       "/api": {
         target: process.env.API_URL || "http://localhost:5050",

@@ -19,6 +19,7 @@ pnpm monorepo — "Oman Debates" debate tournament scoring system. Three runtime
 | web | PORT | 3000 |
 | web | BASE_PATH | / |
 | web | API_URL | http://api:5050 (Vite proxy target) |
+| web | DISABLE_HMR | true — user asked that the page never refresh by itself; Vite HMR/websocket are off (a dropped websocket made Vite `location.reload()`). After code edits, reload the preview manually. |
 | api | DATABASE_URL | postgresql://oman:oman_debates_dev@db:5432/oman_debates |
 | api | PORT | 5050 |
 
