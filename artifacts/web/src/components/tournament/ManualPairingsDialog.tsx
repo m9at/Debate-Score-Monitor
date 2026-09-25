@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { AlertTriangle, ArrowLeftRight, Plus, Trash2 } from "lucide-react";
+import { AlertTriangle, ArrowLeftRight, Plus, RotateCcw } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -60,8 +60,10 @@ export default function ManualPairingsDialog({ open, onOpenChange, tournament, o
   );
   const duplicates = tournament.teams.filter((t) => (usage.get(t.id) ?? 0) > 1);
   const unplaced = tournament.teams.filter((t) => !usage.has(t.id));
-  const incomplete = pairs.some((p) => !p.govTeamId || !p.oppTeamId);
-  const canSave = editableRounds.length > 0 && pairs.length > 0 && !incomplete && duplicates.length === 0;
+  // Rooms left fully empty are simply skipped; half-filled ones block saving.
+  const filled = pairs.filter((p) => p.govTeamId || p.oppTeamId);
+  const incomplete = filled.some((p) => !p.govTeamId || !p.oppTeamId);
+  const canSave = editableRounds.length > 0 && filled.length > 0 && !incomplete && duplicates.length === 0;
 
   const update = (i: number, patch: Partial<ManualPair>) =>
     setPairs((prev) => prev.map((p, idx) => (idx === i ? { ...p, ...patch } : p)));
@@ -71,7 +73,7 @@ export default function ManualPairingsDialog({ open, onOpenChange, tournament, o
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[88vh] overflow-y-auto" dir="rtl">
+      <DialogContent className="max-w-3xl max-h-[88vh] overflow-y-auto" dir="rtl">
         <DialogHeader className="text-right sm:text-right">
           <DialogTitle>تحديد المواجهات يدويًا</DialogTitle>
           <DialogDescription>
@@ -103,20 +105,29 @@ export default function ManualPairingsDialog({ open, onOpenChange, tournament, o
               </select>
             </label>
 
-            <div className="space-y-2">
+            <div className="grid gap-2 md:grid-cols-2">
               {pairs.map((p, i) => (
                 <div
                   key={i}
-                  className="flex items-end gap-2 flex-wrap rounded-xl border p-2.5"
+                  className="rounded-xl border p-2 space-y-1.5"
                   style={{ borderColor: BRAND.border }}
                   data-testid={`manual-pair-${i}`}
                 >
-                  <span
-                    className="w-20 shrink-0 self-center text-[12.5px] font-bold"
-                    style={{ color: BRAND.purple }}
-                  >
-                    {roomName(i)}
-                  </span>
+                  <div className="flex items-center justify-between">
+                    <span className="text-[12px] font-bold" style={{ color: BRAND.purple }}>
+                      {roomName(i)}
+                    </span>
+                    <button
+                      type="button"
+                      title="إعادة تعيين القاعة"
+                      onClick={() => update(i, { ...EMPTY })}
+                      className={`${BTN.base} ${BTN.ghost} h-7 w-7 px-0`}
+                      data-testid={`manual-pair-${i}-reset`}
+                    >
+                      <RotateCcw className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                  <div className="flex items-end gap-1.5">
                   <TeamSelect
                     label="الحكومة"
                     value={p.govTeamId}
@@ -129,7 +140,7 @@ export default function ManualPairingsDialog({ open, onOpenChange, tournament, o
                     type="button"
                     title="تبديل الجهتين"
                     onClick={() => update(i, { govTeamId: p.oppTeamId, oppTeamId: p.govTeamId })}
-                    className={`${BTN.base} ${BTN.ghost} h-9 w-9 px-0`}
+                    className={`${BTN.base} ${BTN.ghost} h-8 w-8 px-0 shrink-0`}
                   >
                     <ArrowLeftRight className="w-4 h-4" />
                   </button>
@@ -141,14 +152,7 @@ export default function ManualPairingsDialog({ open, onOpenChange, tournament, o
                     usage={usage}
                     testId={`manual-pair-${i}-opp`}
                   />
-                  <button
-                    type="button"
-                    title="حذف القاعة"
-                    onClick={() => setPairs((prev) => prev.filter((_, idx) => idx !== i))}
-                    className={`${BTN.base} ${BTN.ghost} h-9 w-9 px-0 text-[#EF4444]`}
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+                  </div>
                 </div>
               ))}
             </div>
@@ -168,11 +172,26 @@ export default function ManualPairingsDialog({ open, onOpenChange, tournament, o
                 فرق مكررة في أكثر من مكان: {duplicates.map((t) => t.name).join("، ")}
               </Warning>
             )}
-            {unplaced.length > 0 && (
-              <Warning tone="yellow">
-                فرق غير موزعة على أي قاعة: {unplaced.map((t) => t.name).join("، ")}
-              </Warning>
-            )}
+            <div className="space-y-1.5" data-testid="manual-pairings-unused">
+              <p className="text-[12px] font-bold" style={{ color: BRAND.ink }}>
+                الفرق غير المستخدمة ({unplaced.length})
+              </p>
+              {unplaced.length === 0 ? (
+                <p className="text-[12px] text-[#15803D]">تم توزيع جميع الفرق ✓</p>
+              ) : (
+                <div className="flex flex-wrap gap-1.5">
+                  {unplaced.map((t) => (
+                    <span
+                      key={t.id}
+                      className="rounded-full px-2.5 py-0.5 text-[11.5px] font-bold"
+                      style={{ color: "#B45309", backgroundColor: "#FFFBEB" }}
+                    >
+                      {t.name}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         )}
 
@@ -181,10 +200,10 @@ export default function ManualPairingsDialog({ open, onOpenChange, tournament, o
             type="button"
             disabled={!canSave}
             onClick={() => {
-              onSave(roundNumber, pairs);
+              onSave(roundNumber, filled);
               onOpenChange(false);
             }}
-            className={`${BTN.base} ${BTN.primary}`}
+            className={`${BTN.base} ${BTN.primary} h-8 px-3 text-[12.5px]`}
             style={BTN_PRIMARY_STYLE}
             data-testid="manual-pairings-save"
           >
@@ -193,7 +212,7 @@ export default function ManualPairingsDialog({ open, onOpenChange, tournament, o
           <button
             type="button"
             onClick={() => onOpenChange(false)}
-            className={`${BTN.base} ${BTN.secondary}`}
+            className={`${BTN.base} ${BTN.secondary} h-8 px-3 text-[12.5px]`}
           >
             إلغاء
           </button>
@@ -219,22 +238,24 @@ function TeamSelect({
   testId: string;
 }) {
   return (
-    <label className="flex-1 min-w-[9rem] flex flex-col gap-0.5 text-[11px]" style={{ color: BRAND.ink }}>
+    <label className="flex-1 min-w-0 flex flex-col gap-0.5 text-[11px]" style={{ color: BRAND.ink }}>
       {label}
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="h-9 rounded-lg border px-2 text-[13px] bg-white"
+        className="h-8 w-full rounded-lg border px-1.5 text-[12.5px] bg-white"
         style={{ borderColor: BRAND.border }}
         data-testid={testId}
       >
         <option value="">— اختر فريقًا —</option>
-        {tournament.teams.map((t) => (
-          <option key={t.id} value={t.id}>
-            {t.name}
-            {usage.has(t.id) && t.id !== value ? " (مستخدم)" : ""}
-          </option>
-        ))}
+        {/* A team picked elsewhere can't be picked again. */}
+        {tournament.teams
+          .filter((t) => t.id === value || !usage.has(t.id))
+          .map((t) => (
+            <option key={t.id} value={t.id}>
+              {t.name}
+            </option>
+          ))}
       </select>
     </label>
   );
