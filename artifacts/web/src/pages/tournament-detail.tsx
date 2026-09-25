@@ -1281,6 +1281,7 @@ export default function TournamentDetail() {
   // Delete tournament confirmation
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   const [confirmFinishOpen, setConfirmFinishOpen] = useState(false);
+  const [advancementDismissed, setAdvancementDismissed] = useState(false);
   const [manualPairingsOpen, setManualPairingsOpen] = useState(false);
   const [confirmRedrawRound, setConfirmRedrawRound] = useState<number | null>(null);
   const [confirmReopenOpen, setConfirmReopenOpen] = useState(false);
@@ -3938,7 +3939,7 @@ export default function TournamentDetail() {
       )}
 
       {/* Bottom action bar - Advancement suggestion (rounds count reached) */}
-      {activeTab === "rounds" && showAdvancementSuggestion && (
+      {activeTab === "rounds" && showAdvancementSuggestion && !advancementDismissed && (
         <div
           className="fixed bottom-0 left-0 right-0 bg-background border-t border-border p-4 z-20"
           data-testid="card-advancement-suggestion"
@@ -3946,9 +3947,18 @@ export default function TournamentDetail() {
           <div className="max-w-5xl mx-auto">
             <div className="flex items-center gap-2 mb-3">
               <Flag className="w-4 h-4" style={{ color: GOLD }} />
-              <p className="text-sm font-bold">
+              <p className="text-sm font-bold flex-1">
                 اكتملت جميع الجولات — ماذا تريد بعد ذلك؟
               </p>
+              <button
+                type="button"
+                onClick={() => setAdvancementDismissed(true)}
+                className="p-1 rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
+                aria-label="إغلاق"
+                data-testid="button-dismiss-advancement"
+              >
+                <X className="w-4 h-4" />
+              </button>
             </div>
             <div className="flex flex-col gap-2">
               {tournament.teams.length >= 4 && (
