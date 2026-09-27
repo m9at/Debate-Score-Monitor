@@ -1657,13 +1657,15 @@ export default function TournamentDetail() {
     !tournament.finished &&
     !lastIsKnockout &&
     (tournament.rounds.length === 0 || lastRound?.completed);
+  // A finished quarterfinal always leads to the semifinal (its winners advance).
+  const quarterfinalDone =
+    lastRound?.kind === "quarterfinal" && isCurrentRoundComplete();
   const canGenerateSemifinal =
     tournament.started &&
     !tournament.finished &&
-    !!tournament.semifinalEnabled &&
     !hasSemifinal &&
     !hasFinal &&
-    allRegularDone &&
+    (quarterfinalDone || (!!tournament.semifinalEnabled && allRegularDone)) &&
     tournament.teams.length >= 4;
   const canGenerateFinal =
     tournament.started &&
