@@ -972,8 +972,22 @@ export function knockoutPool(t: Tournament): Team[] {
   );
   const last = drawn[drawn.length - 1];
   if (!last || !last.kind || last.kind === "regular") return ranked;
-  const winners = new Set(last.matches.map((m) => m.winnerId));
-  return ranked.filter((team) => winners.has(team.id));
+  // Winners of the last knockout round, ranked by the points they scored in it.
+  const winnerScore = new Map<string, number>();
+  for (const m of last.matches) {
+    const w = [m.team1, m.team2].find((mt) => mt.teamId === m.winnerId);
+    if (w) winnerScore.set(w.teamId, w.totalScore);
+  }
+  return ranked
+    .filter((team) => winnerScore.has(team.id))
+    .sort((a, b) => winnerScore.get(b.id)! - winnerScore.get(a.id)!);
+}
+
+/** True when the latest drawn round is a knockout round (quarterfinal, etc.). */
+function afterKnockout(t: Tournament): boolean {
+  const drawn = t.rounds.filter((r) => r.matches.length > 0);
+  const last = drawn.sort((a, b) => a.roundNumber - b.roundNumber)[drawn.length - 1];
+  return !!last?.kind && last.kind !== "regular";
 }
 
 export function generateKnockout(t: Tournament, kind: KnockoutKind, teamCount: number): Round | null {
@@ -999,6 +1013,7 @@ export function generateKnockout(t: Tournament, kind: KnockoutKind, teamCount: n
 }
 
 function generateSemifinal(tournament: Tournament): Round | null {
+  if (afterKnockout(tournament)) return generateKnockout(tournament, "semifinal", 4);
   const regularRounds = tournament.rounds.filter(
     (r) => !r.kind || r.kind === "regular"
   );
@@ -1022,6 +1037,7 @@ function generateSemifinal(tournament: Tournament): Round | null {
 }
 
 function generateFinal(tournament: Tournament): Round | null {
+  if (afterKnockout(tournament)) return generateKnockout(tournament, "final", 2);
   const semi = tournament.rounds.find((r) => r.kind === "semifinal");
   if (semi) {
     if (!semi.completed) return null;
