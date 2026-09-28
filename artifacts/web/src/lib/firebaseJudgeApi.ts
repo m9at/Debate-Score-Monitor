@@ -184,12 +184,12 @@ function startPoll(
           for (const [roomKey, entry] of Object.entries(results)) {
             const room = roundData.rooms.find((r) => String(r.roomNumber) === roomKey);
             if (!room) continue;
-            const { submittedAt, matchId, ...scoresOnly } = entry as RoundResultEntry & { matchId?: string | null };
+            const { submittedAt, ...scoresOnly } = entry;
             onRound({
               sessionId: row.sessionId,
               tournamentId,
               roomNumber: Number(roomKey),
-              matchId: matchId ?? room.matchId,
+              matchId: room.matchId,
               roundNumber: roundData.roundNumber,
               scores: scoresOnly as JudgeScores,
               submittedAt,
