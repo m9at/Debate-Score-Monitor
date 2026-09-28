@@ -62,7 +62,6 @@ export function roomsAwaitingReveal(round: Round | undefined): Match[] {
 export function roundTitle(round: Round | undefined, roundNumber: number): string {
   if (round?.kind === "final") return "النهائي";
   if (round?.kind === "semifinal") return "نصف النهائي";
-  if (round?.kind === "quarterfinal") return "ربع النهائي";
   return `الجولة ${roundNumber}`;
 }
 

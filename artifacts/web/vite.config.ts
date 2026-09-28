@@ -1,13 +1,4 @@
-import { defineConfig, createLogger } from "vite";
-
-// The API restarts briefly on code changes; hide the expected
-// "connection refused" proxy noise during that window.
-const logger = createLogger();
-const logError = logger.error;
-logger.error = (msg, options) => {
-  if (msg.includes("http proxy error") && msg.includes("ECONNREFUSED")) return;
-  logError(msg, options);
-};
+import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import path from "path";
@@ -37,7 +28,6 @@ if (!basePath) {
 
 export default defineConfig({
   base: basePath,
-  customLogger: logger,
   plugins: [
     react(),
     tailwindcss(),
@@ -72,18 +62,10 @@ export default defineConfig({
     port,
     host: "0.0.0.0",
     allowedHosts: true,
-    // DISABLE_HMR=true stops the dev server from reloading the page by itself
-    // (e.g. after a dropped connection); refresh manually to see code changes.
-    hmr: process.env.DISABLE_HMR === "true" ? false : undefined,
-    ws: process.env.DISABLE_HMR === "true" ? false : undefined,
     proxy: {
       "/api": {
         target: process.env.API_URL || "http://localhost:5050",
         changeOrigin: true,
-        // Don't let a reset API/client socket crash the dev server.
-        configure: (proxy) => {
-          proxy.on("error", () => {});
-        },
       },
     },
     fs: {

@@ -17,8 +17,6 @@ export interface MatchTeam {
 export interface MatchJudgeAssignment {
   chairJudgeId?: string;
   panelistJudgeIds: string[];
-  /** Judges this room needs — overrides the round's judgesPerRoom when set. */
-  slots?: number;
 }
 
 export interface Match {
@@ -44,7 +42,7 @@ export interface Round {
   completed: boolean;
   caseText?: string;
   judgesPerRoom?: number;
-  kind?: "regular" | "quarterfinal" | "semifinal" | "final";
+  kind?: "regular" | "semifinal" | "final";
   /** Locked rounds cannot have their results edited until reopened. */
   locked?: boolean;
 }
@@ -78,8 +76,6 @@ export interface Team {
   /** Team logo uploaded directly into the system (data URL), replaceable. */
   logoDataUrl?: string;
   registeredAt?: number;
-  /** Disabled teams (e.g. withdrawn) are left out of new draws. */
-  disabled?: boolean;
 }
 
 export interface Judge {
@@ -141,8 +137,6 @@ export interface Room {
   id: string;
   number: number;
   label: string;
-  /** Disabled rooms are skipped when new draws number their rooms. */
-  disabled?: boolean;
 }
 
 /** Format rules chosen while creating the tournament. */

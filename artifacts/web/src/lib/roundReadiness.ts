@@ -10,8 +10,6 @@ export interface ReadinessIssue {
 export interface RoundReadiness {
   ready: boolean;
   issues: ReadinessIssue[];
-  /** Non-blocking notes (e.g. rooms short of judges) — the round may still start. */
-  warnings: ReadinessIssue[];
   /** Checks that passed — shown as a reassuring checklist. */
   passed: string[];
 }
@@ -30,7 +28,6 @@ export function evaluateRoundReadiness(
   round: Round | undefined,
 ): RoundReadiness {
   const issues: ReadinessIssue[] = [];
-  const warnings: ReadinessIssue[] = [];
   const passed: string[] = [];
   const judges = (tournament.judges ?? []).filter((j) => !j.disabled);
   const expectedJudges =
@@ -62,19 +59,9 @@ export function evaluateRoundReadiness(
       key: "matches",
       message: "لا يمكن بدء الجولة — لم يتم إنشاء المواجهات والقاعات.",
     });
-    return { ready: false, issues, warnings, passed };
+    return { ready: false, issues, passed };
   }
   passed.push(`المواجهات جاهزة (${round.matches.length} قاعة)`);
-
-  // فرق مسجلة لم تدخل القرعة (مثلاً أُضيفت بعد إجراء القرعة)
-  const placed = new Set(round.matches.flatMap((m) => [m.team1.teamId, m.team2.teamId]));
-  const unplaced = tournament.teams.filter((t) => !t.disabled && !placed.has(t.id)).length;
-  if (unplaced > 0) {
-    warnings.push({
-      key: "unplaced-teams",
-      message: `${unplaced} فريق غير موزّع على أي قاعة (القاعات ${round.matches.length} من ${Math.floor(tournament.teams.filter((t) => !t.disabled).length / 2)}) — أعد القرعة من الصفر لتوزيع جميع الفرق.`,
-    });
-  }
 
   for (const m of round.matches) {
     // فرق القاعة
@@ -94,26 +81,25 @@ export function evaluateRoundReadiness(
       ...(a?.panelistJudgeIds ?? []),
     ]);
     const count = [...assigned].filter((id) => judges.some((j) => j.id === id)).length;
-    const needed = a?.slots ?? expectedJudges;
-    if (count === 0 && needed > 0) {
-      warnings.push({
+    if (count === 0) {
+      issues.push({
         key: `judges-${m.id}`,
-        message: `${roomName(m)} لم يتم تعيين محكم لها.`,
+        message: `لا يمكن بدء الجولة — ${roomName(m)} لم يتم تعيين محكم لها.`,
       });
-    } else if (count < needed) {
-      warnings.push({
+    } else if (count < expectedJudges) {
+      issues.push({
         key: `judges-count-${m.id}`,
-        message: `${roomName(m)} لديها ${count} من ${needed} محكمين.`,
+        message: `لا يمكن بدء الجولة — ${roomName(m)} لديها ${count} من ${expectedJudges} محكمين.`,
       });
     }
   }
 
-  if (warnings.length === 0) {
-    passed.push("المحكمون موزّعون على القاعات");
+  if (!issues.some((i) => i.key.startsWith("judges"))) {
+    passed.push(`المحكمون موزّعون (${expectedJudges} لكل قاعة)`);
   }
   if (!issues.some((i) => i.key.startsWith("teams-"))) {
     passed.push("الفرق موزّعة على القاعات");
   }
 
-  return { ready: issues.length === 0, issues, warnings, passed };
+  return { ready: issues.length === 0, issues, passed };
 }

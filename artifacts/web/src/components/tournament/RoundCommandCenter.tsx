@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { AlertTriangle, CheckCircle2, Gavel, Play, Shuffle } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Play } from "lucide-react";
 import type { Tournament } from "@/types/tournament";
 import { BRAND, BTN, BTN_PRIMARY_STYLE, BTN_SIZE } from "@/lib/brand";
 import { roundTitle } from "@/lib/reveal";
@@ -16,10 +16,6 @@ interface RoundCommandCenterProps {
   onStartNextRound: () => void;
   /** Makes the selected (already prepared) round the live one. */
   onStartSelectedRound: () => void;
-  /** Draws the selected round when it has no pairings yet (judges are not assigned). */
-  onDraw: () => void;
-  /** Opens the judge distribution page. */
-  onOpenJudges: () => void;
   canManage: boolean;
 }
 
@@ -33,8 +29,6 @@ export default function RoundCommandCenter({
   selectedRound,
   onStartNextRound,
   onStartSelectedRound,
-  onDraw,
-  onOpenJudges,
   canManage,
 }: RoundCommandCenterProps) {
   const round = tournament.rounds.find((r) => r.roundNumber === selectedRound);
@@ -43,11 +37,7 @@ export default function RoundCommandCenter({
     [tournament, round],
   );
 
-  // A round without a draw isn't running yet, even if it is the current one.
-  const isLive =
-    tournament.started &&
-    tournament.currentRound === selectedRound &&
-    (round?.matches.length ?? 0) > 0;
+  const isLive = tournament.started && tournament.currentRound === selectedRound;
   const roundFinished = !!round?.completed;
   const nextRoundExists = tournament.rounds.some(
     (r) => r.roundNumber === selectedRound + 1,
@@ -83,19 +73,7 @@ export default function RoundCommandCenter({
         ) : (
           canManage &&
           !roundFinished &&
-          round &&
-          (round.matches.length === 0 ? (
-            <button
-              type="button"
-              onClick={onDraw}
-              className={`${BTN.base} ${BTN.primary} ${BTN_SIZE.lg}`}
-              style={BTN_PRIMARY_STYLE}
-              data-testid="button-draw-round"
-            >
-              <Shuffle className="w-4 h-4" />
-              بدء القرعة
-            </button>
-          ) : (
+          round && (
             <button
               type="button"
               onClick={onStartSelectedRound}
@@ -107,7 +85,7 @@ export default function RoundCommandCenter({
               <Play className="w-4 h-4" />
               بدء {roundTitle(round, selectedRound)}
             </button>
-          ))
+          )
         )}
 
         {canPrepareNext && (
@@ -162,36 +140,6 @@ export default function RoundCommandCenter({
               </li>
             ))}
           </ul>
-        )}
-
-        {readiness.warnings.length > 0 && (
-          <div
-            className="mt-3 rounded-xl border p-3"
-            style={{ borderColor: `${BRAND.warning}66`, backgroundColor: `${BRAND.warning}12` }}
-            data-testid="round-judge-warnings"
-          >
-            <p className="text-[13px] font-bold" style={{ color: "#92400E" }}>
-              ⚠️ تنبيهات — يمكنك بدء الجولة رغم ذلك
-            </p>
-            <ul className="mt-1.5 space-y-1">
-              {readiness.warnings.map((w) => (
-                <li key={w.key} className="text-[12.5px] font-semibold" style={{ color: "#92400E" }}>
-                  • {w.message}
-                </li>
-              ))}
-            </ul>
-            {canManage && (
-              <button
-                type="button"
-                onClick={onOpenJudges}
-                className={`${BTN.base} ${BTN.secondary} ${BTN_SIZE.sm} mt-2.5`}
-                data-testid="button-open-judge-distribution"
-              >
-                <Gavel className="w-3.5 h-3.5" />
-                الانتقال إلى توزيع المحكمين
-              </button>
-            )}
-          </div>
         )}
 
         {readiness.passed.length > 0 && (
