@@ -21,6 +21,14 @@ import {
   deleteShared,
 } from "@/lib/sharedTournamentsApi";
 
+/** One room of a manually set draw: who is government and who is opposition. */
+export interface ManualPair {
+  govTeamId: string;
+  oppTeamId: string;
+}
+
+export type KnockoutKind = "quarterfinal" | "semifinal" | "final";
+
 const STORAGE_KEY = "debate_tournaments_v2";
 const SYNC_POLL_MS = 8000;
 const SYNC_DEBOUNCE_MS = 800;
@@ -35,6 +43,8 @@ type Action =
   | { type: "ADD_TOURNAMENT"; tournament: Tournament }
   | { type: "DELETE_TOURNAMENT"; id: string }
   | { type: "UPDATE_TOURNAMENT"; tournament: Tournament }
+  /** Applies an update to the latest state (never to a stale snapshot). */
+  | { type: "PATCH_TOURNAMENT"; tournamentId: string; update: (t: Tournament) => Tournament }
   | { type: "ADD_TEAM"; tournamentId: string; team: Team }
   | { type: "DELETE_TEAM"; tournamentId: string; teamId: string }
   | { type: "UPDATE_TEAM"; tournamentId: string; team: Team }
@@ -62,6 +72,11 @@ type Action =
   | { type: "FINISH_TOURNAMENT"; tournamentId: string }
   | { type: "REOPEN_TOURNAMENT"; tournamentId: string }
   | { type: "DELETE_ROUND"; tournamentId: string; roundNumber: number }
+  | { type: "AUTO_ASSIGN_JUDGES"; tournamentId: string; roundNumber: number }
+  | { type: "CLEAR_ROUND_JUDGES"; tournamentId: string; roundNumber: number }
+  | { type: "REDRAW_ROUND"; tournamentId: string; roundNumber: number }
+  | { type: "GENERATE_KNOCKOUT"; tournamentId: string; kind: KnockoutKind; teamCount: number }
+  | { type: "SET_ROUND_PAIRINGS"; tournamentId: string; roundNumber: number; pairs: ManualPair[] }
   | { type: "SET_PROTECTION"; tournamentId: string; protection: TournamentProtection };
 
 function reducer(state: TournamentState, action: Action): TournamentState {
@@ -88,6 +103,12 @@ function reducer(state: TournamentState, action: Action): TournamentState {
       return {
         tournaments: state.tournaments.map((t) =>
           t.id === action.tournament.id ? action.tournament : t
+        ),
+      };
+    case "PATCH_TOURNAMENT":
+      return {
+        tournaments: state.tournaments.map((t) =>
+          t.id === action.tournamentId ? action.update(t) : t
         ),
       };
     case "ADD_TEAM": {
@@ -568,9 +589,199 @@ function reducer(state: TournamentState, action: Action): TournamentState {
           };
         }),
       };
+    case "AUTO_ASSIGN_JUDGES":
+    case "CLEAR_ROUND_JUDGES":
+      return {
+        tournaments: state.tournaments.map((t) => {
+          if (t.id !== action.tournamentId) return t;
+          return {
+            ...t,
+            rounds: t.rounds.map((r) => {
+              if (r.roundNumber !== action.roundNumber) return r;
+              if (action.type === "AUTO_ASSIGN_JUDGES") {
+                return { ...r, matches: assignJudgesToRound(t, r) };
+              }
+              return {
+                ...r,
+                matches: r.matches.map((m) => ({
+                  ...m,
+                  judgeAssignment: {
+                    panelistJudgeIds: [],
+                    slots: m.judgeAssignment?.slots,
+                  },
+                })),
+              };
+            }),
+          };
+        }),
+      };
+    case "REDRAW_ROUND":
+      return {
+        tournaments: state.tournaments.map((t) => {
+          if (t.id !== action.tournamentId) return t;
+          const target = t.rounds.find((r) => r.roundNumber === action.roundNumber);
+          if (!canRedrawRound(t, action.roundNumber) || !target) return t;
+          // Empties the round (pairings, rooms, judges). The organiser draws it
+          // again with "بدء القرعة" and assigns judges manually.
+          const redrawn: Round = { ...target, matches: [], completed: false };
+          return {
+            ...t,
+            rounds: t.rounds.map((r) =>
+              r.roundNumber === action.roundNumber ? redrawn : r,
+            ),
+            pendingResults: (t.pendingResults ?? []).filter(
+              (p) => p.roundNumber !== action.roundNumber,
+            ),
+          };
+        }),
+      };
+    case "GENERATE_KNOCKOUT":
+      return {
+        tournaments: state.tournaments.map((t) => {
+          if (t.id !== action.tournamentId) return t;
+          const round = generateKnockout(t, action.kind, action.teamCount);
+          if (!round) return t;
+          // Fills the first empty (undrawn) slot; any later empty regular slots
+          // are dropped because the organiser moved to the knockout stage.
+          const slot = t.rounds
+            .filter((r) => r.matches.length === 0)
+            .sort((a, b) => a.roundNumber - b.roundNumber)[0];
+          if (slot) {
+            round.roundNumber = slot.roundNumber;
+            round.caseText = slot.caseText;
+            round.judgesPerRoom = slot.judgesPerRoom;
+          }
+          const rounds = [
+            ...t.rounds.filter((r) => r.matches.length > 0 || (r.kind && r.kind !== "regular" && r !== slot)),
+            round,
+          ].sort((a, b) => a.roundNumber - b.roundNumber);
+          return {
+            ...t,
+            rounds,
+            totalRounds: rounds.filter((r) => !r.kind || r.kind === "regular").length,
+            currentRound: round.roundNumber,
+            finished: false,
+          };
+        }),
+      };
+    case "SET_ROUND_PAIRINGS":
+      return {
+        tournaments: state.tournaments.map((t) => {
+          if (t.id !== action.tournamentId) return t;
+          if (!canEditRoundPairings(t, action.roundNumber)) return t;
+          const existing = t.rounds.find((r) => r.roundNumber === action.roundNumber);
+          const teamById = new Map(t.teams.map((team) => [team.id, team]));
+          const matches: Match[] = [];
+          const roomNumbers = openRoomNumbers(t, action.pairs.length);
+          action.pairs.forEach((pair, i) => {
+            const gov = teamById.get(pair.govTeamId);
+            const opp = teamById.get(pair.oppTeamId);
+            if (!gov || !opp || gov.id === opp.id) return;
+            const roomNumber = roomNumbers[matches.length];
+            const match = createMatch(gov, opp, roomNumber);
+            const room = t.rooms?.find((r) => r.number === roomNumber);
+            if (room?.label.trim()) match.roomLabel = room.label;
+            // The room keeps its judges when only the teams change.
+            const prev = existing?.matches[i];
+            if (prev?.judgeAssignment) match.judgeAssignment = prev.judgeAssignment;
+            matches.push(match);
+          });
+          const wasEmpty = !existing || existing.matches.length === 0;
+          const isFirstDraw = !t.rounds.some(
+            (r) => r.matches.length > 0 && (!r.kind || r.kind === "regular"),
+          );
+          const round: Round = {
+            ...(existing ?? { roundNumber: action.roundNumber }),
+            matches,
+            completed: false,
+          };
+          if (isFirstDraw && !round.caseText && t.openingCaseText) {
+            round.caseText = t.openingCaseText;
+          }
+          const rounds = existing
+            ? t.rounds.map((r) => (r.roundNumber === action.roundNumber ? round : r))
+            : [...t.rounds, round].sort((a, b) => a.roundNumber - b.roundNumber);
+          return {
+            ...t,
+            rounds,
+            totalRounds: Math.max(t.totalRounds, action.roundNumber),
+            currentRound: wasEmpty && matches.length > 0 ? action.roundNumber : t.currentRound,
+            finished: false,
+            pendingResults: (t.pendingResults ?? []).filter(
+              (p) => p.roundNumber !== action.roundNumber,
+            ),
+          };
+        }),
+      };
     default:
       return state;
   }
+}
+
+/** A regular round's pairings can be set by hand while it has no results. */
+export function canEditRoundPairings(t: Tournament, roundNumber: number): boolean {
+  const round = t.rounds.find((r) => r.roundNumber === roundNumber);
+  if (!round) return true;
+  if (round.kind && round.kind !== "regular") return false;
+  return !round.matches.some((m) => m.completed);
+}
+
+/** A regular round can be redrawn while it has no results and nothing follows it. */
+export function canRedrawRound(t: Tournament, roundNumber: number): boolean {
+  const round = t.rounds.find((r) => r.roundNumber === roundNumber);
+  if (!round || (round.kind && round.kind !== "regular")) return false;
+  if (round.matches.some((m) => m.completed)) return false;
+  return !t.rounds.some((r) => r.roundNumber > roundNumber && r.matches.length > 0);
+}
+
+function shuffle<T>(items: T[]): T[] {
+  const a = [...items];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+/**
+ * Spreads the tournament's active judges over the rooms of a round — randomly
+ * each time, while still balancing load, giving each room a chair when
+ * possible and avoiding conflicts. Each room keeps its own seat count.
+ */
+function assignJudgesToRound(t: Tournament, round: Round): Match[] {
+  const judges = shuffle((t.judges ?? []).filter((j) => !j.disabled));
+  const perRoom = round.judgesPerRoom ?? t.settings?.judgesPerRoom ?? 3;
+  const usage = new Map<string, number>(judges.map((j) => [j.id, 0]));
+  const used = new Set<string>();
+  const isConflict = (judge: Judge, match: Match) =>
+    judge.conflictTeamIds.includes(match.team1.teamId) ||
+    judge.conflictTeamIds.includes(match.team2.teamId);
+  const byUsage = (a: Judge, b: Judge) => usage.get(a.id)! - usage.get(b.id)!;
+
+  const assigned = new Map<string, MatchJudgeAssignment>();
+  for (const match of shuffle(round.matches)) {
+    const slots = match.judgeAssignment?.slots ?? perRoom;
+    const free = judges.filter((j) => !used.has(j.id) && !isConflict(j, match));
+    const ids: string[] = [];
+    if (slots > 0) {
+      const chair = free.filter((j) => j.canChair).sort(byUsage)[0] ?? free.sort(byUsage)[0];
+      if (chair) ids.push(chair.id);
+      for (const j of free.sort(byUsage)) {
+        if (ids.length >= slots) break;
+        if (!ids.includes(j.id)) ids.push(j.id);
+      }
+    }
+    ids.forEach((id) => {
+      used.add(id);
+      usage.set(id, usage.get(id)! + 1);
+    });
+    assigned.set(match.id, {
+      chairJudgeId: ids[0],
+      panelistJudgeIds: ids.slice(1),
+      slots: match.judgeAssignment?.slots,
+    });
+  }
+  return round.matches.map((m) => ({ ...m, judgeAssignment: assigned.get(m.id) }));
 }
 
 function recalcTeamStats(teams: Team[], rounds: Round[]): Team[] {
@@ -619,8 +830,24 @@ function pairBucket(
   return null;
 }
 
+/** Teams that take part in new draws (disabled/withdrawn teams are left out). */
+export function activeTeams(t: Tournament): Team[] {
+  return t.teams.filter((team) => !team.disabled);
+}
+
+/** The first `count` room numbers of a new draw, skipping disabled rooms. */
+export function openRoomNumbers(t: Tournament, count: number): number[] {
+  const closed = new Set((t.rooms ?? []).filter((r) => r.disabled).map((r) => r.number));
+  const out: number[] = [];
+  for (let n = 1; out.length < count; n++) if (!closed.has(n)) out.push(n);
+  return out;
+}
+
 function generateRound(tournament: Tournament): Round | null {
-  const isFirstRound = tournament.rounds.length === 0;
+  // Rounds are pre-created empty, so "first" means no regular round was drawn yet.
+  const isFirstRound = !tournament.rounds.some(
+    (r) => r.matches.length > 0 && (!r.kind || r.kind === "regular")
+  );
   const roundNumber =
     tournament.rounds.reduce((max, r) => Math.max(max, r.roundNumber), 0) + 1;
 
@@ -637,7 +864,7 @@ function generateRound(tournament: Tournament): Round | null {
     }
   }
 
-  let teams = [...tournament.teams];
+  let teams = activeTeams(tournament);
   if (teams.length < 2) return null;
 
   let pairList: [Team, Team][] = [];
@@ -705,18 +932,88 @@ function generateRound(tournament: Tournament): Round | null {
   };
 
   const matches: Match[] = [];
-  let roomNumber = 1;
-  for (const [a, b] of pairList) {
+  const roomNumbers = openRoomNumbers(tournament, pairList.length);
+  pairList.forEach(([a, b], i) => {
+    const roomNumber = roomNumbers[i];
     const roleA = pickRole(a.id);
     const govTeam = roleA === "gov" ? a : b;
     const oppTeam = roleA === "gov" ? b : a;
-    matches.push(createMatch(govTeam, oppTeam, roomNumber++));
-  }
+    const match = createMatch(govTeam, oppTeam, roomNumber);
+    const room = tournament.rooms?.find((r) => r.number === roomNumber);
+    if (room?.label.trim()) match.roomLabel = room.label;
+    matches.push(match);
+  });
 
   return { roundNumber, matches, completed: false };
 }
 
+/**
+ * Knockout pools: the winners of the previous knockout round, or the regular
+ * standings. Highest seed meets the lowest: 1×8, 2×7, 3×6, 4×5; semifinal
+ * 1×4 and 2×3; final 1×2. The higher seed argues government.
+ */
+export function knockoutReady(t: Tournament): boolean {
+  const drawn = t.rounds.filter((r) => r.matches.length > 0);
+  return (
+    t.started &&
+    drawn.length > 0 &&
+    drawn.every((r) => r.matches.every((m) => m.completed)) &&
+    drawn[drawn.length - 1].kind !== "final"
+  );
+}
+
+export function knockoutPool(t: Tournament): Team[] {
+  const drawn = [...t.rounds]
+    .filter((r) => r.matches.length > 0)
+    .sort((a, b) => a.roundNumber - b.roundNumber);
+  const regular = drawn.filter((r) => !r.kind || r.kind === "regular");
+  const ranked = recalcTeamStats(activeTeams(t), regular).sort(
+    (a, b) => b.wins - a.wins || b.totalPoints - a.totalPoints,
+  );
+  const last = drawn[drawn.length - 1];
+  if (!last || !last.kind || last.kind === "regular") return ranked;
+  // Winners of the last knockout round, ranked by the points they scored in it.
+  const winnerScore = new Map<string, number>();
+  for (const m of last.matches) {
+    const w = [m.team1, m.team2].find((mt) => mt.teamId === m.winnerId);
+    if (w) winnerScore.set(w.teamId, w.totalScore);
+  }
+  return ranked
+    .filter((team) => winnerScore.has(team.id))
+    .sort((a, b) => winnerScore.get(b.id)! - winnerScore.get(a.id)!);
+}
+
+/** True when the latest drawn round is a knockout round (quarterfinal, etc.). */
+function afterKnockout(t: Tournament): boolean {
+  const drawn = t.rounds.filter((r) => r.matches.length > 0);
+  const last = drawn.sort((a, b) => a.roundNumber - b.roundNumber)[drawn.length - 1];
+  return !!last?.kind && last.kind !== "regular";
+}
+
+export function generateKnockout(t: Tournament, kind: KnockoutKind, teamCount: number): Round | null {
+  if (!knockoutReady(t)) return null;
+  const size = kind === "semifinal" ? 4 : kind === "final" ? 2 : teamCount;
+  const pool = knockoutPool(t);
+  if (size < 2 || size % 2 === 1 || pool.length < size) return null;
+  const seeds = pool.slice(0, size);
+  // Top seed meets the bottom seed: 1×8, 2×7, 3×6, 4×5 (semifinal 1×4, 2×3).
+  const pairs: [Team, Team][] = Array.from({ length: size / 2 }, (_, i) => [
+    seeds[i],
+    seeds[size - 1 - i],
+  ]);
+  const roomNumbers = openRoomNumbers(t, pairs.length);
+  const matches = pairs.map(([gov, opp], i) => {
+    const match = createMatch(gov, opp, roomNumbers[i]);
+    const room = t.rooms?.find((r) => r.number === roomNumbers[i]);
+    if (room?.label.trim()) match.roomLabel = room.label;
+    return match;
+  });
+  const roundNumber = t.rounds.reduce((max, r) => Math.max(max, r.roundNumber), 0) + 1;
+  return { roundNumber, matches, completed: false, kind };
+}
+
 function generateSemifinal(tournament: Tournament): Round | null {
+  if (afterKnockout(tournament)) return generateKnockout(tournament, "semifinal", 4);
   const regularRounds = tournament.rounds.filter(
     (r) => !r.kind || r.kind === "regular"
   );
@@ -740,6 +1037,7 @@ function generateSemifinal(tournament: Tournament): Round | null {
 }
 
 function generateFinal(tournament: Tournament): Round | null {
+  if (afterKnockout(tournament)) return generateKnockout(tournament, "final", 2);
   const semi = tournament.rounds.find((r) => r.kind === "semifinal");
   if (semi) {
     if (!semi.completed) return null;
@@ -844,6 +1142,18 @@ interface TournamentContextType {
   setRoundJudgesPerRoom: (tournamentId: string, roundNumber: number, judgesPerRoom: number) => void;
   setMatchJudges: (tournamentId: string, roundNumber: number, matchId: string, assignment: MatchJudgeAssignment) => void;
   autoAssignJudges: (tournamentId: string, roundNumber: number) => void;
+  /** Empties every room's panel in the round (seat counts are kept). */
+  clearRoundJudges: (tournamentId: string, roundNumber: number) => void;
+  /** Re-pairs a round that has no results yet, with all current teams. */
+  redrawRound: (tournamentId: string, roundNumber: number) => void;
+  /** Starts a knockout round (quarterfinal with N teams, semifinal or final). */
+  generateKnockout: (tournamentId: string, kind: KnockoutKind, teamCount: number) => void;
+  /** Replaces a round's rooms with pairings chosen by the organiser. */
+  setRoundPairings: (tournamentId: string, roundNumber: number, pairs: ManualPair[]) => void;
+  /** Leaves a team out of (or back into) new draws. */
+  setTeamDisabled: (tournamentId: string, teamId: string, disabled: boolean) => void;
+  /** Closes (or reopens) a room number for new draws. */
+  setRoomDisabled: (tournamentId: string, roomNumber: number, disabled: boolean) => void;
   fillDummyData: (tournamentId: string, opts?: { teams?: number; judges?: number }) => void;
   finishTournament: (tournamentId: string) => void;
   reopenTournament: (tournamentId: string) => void;
@@ -863,12 +1173,15 @@ interface TournamentContextType {
         | "logoWhiteDataUrl"
         | "coverImageDataUrl"
         | "countdown"
+        | "settings"
       >
     >
   ) => void;
   setTournamentArchived: (tournamentId: string, archived: boolean) => void;
   /** Deep-copies a tournament under a new id and name. Returns the new id. */
   duplicateTournament: (tournamentId: string) => string | undefined;
+  /** A trial copy: same structure, numbered teams/judges, no rounds drawn. */
+  duplicateTournamentForTest: (tournamentId: string) => string | undefined;
   /** Creates a fully configured tournament from the setup wizard. Returns its id. */
   createTournamentFromSetup: (setup: TournamentSetup) => string;
   /** Flags a room's result as publicly announced (idempotent). */
@@ -1118,16 +1431,21 @@ export function TournamentProvider({ children }: { children: ReactNode }) {
       setSaveState("saving");
       if (pushTimerRef.current) clearTimeout(pushTimerRef.current);
       pushTimerRef.current = setTimeout(async () => {
+        // Ids stay dirty until the server confirms, so a poll landing mid-push
+        // can't replace the local edit with the older server copy.
         const ids = Array.from(dirtyIdsRef.current);
-        dirtyIdsRef.current.clear();
         let failed = false;
         for (const id of ids) {
-          const t = state.tournaments.find((x) => x.id === id);
-          if (!t) continue;
+          const t = stateRef.current.tournaments.find((x) => x.id === id);
+          if (!t) {
+            dirtyIdsRef.current.delete(id);
+            continue;
+          }
+          const sent = JSON.stringify(t);
           try {
             await pushShared(t);
+            if (lastSerializedRef.current.get(id) === sent) dirtyIdsRef.current.delete(id);
           } catch {
-            dirtyIdsRef.current.add(id);
             failed = true;
           }
         }
@@ -1320,12 +1638,13 @@ export function TournamentProvider({ children }: { children: ReactNode }) {
         | "logoWhiteDataUrl"
         | "coverImageDataUrl"
         | "countdown"
+        | "settings"
       >
       >
     ) => {
       const t = stateRef.current.tournaments.find((x) => x.id === tournamentId);
       if (!t) return;
-      dispatch({ type: "UPDATE_TOURNAMENT", tournament: { ...t, ...patch } });
+      dispatch({ type: "PATCH_TOURNAMENT", tournamentId, update: (t) => ({ ...t, ...patch }) });
     },
     []
   );
@@ -1334,7 +1653,7 @@ export function TournamentProvider({ children }: { children: ReactNode }) {
     (tournamentId: string, publicVisible: boolean) => {
       const t = stateRef.current.tournaments.find((x) => x.id === tournamentId);
       if (!t) return;
-      dispatch({ type: "UPDATE_TOURNAMENT", tournament: { ...t, publicVisible } });
+      dispatch({ type: "PATCH_TOURNAMENT", tournamentId, update: (t) => ({ ...t, publicVisible }) });
     },
     []
   );
@@ -1343,7 +1662,7 @@ export function TournamentProvider({ children }: { children: ReactNode }) {
     (tournamentId: string, archived: boolean) => {
       const t = stateRef.current.tournaments.find((x) => x.id === tournamentId);
       if (!t) return;
-      dispatch({ type: "UPDATE_TOURNAMENT", tournament: { ...t, archived } });
+      dispatch({ type: "PATCH_TOURNAMENT", tournamentId, update: (t) => ({ ...t, archived }) });
     },
     []
   );
@@ -1357,6 +1676,64 @@ export function TournamentProvider({ children }: { children: ReactNode }) {
       name: `${t.name} (نسخة)`,
       createdAt: Date.now(),
       archived: false,
+    };
+    dispatch({ type: "ADD_TOURNAMENT", tournament: copy });
+    return copy.id;
+  }, []);
+
+  const duplicateTournamentForTest = useCallback((tournamentId: string) => {
+    const t = stateRef.current.tournaments.find((x) => x.id === tournamentId);
+    if (!t) return undefined;
+    const teamIds = new Map<string, string>();
+    const teams: Team[] = t.teams.map((team, i) => {
+      const id = crypto.randomUUID();
+      teamIds.set(team.id, id);
+      return {
+        id,
+        name: `فريق ${i + 1}`,
+        speakersPerTeam: team.speakersPerTeam,
+        speakerNames: team.speakerNames.map((_, s) => `متحدث ${i + 1}-${s + 1}`),
+        totalPoints: 0,
+        wins: 0,
+        losses: 0,
+        matchesPlayed: 0,
+      };
+    });
+    const judges: Judge[] = (t.judges ?? []).map((j, i) => ({
+      id: crypto.randomUUID(),
+      name: `محكم ${i + 1}`,
+      canChair: j.canChair,
+      disabled: j.disabled,
+      conflictTeamIds: j.conflictTeamIds
+        .map((id) => teamIds.get(id))
+        .filter((id): id is string => !!id),
+    }));
+    const copy: Tournament = {
+      id: crypto.randomUUID(),
+      name: `${t.name} (تجريبية)`,
+      createdAt: Date.now(),
+      totalRounds: t.totalRounds,
+      teams,
+      judges,
+      rounds: t.rounds
+        .filter((r) => !r.kind || r.kind === "regular")
+        .map((r) => ({
+          roundNumber: r.roundNumber,
+          matches: [],
+          completed: false,
+          caseText: r.caseText,
+          judgesPerRoom: r.judgesPerRoom,
+          kind: "regular" as const,
+        })),
+      currentRound: 1,
+      presentedRound: 1,
+      started: false,
+      finished: false,
+      semifinalEnabled: t.semifinalEnabled,
+      finalEnabled: t.finalEnabled,
+      rooms: t.rooms ? structuredClone(t.rooms) : undefined,
+      settings: t.settings ? { ...t.settings } : undefined,
+      openingCaseText: t.openingCaseText,
     };
     dispatch({ type: "ADD_TOURNAMENT", tournament: copy });
     return copy.id;
@@ -1595,73 +1972,68 @@ export function TournamentProvider({ children }: { children: ReactNode }) {
 
   const autoAssignJudges = useCallback(
     (tournamentId: string, roundNumber: number) => {
-      const t = state.tournaments.find((x) => x.id === tournamentId);
-      if (!t) return;
-      const round = t.rounds.find((r) => r.roundNumber === roundNumber);
-      if (!round) return;
-      const judges = t.judges ?? [];
-      const perRoom = round.judgesPerRoom ?? 3;
-
-      const usage: Record<string, number> = {};
-      const chairUsage: Record<string, number> = {};
-      judges.forEach((j) => {
-        usage[j.id] = 0;
-        chairUsage[j.id] = 0;
-      });
-
-      const assignedChairs = new Set<string>();
-
-      const isConflict = (judge: Judge, match: Match) =>
-        judge.conflictTeamIds.includes(match.team1.teamId) ||
-        judge.conflictTeamIds.includes(match.team2.teamId);
-
-      const matchesShuffled = [...round.matches];
-
-      for (const match of matchesShuffled) {
-        const usedHere = new Set<string>();
-        // Pick chair: candidate must canChair, no conflict, not yet chair anywhere this round
-        const chairCandidates = judges
-          .filter(
-            (j) =>
-              j.canChair &&
-              !isConflict(j, match) &&
-              !assignedChairs.has(j.id)
-          )
-          .sort((a, b) => {
-            if (chairUsage[a.id] !== chairUsage[b.id])
-              return chairUsage[a.id] - chairUsage[b.id];
-            return usage[a.id] - usage[b.id];
-          });
-        let chairId: string | undefined;
-        if (chairCandidates.length > 0) {
-          chairId = chairCandidates[0].id;
-          assignedChairs.add(chairId);
-          usedHere.add(chairId);
-          usage[chairId]++;
-          chairUsage[chairId]++;
-        }
-        // Pick panelists
-        const panelistIds: string[] = [];
-        const panelistSlots = Math.max(0, perRoom - (chairId ? 1 : 0));
-        const panelCandidates = judges
-          .filter((j) => !usedHere.has(j.id) && !isConflict(j, match))
-          .sort((a, b) => usage[a.id] - usage[b.id]);
-        for (const c of panelCandidates) {
-          if (panelistIds.length >= panelistSlots) break;
-          panelistIds.push(c.id);
-          usedHere.add(c.id);
-          usage[c.id]++;
-        }
-        dispatch({
-          type: "SET_MATCH_JUDGES",
-          tournamentId,
-          roundNumber,
-          matchId: match.id,
-          assignment: { chairJudgeId: chairId, panelistJudgeIds: panelistIds },
-        });
-      }
+      dispatch({ type: "AUTO_ASSIGN_JUDGES", tournamentId, roundNumber });
     },
-    [state.tournaments]
+    []
+  );
+  const clearRoundJudges = useCallback(
+    (tournamentId: string, roundNumber: number) => {
+      dispatch({ type: "CLEAR_ROUND_JUDGES", tournamentId, roundNumber });
+    },
+    []
+  );
+  const redrawRound = useCallback(
+    (tournamentId: string, roundNumber: number) => {
+      dispatch({ type: "REDRAW_ROUND", tournamentId, roundNumber });
+    },
+    []
+  );
+  const generateKnockoutRound = useCallback(
+    (tournamentId: string, kind: KnockoutKind, teamCount: number) => {
+      dispatch({ type: "GENERATE_KNOCKOUT", tournamentId, kind, teamCount });
+    },
+    []
+  );
+  const setRoundPairings = useCallback(
+    (tournamentId: string, roundNumber: number, pairs: ManualPair[]) => {
+      dispatch({ type: "SET_ROUND_PAIRINGS", tournamentId, roundNumber, pairs });
+    },
+    []
+  );
+
+  const setTeamDisabled = useCallback(
+    (tournamentId: string, teamId: string, disabled: boolean) => {
+      dispatch({
+        type: "PATCH_TOURNAMENT",
+        tournamentId,
+        update: (t) => ({
+          ...t,
+          teams: t.teams.map((team) => (team.id === teamId ? { ...team, disabled } : team)),
+        }),
+      });
+    },
+    []
+  );
+
+  const setRoomDisabled = useCallback(
+    (tournamentId: string, roomNumber: number, disabled: boolean) => {
+      dispatch({
+        type: "PATCH_TOURNAMENT",
+        tournamentId,
+        update: (t) => {
+          const rooms = t.rooms ?? [];
+          const exists = rooms.some((r) => r.number === roomNumber);
+          return {
+            ...t,
+            rooms: exists
+              ? rooms.map((r) => (r.number === roomNumber ? { ...r, disabled } : r))
+              : [...rooms, { id: crypto.randomUUID(), number: roomNumber, label: "", disabled }]
+                  .sort((a, b) => a.number - b.number),
+          };
+        },
+      });
+    },
+    []
   );
 
   const fillDummyData = useCallback(
@@ -1763,8 +2135,9 @@ export function TournamentProvider({ children }: { children: ReactNode }) {
         detail,
       };
       dispatch({
-        type: "UPDATE_TOURNAMENT",
-        tournament: { ...t, auditLog: [entry, ...(t.auditLog ?? [])].slice(0, 300) },
+        type: "PATCH_TOURNAMENT",
+        tournamentId,
+        update: (t) => ({ ...t, auditLog: [entry, ...(t.auditLog ?? [])].slice(0, 300) }),
       });
     },
     []
@@ -1790,8 +2163,9 @@ export function TournamentProvider({ children }: { children: ReactNode }) {
       };
 
       dispatch({
-        type: "UPDATE_TOURNAMENT",
-        tournament: {
+        type: "PATCH_TOURNAMENT",
+        tournamentId,
+        update: (t) => ({
           ...t,
           rounds: t.rounds.map((r) =>
             r.roundNumber === roundNumber
@@ -1804,7 +2178,7 @@ export function TournamentProvider({ children }: { children: ReactNode }) {
               : r
           ),
           auditLog: [entry, ...(t.auditLog ?? [])].slice(0, 300),
-        },
+        }),
       });
     },
     []
@@ -1822,14 +2196,15 @@ export function TournamentProvider({ children }: { children: ReactNode }) {
         detail: `الجولة ${roundNumber}`,
       };
       dispatch({
-        type: "UPDATE_TOURNAMENT",
-        tournament: {
+        type: "PATCH_TOURNAMENT",
+        tournamentId,
+        update: (t) => ({
           ...t,
           rounds: t.rounds.map((r) =>
             r.roundNumber === roundNumber ? { ...r, locked } : r
           ),
           auditLog: [entry, ...(t.auditLog ?? [])].slice(0, 300),
-        },
+        }),
       });
     },
     []
@@ -1859,6 +2234,7 @@ export function TournamentProvider({ children }: { children: ReactNode }) {
         setPublicVisible,
         setTournamentArchived,
         duplicateTournament,
+        duplicateTournamentForTest,
         createTournamentFromSetup,
         markResultAnnounced,
         setRoundLocked,
@@ -1882,6 +2258,12 @@ export function TournamentProvider({ children }: { children: ReactNode }) {
         setRoundJudgesPerRoom,
         setMatchJudges,
         autoAssignJudges,
+        clearRoundJudges,
+        redrawRound,
+        setRoundPairings,
+        setTeamDisabled,
+        setRoomDisabled,
+        generateKnockout: generateKnockoutRound,
         finishTournament,
         reopenTournament,
         deleteRound,

@@ -204,6 +204,21 @@ export default function OverviewDashboard({
 
       {roundControl}
 
+      {tournament.settings?.rules?.trim() && (
+        <section
+          className="rounded-2xl bg-white border shadow-sm p-4"
+          style={{ borderColor: BRAND.border }}
+          data-testid="overview-rules"
+        >
+          <h3 className="font-bold text-[14.5px]" style={{ color: BRAND.ink }}>
+            قواعد البطولة
+          </h3>
+          <p className="text-[13px] mt-1.5 whitespace-pre-wrap leading-relaxed" style={{ color: `${BRAND.ink}cc` }}>
+            {tournament.settings.rules}
+          </p>
+        </section>
+      )}
+
       {/* Current round status */}
       {tournament.started && matches.length > 0 && (
         <section
