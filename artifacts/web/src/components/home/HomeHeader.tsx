@@ -1,4 +1,5 @@
 import BrandLogo from "@/components/brand/BrandLogo";
+import InstallAppButton from "@/components/common/InstallAppButton";
 import { BRAND, BRAND_GRADIENT } from "@/lib/brand";
 
 interface HomeHeaderProps {
@@ -29,7 +30,7 @@ export default function HomeHeader({ actions }: HomeHeaderProps) {
       />
 
       <div className="relative max-w-6xl mx-auto px-4 md:px-6 py-4 md:py-5">
-        <div className="flex items-center gap-3 md:gap-4">
+        <div className="flex flex-wrap items-center gap-3 md:gap-4">
           <BrandLogo size={52} tone="dark" glow className="md:!h-16 md:!w-16" />
 
           <div className="flex-1 min-w-0">
@@ -44,9 +45,10 @@ export default function HomeHeader({ actions }: HomeHeaderProps) {
             </p>
           </div>
 
-          {actions && (
-            <div className="flex items-center gap-2 shrink-0">{actions}</div>
-          )}
+          <div className="flex flex-wrap lg:flex-nowrap items-center gap-2 w-full lg:w-auto lg:shrink-0 [&_button]:whitespace-nowrap [&_button]:shrink-0">
+            <InstallAppButton />
+            {actions}
+          </div>
         </div>
       </div>
     </header>
