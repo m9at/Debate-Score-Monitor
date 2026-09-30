@@ -183,12 +183,18 @@ leaderRouter.delete(
       res.status(404).json({ error: "not found" });
       return;
     }
-    const info = row.info as Info;
+    const info = row.info as Info & { days: { day?: number }[] };
+    // ?day=N resets only that round; without it every round is reset.
+    const only = Number(req.query.day) || null;
+    const results = { ...((row.results || {}) as Record<string, unknown>) };
+    const drafts = { ...((results[DRAFTS] || {}) as Record<string, unknown>) };
     info.days.forEach((d) => {
+      if (only && d.day !== only) return;
       d.closed = false;
-      d.rooms.forEach((r) => { r.locked = false; });
+      d.rooms.forEach((r) => { r.locked = false; delete results[r.id]; delete drafts[r.id]; });
     });
-    await db.update(judgeSessions).set({ results: {}, info }).where(eq(judgeSessions.id, row.id));
+    results[DRAFTS] = drafts;
+    await db.update(judgeSessions).set({ results, info }).where(eq(judgeSessions.id, row.id));
     res.json({ ok: true });
   }),
 );

@@ -152,7 +152,8 @@ export const saveLeaderDraft = (id: string, roomId: string, judgeName: string, e
       scores: Object.fromEntries(entries.filter((e) => e.id && e.score !== "").map((e) => [e.id, +e.score])),
     }),
   });
-export const resetLeaderScores = (id: string) => http(`/${encodeURIComponent(id)}/results`, { method: "DELETE" });
+export const resetLeaderScores = (id: string, day?: number) =>
+  http(`/${encodeURIComponent(id)}/results${day ? `?day=${day}` : ""}`, { method: "DELETE" });
 export const deleteLeaderSheet = (id: string, key: string) =>
   http(`/${encodeURIComponent(id)}/results/${encodeURIComponent(key)}`, { method: "DELETE" });
 
