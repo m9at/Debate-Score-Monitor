@@ -62,6 +62,23 @@ export default function LeaderReport({ t }: { t: LeaderTournament }) {
             avg(mine), Math.max(...mine), Math.min(...mine)];
         })} />
 
+      <H>تقرير المحكمين</H>
+      <Tbl head={["المحكم", "القاعات المسندة", "الأوراق المرسلة", "الجولات", "متوسط ما منحه", "الأعلى", "الأدنى"]}
+        rows={(t.info.judgePool ?? []).map((j) => {
+          const mine = allRooms.filter((x) => x.room.judges.includes(j));
+          const given = rows.filter((r) => r.judge === j).map((r) => r.score);
+          return [j, mine.length, mine.filter((x) => t.results[x.room.id]).length,
+            [...new Set(mine.map((x) => x.day))].join("، ") || "—",
+            given.length ? avg(given) : "—", given.length ? Math.max(...given) : "—", given.length ? Math.min(...given) : "—"];
+        })} />
+
+      <H>توزيع المتناظرين على الجولات</H>
+      <Tbl head={["المتناظر", ...days.map((d) => `الجولة ${d.day}`), "عدد المشاركات"]}
+        rows={(t.info.individualPool ?? []).map((p) => {
+          const at = days.map((d) => d.rooms.find((r) => r.individuals.some((x) => x.id === p.id)));
+          return [p.name, ...at.map((r) => r ? `${r.label} · ${r.judges[0] ?? "بلا محكم"}` : "—"), at.filter(Boolean).length];
+        })} />
+
       <button onClick={() => window.print()} className="rounded-lg border px-3 py-1.5 text-sm font-bold print:hidden">🖨️ طباعة التقرير</button>
     </div>
   );

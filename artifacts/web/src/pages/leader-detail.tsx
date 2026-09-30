@@ -1,25 +1,28 @@
 import { useEffect, useState } from "react";
 import { useLocation, useParams } from "wouter";
-import { ArrowRight, Gavel, Link2, Plus, Save, Trash2, Trophy, UserRound, Users } from "lucide-react";
+import { BarChart2, CheckCircle2, FileText, Layers, LayoutDashboard, Save, Settings, UserCheck, Users } from "lucide-react";
 import {
-  dayRange, deleteLeaderSheet, getLeader, newIndividual, newRoom, saveLeaderInfo,
+  deleteLeaderSheet, getLeader, newIndividual, saveLeaderInfo,
   type LeaderInfo, type LeaderTournament,
 } from "@/lib/leaderApi";
-import { BRAND, BRAND_GRADIENT, BTN, BTN_PRIMARY_STYLE, BTN_SIZE } from "@/lib/brand";
-import BrandLogo from "@/components/brand/BrandLogo";
-import { Field, Panel, inputClass, inputStyle } from "@/components/wizard/ui";
+import { BRAND, BTN, BTN_PRIMARY_STYLE } from "@/lib/brand";
+import TournamentSidebar, { type SidebarGroup } from "@/components/tournament/TournamentSidebar";
 import LeaderResults from "@/components/leader/LeaderResults";
-import RoomCard from "@/components/leader/RoomCard";
+import LeaderReport from "@/components/leader/LeaderReport";
+import LeaderOverview from "@/components/leader/LeaderOverview";
 import NamePool from "@/components/leader/NamePool";
+import RoundsPanel from "@/components/leader/RoundsPanel";
+import LeaderSettings from "@/components/leader/LeaderSettings";
+import { SectionHeader } from "@/components/leader/ui";
 
-type Tab = number | "people" | "results";
+type Tab = "overview" | "rounds" | "people" | "judges" | "results" | "reports" | "settings";
 
 export default function LeaderDetailPage() {
   const { id } = useParams<{ id: string }>();
   const [, setLocation] = useLocation();
   const [t, setT] = useState<LeaderTournament | null>(null);
   const [info, setInfo] = useState<LeaderInfo | null>(null);
-  const [tab, setTab] = useState<Tab>("people");
+  const [tab, setTab] = useState<Tab>("overview");
   const [dirty, setDirty] = useState(false);
   const [msg, setMsg] = useState("");
   const [missing, setMissing] = useState(false);
@@ -64,154 +67,123 @@ export default function LeaderDetailPage() {
     setInfo(draft);
     void save(draft);
   };
+  const copyLink = (query = "") => {
+    const url = `${window.location.origin}${import.meta.env.BASE_URL.replace(/\/$/, "")}/leader/judge/${id}${query}`;
+    void navigator.clipboard.writeText(url);
+    flash("تم نسخ الرابط");
+  };
 
-  const judgeLink = (roomId?: string) =>
-    `${window.location.origin}${import.meta.env.BASE_URL.replace(/\/$/, "")}/leader/judge/${id}${roomId ? `?room=${roomId}` : ""}`;
-  const copy = (text: string) => { void navigator.clipboard.writeText(text); flash("تم نسخ الرابط"); };
-
-  const dayIdx = typeof tab === "number" ? info.days.findIndex((d) => d.day === tab) : -1;
-  const day = dayIdx >= 0 ? info.days[dayIdx] : null;
   const people = info.individualPool ?? [];
   const judges = info.judgePool ?? [];
+  /** "Round 1 · Room 2" style placement label for a registry entry. */
+  const placement = (match: (r: LeaderInfo["days"][number]["rooms"][number]) => boolean) => {
+    const at = info.days.flatMap((d) => d.rooms.filter(match).map((r) => `ج${d.day} · ${r.label}`));
+    return at.length ? at.join("، ") : undefined;
+  };
+
+  const groups: SidebarGroup<Tab>[] = [
+    {
+      title: "المناظرة القيادية",
+      tabs: [
+        { key: "overview", label: "🏠 نظرة عامة", icon: LayoutDashboard },
+        { key: "rounds", label: "⚔️ الجولات والقاعات", icon: Layers, badge: info.days.length },
+        { key: "people", label: "👤 المتناظرون", icon: Users, badge: people.length },
+        { key: "judges", label: "👨‍⚖️ المحكمون", icon: UserCheck, badge: judges.length },
+        { key: "results", label: "📊 النتائج", icon: BarChart2 },
+        { key: "reports", label: "📑 التقارير", icon: FileText },
+      ],
+    },
+    { title: "الإدارة", tabs: [{ key: "settings", label: "⚙️ إعدادات البطولة", icon: Settings }] },
+  ];
 
   return (
-    <div className="min-h-screen p-4 sm:p-6" style={{ background: BRAND.surface }} dir="rtl">
-      <div className="mx-auto max-w-6xl space-y-5">
-        {/* Header — logo on the right, like the rest of the system */}
-        <header className="rounded-2xl bg-white border shadow-sm overflow-hidden" style={{ borderColor: BRAND.border }}>
-          <div className="h-1.5" style={{ backgroundImage: BRAND_GRADIENT }} />
-          <div className="p-4 md:p-5 flex flex-wrap items-center gap-4">
-            <BrandLogo size={56} />
-            <div className="flex-1 min-w-[200px]">
-              <button onClick={() => setLocation("/")} className="inline-flex items-center gap-1 text-[12px] font-bold" style={{ color: `${BRAND.ink}80` }}>
-                <ArrowRight className="w-3.5 h-3.5" /> البطولات
-              </button>
-              <h1 className="text-[22px] font-extrabold" style={{ color: BRAND.ink }}>{info.name}</h1>
-              <div className="mt-1 flex flex-wrap gap-1.5 text-[11.5px] font-bold">
-                <Chip>مناظرة قيادية · فردية</Chip>
-                <Chip>{info.days.length} جولات</Chip>
-                <Chip>{people.length} متناظر</Chip>
-                <Chip>{judges.length} محكم</Chip>
-              </div>
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
-              {msg && <span className="text-[12px] font-bold" style={{ color: BRAND.purple }}>{msg}</span>}
-              <button onClick={() => copy(judgeLink())} className={`${BTN.base} ${BTN.secondary}`}>
-                <Link2 className="w-4 h-4" /> رابط التحكيم العام
-              </button>
-              <button onClick={() => save()} disabled={!dirty} className={`${BTN.base} ${BTN.primary}`} style={BTN_PRIMARY_STYLE}
-                data-testid="button-save-leader">
-                <Save className="w-4 h-4" /> حفظ التعديلات
-              </button>
-            </div>
-          </div>
-        </header>
+    <div className="min-h-screen md:flex" style={{ background: BRAND.surface }} dir="rtl">
+      <TournamentSidebar<Tab> groups={groups} activeTab={tab} onTabChange={(k) => setTab(k)} onHome={() => setLocation("/")} />
 
-        {/* Tabs */}
-        <nav className="flex flex-wrap gap-1.5 rounded-2xl bg-white border p-1.5 shadow-sm" style={{ borderColor: BRAND.border }}>
-          <TabBtn active={tab === "people"} onClick={() => setTab("people")}><Users className="w-4 h-4" /> المتناظرون والمحكمون</TabBtn>
-          {info.days.map((d) => (
-            <TabBtn key={d.day} active={tab === d.day} onClick={() => setTab(d.day)}>
-              الجولة {d.day}{d.title ? ` · ${d.title}` : ""}
-            </TabBtn>
-          ))}
-          <TabBtn active={tab === "results"} onClick={() => setTab("results")}><Trophy className="w-4 h-4" /> النتائج والتقرير</TabBtn>
-          <button onClick={() => edit((dr) => { dr.days.push({ day: dr.days.length + 1, rooms: [newRoom(1)] }); })}
-            className={`${BTN.base} ${BTN.ghost} ${BTN_SIZE.sm} mr-auto`}>
-            <Plus className="w-4 h-4" /> جولة
+      <main className="min-w-0 flex-1">
+        {/* Top bar: tournament identity on the right, actions on the left */}
+        <div className="sticky top-0 z-20 flex flex-wrap items-center gap-3 border-b bg-white/90 px-4 py-3 backdrop-blur md:px-8"
+          style={{ borderColor: BRAND.border }}>
+          <div className="min-w-0 flex-1">
+            <div className="text-[11.5px] font-bold" style={{ color: BRAND.purple }}>مناظرة قيادية · فردية</div>
+            <h1 className="truncate text-[18px] font-extrabold" style={{ color: BRAND.ink }}>{info.name}</h1>
+          </div>
+          {msg && <span className="inline-flex items-center gap-1 text-[12px] font-bold" style={{ color: BRAND.success }}><CheckCircle2 className="w-4 h-4" />{msg}</span>}
+          {dirty && !msg && <span className="text-[12px] font-bold" style={{ color: BRAND.warning }}>تعديلات غير محفوظة</span>}
+          <button onClick={() => save()} disabled={!dirty} className={`${BTN.base} ${BTN.primary}`} style={BTN_PRIMARY_STYLE}
+            data-testid="button-save-leader">
+            <Save className="w-4 h-4" /> حفظ
           </button>
-        </nav>
+        </div>
 
-        {tab === "results" && <LeaderResults t={t} />}
-
-        {tab === "people" && (
-          <div className="grid gap-4 md:grid-cols-2">
-            <NamePool title="المتناظرون (الأفراد)" icon={<UserRound className="w-4 h-4" />} placeholder="اسم المتناظر"
-              names={people.map((p) => p.name)}
-              onAdd={(n) => edit((dr) => { dr.individualPool = [...(dr.individualPool ?? []), newIndividual(n)]; })}
-              onRemove={(i) => edit((dr) => { dr.individualPool!.splice(i, 1); })} />
-            <NamePool title="المحكمون" icon={<Gavel className="w-4 h-4" />} placeholder="اسم المحكم"
-              names={judges}
-              onAdd={(n) => edit((dr) => { dr.judgePool = [...(dr.judgePool ?? []), n]; })}
-              onRemove={(i) => edit((dr) => { dr.judgePool!.splice(i, 1); })} />
-          </div>
-        )}
-
-        {day && (
-          <>
-            <Panel title={`إعدادات الجولة ${day.day}`} hint="لكل جولة موضوعها ونطاق درجاتها — وتُجمع كل الجولات في النتيجة النهائية">
-              <div className="grid gap-3 sm:grid-cols-[1fr_120px_120px_auto] items-end">
-                <Field label="عنوان / موضوع الجولة">
-                  <input value={day.title ?? ""} placeholder="مثال: الجولة التمهيدية"
-                    onChange={(e) => edit((dr) => { dr.days[dayIdx].title = e.target.value; })}
-                    className={inputClass} style={inputStyle} />
-                </Field>
-                <Field label="أقل درجة">
-                  <input type="number" value={dayRange(info, day).min}
-                    onChange={(e) => edit((dr) => { dr.days[dayIdx].scoreMin = +e.target.value; })}
-                    className={inputClass} style={inputStyle} />
-                </Field>
-                <Field label="أعلى درجة">
-                  <input type="number" value={dayRange(info, day).max}
-                    onChange={(e) => edit((dr) => { dr.days[dayIdx].scoreMax = +e.target.value; })}
-                    className={inputClass} style={inputStyle} />
-                </Field>
-                {info.days.length > 1 && (
-                  <button onClick={() => {
-                    if (!confirm("حذف هذه الجولة؟")) return;
-                    edit((dr) => { dr.days.splice(dayIdx, 1); dr.days.forEach((d, i) => { d.day = i + 1; }); });
-                    setTab("people");
-                  }} className={`${BTN.base} ${BTN.secondary} h-11`}>
-                    <Trash2 className="w-4 h-4" /> حذف الجولة
-                  </button>
-                )}
-              </div>
-            </Panel>
-
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-              {day.rooms.map((room, ri) => {
-                const others = day.rooms.filter((_, i) => i !== ri);
-                return (
-                  <RoomCard
-                    key={room.id}
-                    room={room}
-                    people={people.filter((p) => !others.some((r) => r.individuals.some((x) => x.id === p.id)))}
-                    judges={judges.filter((j) => !others.some((r) => r.judges.includes(j)))}
-                    sheets={Object.entries(t.results).filter(([, s]) => s.roomId === room.id)}
-                    onChange={(fn) => edit((dr) => fn(dr.days[dayIdx].rooms[ri]))}
-                    onRemove={() => { if (confirm("حذف القاعة؟")) edit((dr) => { dr.days[dayIdx].rooms.splice(ri, 1); }); }}
-                    onToggleLock={() => toggleLock(dayIdx, ri)}
-                    onCopyLink={() => copy(judgeLink(room.id))}
-                    onDeleteSheet={async (key) => {
-                      if (!confirm("حذف ورقة هذا المحكم ليعيد الإدخال؟")) return;
-                      await deleteLeaderSheet(id, key); await refresh();
-                    }}
-                  />
-                );
-              })}
-              <button onClick={() => edit((dr) => { dr.days[dayIdx].rooms.push(newRoom(dr.days[dayIdx].rooms.length + 1)); })}
-                className="min-h-[180px] rounded-2xl border-2 border-dashed flex flex-col items-center justify-center gap-2 font-bold text-[14px] transition-colors hover:bg-white"
-                style={{ borderColor: `${BRAND.purple}40`, color: BRAND.purple }}>
-                <Plus className="w-6 h-6" /> إضافة قاعة
-              </button>
+        <div className="mx-auto max-w-6xl p-4 md:p-8">
+          {tab === "overview" && (
+            <div>
+              <SectionHeader title="نظرة عامة" subtitle="حالة كل جولة ورابط التحكيم الخاص بها" />
+              <LeaderOverview t={{ ...t, info }} copyLink={copyLink} />
             </div>
-          </>
-        )}
-      </div>
+          )}
+
+          {tab === "rounds" && (
+            <RoundsPanel t={t} info={info} edit={edit} onToggleLock={toggleLock} copyLink={copyLink}
+              onDeleteSheet={async (key) => { await deleteLeaderSheet(id, key); await refresh(); }} />
+          )}
+
+          {tab === "people" && (
+            <div>
+              <SectionHeader title="المتناظرون" subtitle="سجّل أسماء الأفراد هنا، ثم وزّعهم على القاعات من قسم الجولات" />
+              <NamePool noun="المتناظر" placeholder="اسم المتناظر" names={people.map((p) => p.name)}
+                assigned={(i) => placement((r) => r.individuals.some((x) => x.id === people[i].id))}
+                onAdd={(n) => edit((d) => { d.individualPool = [...(d.individualPool ?? []), newIndividual(n)]; })}
+                onRename={(i, n) => edit((d) => {
+                  const pid = d.individualPool![i].id;
+                  d.individualPool![i].name = n;
+                  d.days.forEach((x) => x.rooms.forEach((r) => r.individuals.forEach((ind) => { if (ind.id === pid) ind.name = n; })));
+                })}
+                onRemove={(i) => edit((d) => {
+                  const pid = d.individualPool![i].id;
+                  d.individualPool!.splice(i, 1);
+                  d.days.forEach((x) => x.rooms.forEach((r) => { r.individuals = r.individuals.filter((ind) => ind.id !== pid); }));
+                })} />
+            </div>
+          )}
+
+          {tab === "judges" && (
+            <div>
+              <SectionHeader title="المحكمون" subtitle="محكم واحد لكل قاعة، ولا يتكرر المحكم في قاعتين داخل نفس الجولة" />
+              <NamePool noun="المحكم" placeholder="اسم المحكم" names={judges}
+                assigned={(i) => placement((r) => r.judges.includes(judges[i]))}
+                onAdd={(n) => edit((d) => { d.judgePool = [...(d.judgePool ?? []), n]; })}
+                onRename={(i, n) => edit((d) => {
+                  const old = d.judgePool![i];
+                  d.judgePool![i] = n;
+                  d.days.forEach((x) => x.rooms.forEach((r) => { r.judges = r.judges.map((j) => (j === old ? n : j)); }));
+                })}
+                onRemove={(i) => edit((d) => {
+                  const old = d.judgePool![i];
+                  d.judgePool!.splice(i, 1);
+                  d.days.forEach((x) => x.rooms.forEach((r) => { r.judges = r.judges.filter((j) => j !== old); }));
+                })} />
+            </div>
+          )}
+
+          {tab === "results" && (
+            <div>
+              <SectionHeader title="النتائج" subtitle="الترتيب حسب المجموع الكلي، الجولة، أو القاعة — مع تصدير Excel" />
+              <LeaderResults t={t} />
+            </div>
+          )}
+
+          {tab === "reports" && (
+            <div>
+              <SectionHeader title="التقارير" subtitle="ملخص الجولات، القاعات، المحكمين، وكشف الأفراد التفصيلي" />
+              <LeaderReport t={{ ...t, info }} />
+            </div>
+          )}
+
+          {tab === "settings" && <LeaderSettings info={info} edit={edit} />}
+        </div>
+      </main>
     </div>
-  );
-}
-
-function Chip({ children }: { children: React.ReactNode }) {
-  return <span className="rounded-full px-2.5 py-0.5" style={{ background: `${BRAND.purple}10`, color: BRAND.purple }}>{children}</span>;
-}
-
-function TabBtn({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
-  return (
-    <button onClick={onClick}
-      className={`${BTN.base} ${BTN_SIZE.sm} ${active ? BTN.primary : BTN.ghost}`}
-      style={active ? BTN_PRIMARY_STYLE : undefined}>
-      {children}
-    </button>
   );
 }

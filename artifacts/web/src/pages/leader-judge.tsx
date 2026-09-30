@@ -8,6 +8,8 @@ import {
 export default function LeaderJudgePage() {
   const { id } = useParams<{ id: string }>();
   const fixedRoom = new URLSearchParams(window.location.search).get("room");
+  // Each round has its own judge link (?day=N) listing only that round's rooms.
+  const fixedDay = Number(new URLSearchParams(window.location.search).get("day")) || null;
   const [t, setT] = useState<LeaderTournament | null>(null);
   const [error, setError] = useState(false);
   const [roomId, setRoomId] = useState<string | null>(fixedRoom);
@@ -33,7 +35,7 @@ export default function LeaderJudgePage() {
 
   return (
     <Shell title={t.info.name} subtitle="مناظرة قيادية · اختر قاعتك">
-      {t.info.days.map((d) => (
+      {t.info.days.filter((d) => !fixedDay || d.day === fixedDay).map((d) => (
         <div key={d.day}>
           <div className="judge-info-label" style={{ margin: "12px 0 6px" }}>الجولة {d.day}</div>
           {d.rooms.map((r) => (

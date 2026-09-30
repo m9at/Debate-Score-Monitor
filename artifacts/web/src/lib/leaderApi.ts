@@ -29,6 +29,13 @@ export interface LeaderInfo {
   judgePool?: string[];
   /** Registered individuals; rooms pick from this list. */
   individualPool?: LeaderIndividual[];
+  /** Descriptive details shown in settings, overview and reports. */
+  organizer?: string;
+  venue?: string;
+  startDate?: string;
+  description?: string;
+  /** Target individuals per room used by the auto-draw. */
+  individualsPerRoom?: number;
 }
 export interface LeaderSheet {
   roomId: string;
