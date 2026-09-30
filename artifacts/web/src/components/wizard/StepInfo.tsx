@@ -145,7 +145,7 @@ export default function StepInfo({ setup, patch }: StepInfoProps) {
                 data-testid="input-wizard-rounds"
               />
             </Field>
-            <Field label="عدد الفرق المتوقع" hint="تقديري فقط — تضيف الفرق في خطوة لاحقة">
+            <Field label={setup.kind === "leadership" ? "عدد الأفراد المتوقع" : "عدد الفرق المتوقع"} hint={setup.kind === "leadership" ? "تقديري فقط — تضيف الأفراد في خطوة لاحقة" : "تقديري فقط — تضيف الفرق في خطوة لاحقة"}>
               <input
                 type="number"
                 min={2}
