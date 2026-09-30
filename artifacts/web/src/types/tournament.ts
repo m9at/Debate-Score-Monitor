@@ -68,7 +68,7 @@ export interface Team {
   id: string;
   name: string;
   speakerNames: string[];
-  speakersPerTeam: 3 | 4;
+  speakersPerTeam: 1 | 3 | 4;
   totalPoints: number;
   wins: number;
   losses: number;

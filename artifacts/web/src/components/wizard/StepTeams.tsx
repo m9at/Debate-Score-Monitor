@@ -13,7 +13,14 @@ interface StepTeamsProps {
 
 const EMPTY = { name: "", institution: "", s1: "", s2: "", s3: "", sub: "" };
 
-function makeTeam(f: typeof EMPTY): Team {
+function makeTeam(f: typeof EMPTY, individual = false): Team {
+  if (individual) {
+    return {
+      id: crypto.randomUUID(), name: f.name.trim(), institution: f.institution.trim() || undefined,
+      speakerNames: [f.name.trim()], speakersPerTeam: 1,
+      totalPoints: 0, wins: 0, losses: 0, matchesPlayed: 0, registeredAt: Date.now(),
+    };
+  }
   const speakers = [f.s1, f.s2, f.s3, f.sub].map((s) => s.trim());
   const hasSub = !!speakers[3];
   return {
@@ -35,13 +42,14 @@ export default function StepTeams({ setup, patch }: StepTeamsProps) {
   const [form, setForm] = useState(EMPTY);
   const [expanded, setExpanded] = useState<string | null>(null);
   const teams = setup.teams;
+  const isInd = setup.kind === "leadership";
 
   const set = (k: keyof typeof EMPTY, v: string) =>
     setForm((f) => ({ ...f, [k]: v }));
 
   const add = () => {
     if (!form.name.trim()) return;
-    patch({ teams: [...teams, makeTeam(form)], draw: null, drawApproved: false });
+    patch({ teams: [...teams, makeTeam(form, isInd)], draw: null, drawApproved: false });
     setForm(EMPTY);
   };
 
@@ -73,14 +81,14 @@ export default function StepTeams({ setup, patch }: StepTeamsProps) {
         topic={setup.caseText}
       />
 
-      <Panel title="إضافة فريق" hint="اسم الفريق فقط كافٍ للإضافة — يمكن استكمال المتحدثين لاحقاً">
+      <Panel title={isInd ? "إضافة فرد" : "إضافة فريق"} hint="اسم الفريق فقط كافٍ للإضافة — يمكن استكمال المتحدثين لاحقاً">
         <div className="space-y-3">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <input
               value={form.name}
               onChange={(e) => set("name", e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && add()}
-              placeholder="اسم الفريق *"
+              placeholder={isInd ? "اسم الفرد *" : "اسم الفريق *"}
               className={inputClass}
               style={inputStyle}
               autoFocus
@@ -97,7 +105,7 @@ export default function StepTeams({ setup, patch }: StepTeamsProps) {
             />
           </div>
 
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          {!isInd && <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
             {(
               [
                 ["s1", "المتحدث الأول"],
@@ -117,7 +125,7 @@ export default function StepTeams({ setup, patch }: StepTeamsProps) {
                 data-testid={`input-team-${key}`}
               />
             ))}
-          </div>
+          </div>}
 
           <button
             type="button"
@@ -128,12 +136,12 @@ export default function StepTeams({ setup, patch }: StepTeamsProps) {
             data-testid="button-add-team"
           >
             <Plus className="w-4 h-4" />
-            إضافة فريق
+            {isInd ? "إضافة فرد" : "إضافة فريق"}
           </button>
         </div>
       </Panel>
 
-      <Panel title={`الفرق المشاركة (${teams.length})`}>
+      <Panel title={`${isInd ? "الأفراد المشاركون" : "الفرق المشاركة"} (${teams.length})`}>
         {teams.length === 0 ? (
           <div className="py-8 flex flex-col items-center gap-2 text-center">
             <Users className="w-9 h-9" style={{ color: `${BRAND.purple}59` }} />

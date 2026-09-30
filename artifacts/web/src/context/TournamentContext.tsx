@@ -1106,7 +1106,7 @@ interface TournamentContextType {
   ) => string;
   deleteTournament: (id: string) => void;
   getTournament: (id: string) => Tournament | undefined;
-  addTeam: (tournamentId: string, name: string, speakersPerTeam: 3 | 4, speakerNames: string[]) => void;
+  addTeam: (tournamentId: string, name: string, speakersPerTeam: 1 | 3 | 4, speakerNames: string[]) => void;
   deleteTeam: (tournamentId: string, teamId: string) => void;
   updateTeam: (tournamentId: string, team: Team) => void;
   startTournament: (tournamentId: string) => void;
@@ -1557,7 +1557,7 @@ export function TournamentProvider({ children }: { children: ReactNode }) {
   );
 
   const addTeam = useCallback(
-    (tournamentId: string, name: string, speakersPerTeam: 3 | 4, speakerNames: string[]) => {
+    (tournamentId: string, name: string, speakersPerTeam: 1 | 3 | 4, speakerNames: string[]) => {
       const team: Team = {
         id: crypto.randomUUID(),
         name,
