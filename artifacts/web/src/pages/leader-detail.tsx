@@ -1,20 +1,25 @@
 import { useEffect, useState } from "react";
 import { useLocation, useParams } from "wouter";
+import { ArrowRight, Gavel, Link2, Plus, Save, Trash2, Trophy, UserRound, Users } from "lucide-react";
 import {
   dayRange, deleteLeaderSheet, getLeader, newIndividual, newRoom, saveLeaderInfo,
-  type LeaderInfo, type LeaderRoom, type LeaderTournament,
+  type LeaderInfo, type LeaderTournament,
 } from "@/lib/leaderApi";
+import { BRAND, BRAND_GRADIENT, BTN, BTN_PRIMARY_STYLE, BTN_SIZE } from "@/lib/brand";
+import BrandLogo from "@/components/brand/BrandLogo";
+import { Field, Panel, inputClass, inputStyle } from "@/components/wizard/ui";
 import LeaderResults from "@/components/leader/LeaderResults";
+import RoomCard from "@/components/leader/RoomCard";
+import NamePool from "@/components/leader/NamePool";
 
-const PURPLE = "#7B2D8E";
-const CYAN = "#29ABE2";
+type Tab = number | "people" | "results";
 
 export default function LeaderDetailPage() {
   const { id } = useParams<{ id: string }>();
   const [, setLocation] = useLocation();
   const [t, setT] = useState<LeaderTournament | null>(null);
   const [info, setInfo] = useState<LeaderInfo | null>(null);
-  const [tab, setTab] = useState<number | "results">(1);
+  const [tab, setTab] = useState<Tab>("people");
   const [dirty, setDirty] = useState(false);
   const [msg, setMsg] = useState("");
   const [missing, setMissing] = useState(false);
@@ -36,6 +41,7 @@ export default function LeaderDetailPage() {
   if (missing) return <div className="p-10 text-center" dir="rtl">البطولة غير موجودة</div>;
   if (!t || !info) return <div className="p-10 text-center" dir="rtl">جارٍ التحميل…</div>;
 
+  const flash = (m: string) => { setMsg(m); setTimeout(() => setMsg(""), 2000); };
   const edit = (fn: (draft: LeaderInfo) => void) => {
     const draft = structuredClone(info);
     fn(draft);
@@ -46,10 +52,9 @@ export default function LeaderDetailPage() {
     try {
       await saveLeaderInfo(id, next);
       setDirty(false);
-      setMsg("✅ تم الحفظ");
-      setTimeout(() => setMsg(""), 2000);
+      flash("تم الحفظ");
       await refresh();
-    } catch { setMsg("⚠️ تعذّر الحفظ"); }
+    } catch { flash("تعذّر الحفظ"); }
   };
   /** Lock/unlock saves immediately — it must reach judges right away. */
   const toggleLock = (dayIdx: number, roomIdx: number) => {
@@ -62,92 +67,134 @@ export default function LeaderDetailPage() {
 
   const judgeLink = (roomId?: string) =>
     `${window.location.origin}${import.meta.env.BASE_URL.replace(/\/$/, "")}/leader/judge/${id}${roomId ? `?room=${roomId}` : ""}`;
-  const copy = (text: string) => {
-    void navigator.clipboard.writeText(text);
-    setMsg("📋 تم نسخ الرابط");
-    setTimeout(() => setMsg(""), 2000);
-  };
+  const copy = (text: string) => { void navigator.clipboard.writeText(text); flash("تم نسخ الرابط"); };
 
   const dayIdx = typeof tab === "number" ? info.days.findIndex((d) => d.day === tab) : -1;
   const day = dayIdx >= 0 ? info.days[dayIdx] : null;
+  const people = info.individualPool ?? [];
+  const judges = info.judgePool ?? [];
 
   return (
-    <div className="min-h-screen bg-gray-50 p-4 sm:p-6" dir="rtl">
+    <div className="min-h-screen p-4 sm:p-6" style={{ background: BRAND.surface }} dir="rtl">
       <div className="mx-auto max-w-6xl space-y-5">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <button onClick={() => setLocation("/")} className="text-sm text-gray-500">← البطولات</button>
-            <h1 className="text-2xl font-extrabold" style={{ color: PURPLE }}>{info.name}</h1>
-            <p className="text-sm text-gray-500">مناظرة قيادية · الدرجات من {info.scoreMin} إلى {info.scoreMax} · بدون فائز</p>
+        {/* Header — logo on the right, like the rest of the system */}
+        <header className="rounded-2xl bg-white border shadow-sm overflow-hidden" style={{ borderColor: BRAND.border }}>
+          <div className="h-1.5" style={{ backgroundImage: BRAND_GRADIENT }} />
+          <div className="p-4 md:p-5 flex flex-wrap items-center gap-4">
+            <BrandLogo size={56} />
+            <div className="flex-1 min-w-[200px]">
+              <button onClick={() => setLocation("/")} className="inline-flex items-center gap-1 text-[12px] font-bold" style={{ color: `${BRAND.ink}80` }}>
+                <ArrowRight className="w-3.5 h-3.5" /> البطولات
+              </button>
+              <h1 className="text-[22px] font-extrabold" style={{ color: BRAND.ink }}>{info.name}</h1>
+              <div className="mt-1 flex flex-wrap gap-1.5 text-[11.5px] font-bold">
+                <Chip>مناظرة قيادية · فردية</Chip>
+                <Chip>{info.days.length} جولات</Chip>
+                <Chip>{people.length} متناظر</Chip>
+                <Chip>{judges.length} محكم</Chip>
+              </div>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              {msg && <span className="text-[12px] font-bold" style={{ color: BRAND.purple }}>{msg}</span>}
+              <button onClick={() => copy(judgeLink())} className={`${BTN.base} ${BTN.secondary}`}>
+                <Link2 className="w-4 h-4" /> رابط التحكيم العام
+              </button>
+              <button onClick={() => save()} disabled={!dirty} className={`${BTN.base} ${BTN.primary}`} style={BTN_PRIMARY_STYLE}
+                data-testid="button-save-leader">
+                <Save className="w-4 h-4" /> حفظ التعديلات
+              </button>
+            </div>
           </div>
-          <div className="flex items-center gap-2">
-            {msg && <span className="text-sm">{msg}</span>}
-            <button onClick={() => copy(judgeLink())} className="rounded-lg border px-3 py-2 text-sm font-bold" style={{ color: CYAN, borderColor: CYAN }}>
-              🔗 رابط التحكيم العام
-            </button>
-            <button onClick={() => save()} disabled={!dirty}
-              className="rounded-lg px-4 py-2 text-sm font-bold text-white disabled:opacity-40" style={{ background: PURPLE }}
-              data-testid="button-save-leader">
-              💾 حفظ التعديلات
-            </button>
-          </div>
-        </div>
+        </header>
 
-        <div className="flex flex-wrap gap-2">
+        {/* Tabs */}
+        <nav className="flex flex-wrap gap-1.5 rounded-2xl bg-white border p-1.5 shadow-sm" style={{ borderColor: BRAND.border }}>
+          <TabBtn active={tab === "people"} onClick={() => setTab("people")}><Users className="w-4 h-4" /> المتناظرون والمحكمون</TabBtn>
           {info.days.map((d) => (
-            <TabBtn key={d.day} active={tab === d.day} onClick={() => setTab(d.day)}>الجولة {d.day}</TabBtn>
+            <TabBtn key={d.day} active={tab === d.day} onClick={() => setTab(d.day)}>
+              الجولة {d.day}{d.title ? ` · ${d.title}` : ""}
+            </TabBtn>
           ))}
-          <TabBtn active={tab === "results"} onClick={() => setTab("results")}>🏅 النتائج</TabBtn>
+          <TabBtn active={tab === "results"} onClick={() => setTab("results")}><Trophy className="w-4 h-4" /> النتائج والتقرير</TabBtn>
           <button onClick={() => edit((dr) => { dr.days.push({ day: dr.days.length + 1, rooms: [newRoom(1)] }); })}
-            className="rounded-full px-3 py-1.5 text-sm text-gray-500">+ جولة</button>
-        </div>
+            className={`${BTN.base} ${BTN.ghost} ${BTN_SIZE.sm} mr-auto`}>
+            <Plus className="w-4 h-4" /> جولة
+          </button>
+        </nav>
 
         {tab === "results" && <LeaderResults t={t} />}
 
-        {tab !== "results" && (
-          <JudgePool pool={info.judgePool ?? []}
-            onChange={(fn) => edit((dr) => { dr.judgePool = dr.judgePool ?? []; fn(dr.judgePool); })} />
+        {tab === "people" && (
+          <div className="grid gap-4 md:grid-cols-2">
+            <NamePool title="المتناظرون (الأفراد)" icon={<UserRound className="w-4 h-4" />} placeholder="اسم المتناظر"
+              names={people.map((p) => p.name)}
+              onAdd={(n) => edit((dr) => { dr.individualPool = [...(dr.individualPool ?? []), newIndividual(n)]; })}
+              onRemove={(i) => edit((dr) => { dr.individualPool!.splice(i, 1); })} />
+            <NamePool title="المحكمون" icon={<Gavel className="w-4 h-4" />} placeholder="اسم المحكم"
+              names={judges}
+              onAdd={(n) => edit((dr) => { dr.judgePool = [...(dr.judgePool ?? []), n]; })}
+              onRemove={(i) => edit((dr) => { dr.judgePool!.splice(i, 1); })} />
+          </div>
         )}
 
         {day && (
           <>
-            <div className="flex flex-wrap items-center gap-2 rounded-2xl bg-white p-3 shadow-sm text-sm">
-              <b style={{ color: PURPLE }}>نظام الجولة {day.day}:</b>
-              <input value={day.title ?? ""} placeholder="عنوان / موضوع الجولة"
-                onChange={(e) => edit((dr) => { dr.days[dayIdx].title = e.target.value; })}
-                className="min-w-[140px] flex-1 rounded border px-2 py-1" />
-              <label className="flex items-center gap-1">من
-                <input type="number" value={dayRange(info, day).min}
-                  onChange={(e) => edit((dr) => { dr.days[dayIdx].scoreMin = +e.target.value; })}
-                  className="w-16 rounded border px-2 py-1" />
-              </label>
-              <label className="flex items-center gap-1">إلى
-                <input type="number" value={dayRange(info, day).max}
-                  onChange={(e) => edit((dr) => { dr.days[dayIdx].scoreMax = +e.target.value; })}
-                  className="w-16 rounded border px-2 py-1" />
-              </label>
+            <Panel title={`إعدادات الجولة ${day.day}`} hint="لكل جولة موضوعها ونطاق درجاتها — وتُجمع كل الجولات في النتيجة النهائية">
+              <div className="grid gap-3 sm:grid-cols-[1fr_120px_120px_auto] items-end">
+                <Field label="عنوان / موضوع الجولة">
+                  <input value={day.title ?? ""} placeholder="مثال: الجولة التمهيدية"
+                    onChange={(e) => edit((dr) => { dr.days[dayIdx].title = e.target.value; })}
+                    className={inputClass} style={inputStyle} />
+                </Field>
+                <Field label="أقل درجة">
+                  <input type="number" value={dayRange(info, day).min}
+                    onChange={(e) => edit((dr) => { dr.days[dayIdx].scoreMin = +e.target.value; })}
+                    className={inputClass} style={inputStyle} />
+                </Field>
+                <Field label="أعلى درجة">
+                  <input type="number" value={dayRange(info, day).max}
+                    onChange={(e) => edit((dr) => { dr.days[dayIdx].scoreMax = +e.target.value; })}
+                    className={inputClass} style={inputStyle} />
+                </Field>
+                {info.days.length > 1 && (
+                  <button onClick={() => {
+                    if (!confirm("حذف هذه الجولة؟")) return;
+                    edit((dr) => { dr.days.splice(dayIdx, 1); dr.days.forEach((d, i) => { d.day = i + 1; }); });
+                    setTab("people");
+                  }} className={`${BTN.base} ${BTN.secondary} h-11`}>
+                    <Trash2 className="w-4 h-4" /> حذف الجولة
+                  </button>
+                )}
+              </div>
+            </Panel>
+
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+              {day.rooms.map((room, ri) => {
+                const others = day.rooms.filter((_, i) => i !== ri);
+                return (
+                  <RoomCard
+                    key={room.id}
+                    room={room}
+                    people={people.filter((p) => !others.some((r) => r.individuals.some((x) => x.id === p.id)))}
+                    judges={judges.filter((j) => !others.some((r) => r.judges.includes(j)))}
+                    sheets={Object.entries(t.results).filter(([, s]) => s.roomId === room.id)}
+                    onChange={(fn) => edit((dr) => fn(dr.days[dayIdx].rooms[ri]))}
+                    onRemove={() => { if (confirm("حذف القاعة؟")) edit((dr) => { dr.days[dayIdx].rooms.splice(ri, 1); }); }}
+                    onToggleLock={() => toggleLock(dayIdx, ri)}
+                    onCopyLink={() => copy(judgeLink(room.id))}
+                    onDeleteSheet={async (key) => {
+                      if (!confirm("حذف ورقة هذا المحكم ليعيد الإدخال؟")) return;
+                      await deleteLeaderSheet(id, key); await refresh();
+                    }}
+                  />
+                );
+              })}
+              <button onClick={() => edit((dr) => { dr.days[dayIdx].rooms.push(newRoom(dr.days[dayIdx].rooms.length + 1)); })}
+                className="min-h-[180px] rounded-2xl border-2 border-dashed flex flex-col items-center justify-center gap-2 font-bold text-[14px] transition-colors hover:bg-white"
+                style={{ borderColor: `${BRAND.purple}40`, color: BRAND.purple }}>
+                <Plus className="w-6 h-6" /> إضافة قاعة
+              </button>
             </div>
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {day.rooms.map((room, ri) => (
-                <RoomCard
-                  key={room.id}
-                  room={room}
-                  pool={info.judgePool ?? []}
-                  usedJudges={day.rooms.filter((_, i) => i !== ri).flatMap((r) => r.judges.map((j) => j.trim()))}
-                  sheets={Object.entries(t.results).filter(([, s]) => s.roomId === room.id)}
-                  onChange={(fn) => edit((dr) => fn(dr.days[dayIdx].rooms[ri]))}
-                  onRemove={() => { if (confirm("حذف القاعة؟")) edit((dr) => { dr.days[dayIdx].rooms.splice(ri, 1); }); }}
-                  onToggleLock={() => toggleLock(dayIdx, ri)}
-                  onCopyLink={() => copy(judgeLink(room.id))}
-                  onDeleteSheet={async (key) => {
-                    if (!confirm("حذف ورقة هذا المحكم ليعيد الإدخال؟")) return;
-                    await deleteLeaderSheet(id, key); await refresh();
-                  }}
-                />
-              ))}
-            </div>
-            <button onClick={() => edit((dr) => { dr.days[dayIdx].rooms.push(newRoom(dr.days[dayIdx].rooms.length + 1)); })}
-              className="rounded-lg border-2 border-dashed px-4 py-2 text-sm font-bold text-gray-500">+ إضافة قاعة</button>
           </>
         )}
       </div>
@@ -155,131 +202,16 @@ export default function LeaderDetailPage() {
   );
 }
 
+function Chip({ children }: { children: React.ReactNode }) {
+  return <span className="rounded-full px-2.5 py-0.5" style={{ background: `${BRAND.purple}10`, color: BRAND.purple }}>{children}</span>;
+}
+
 function TabBtn({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
   return (
-    <button onClick={onClick} className="rounded-full px-4 py-1.5 text-sm font-bold"
-      style={active ? { background: PURPLE, color: "#fff" } : { background: "#fff", color: PURPLE }}>
+    <button onClick={onClick}
+      className={`${BTN.base} ${BTN_SIZE.sm} ${active ? BTN.primary : BTN.ghost}`}
+      style={active ? BTN_PRIMARY_STYLE : undefined}>
       {children}
     </button>
-  );
-}
-
-function RoomCard({ room, pool, usedJudges, sheets, onChange, onRemove, onToggleLock, onCopyLink, onDeleteSheet }: {
-  room: LeaderRoom;
-  pool: string[];
-  usedJudges: string[];
-  sheets: [string, { judgeName: string }][];
-  onChange: (fn: (r: LeaderRoom) => void) => void;
-  onRemove: () => void;
-  onToggleLock: () => void;
-  onCopyLink: () => void;
-  onDeleteSheet: (key: string) => void;
-}) {
-  const [judgeDraft, setJudgeDraft] = useState("");
-  /** A judge belongs to one room per round — no repeats across rooms. */
-  const addJudge = () => {
-    const v = judgeDraft.trim();
-    if (!v) return;
-    if (usedJudges.includes(v) || room.judges.includes(v)) {
-      alert("هذا المحكم معيَّن بالفعل في قاعة أخرى في هذه الجولة");
-      return;
-    }
-    onChange((r) => { r.judges.push(v); });
-    setJudgeDraft("");
-  };
-  return (
-    <div className="space-y-3 rounded-2xl bg-white p-4 shadow-sm" style={{ borderTop: `4px solid ${room.locked ? "#999" : CYAN}` }}>
-      <div className="flex items-center gap-2">
-        <input value={room.label} onChange={(e) => onChange((r) => { r.label = e.target.value; })}
-          className="flex-1 rounded border px-2 py-1 font-bold" />
-        <button onClick={onRemove} className="text-xs text-red-500">حذف</button>
-      </div>
-
-      <div className="flex gap-2">
-        <button onClick={onToggleLock} className="flex-1 rounded-lg px-2 py-1.5 text-xs font-bold text-white"
-          style={{ background: room.locked ? "#16a34a" : "#dc2626" }}>
-          {room.locked ? "🔓 فتح الرابط" : "🔒 إغلاق الرابط"}
-        </button>
-        <button onClick={onCopyLink} className="flex-1 rounded-lg border px-2 py-1.5 text-xs font-bold" style={{ color: CYAN, borderColor: CYAN }}>
-          🔗 نسخ رابط القاعة
-        </button>
-      </div>
-
-      <div>
-        <div className="mb-1 text-xs font-bold text-gray-500">👤 الأفراد ({room.individuals.length})</div>
-        <div className="space-y-1">
-          {room.individuals.map((ind, i) => (
-            <div key={ind.id} className="flex gap-1">
-              <input value={ind.name} placeholder={`الفرد ${i + 1}`}
-                onChange={(e) => onChange((r) => { r.individuals[i].name = e.target.value; })}
-                className="flex-1 rounded border px-2 py-1 text-sm" />
-              <button onClick={() => onChange((r) => { r.individuals.splice(i, 1); })} className="px-1 text-xs text-red-400">✕</button>
-            </div>
-          ))}
-        </div>
-        <button onClick={() => onChange((r) => { r.individuals.push(newIndividual()); })}
-          className="mt-1 text-xs font-bold" style={{ color: PURPLE }}>+ إضافة فرد</button>
-      </div>
-
-      <div>
-        <div className="mb-1 text-xs font-bold text-gray-500">👨‍⚖️ المحكمون</div>
-        <div className="flex flex-wrap gap-1">
-          {room.judges.map((j, i) => (
-            <span key={i} className="rounded-full bg-purple-50 px-2 py-0.5 text-xs">
-              {j} <button onClick={() => onChange((r) => { r.judges.splice(i, 1); })} className="text-red-400">✕</button>
-            </span>
-          ))}
-        </div>
-        <div className="mt-1 flex gap-1">
-          <select value={judgeDraft} onChange={(e) => setJudgeDraft(e.target.value)}
-            className="flex-1 rounded border px-2 py-1 text-sm">
-            <option value="">اختر المحكم من القائمة</option>
-            {pool.filter((j) => !usedJudges.includes(j) && !room.judges.includes(j)).map((j) => (
-              <option key={j} value={j}>{j}</option>
-            ))}
-          </select>
-          <button onClick={addJudge} className="text-xs font-bold" style={{ color: PURPLE }}>إضافة</button>
-        </div>
-      </div>
-
-      <div className="border-t pt-2 text-xs">
-        <div className="mb-1 font-bold text-gray-500">📥 أوراق مستلمة ({sheets.length}/{room.judges.length || "—"})</div>
-        {sheets.map(([key, s]) => (
-          <div key={key} className="flex justify-between">
-            <span>✅ {s.judgeName}</span>
-            <button onClick={() => onDeleteSheet(key)} className="text-red-400">حذف</button>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-/** Tournament-level judge list; rooms pick from it, so a judge can't be typed twice. */
-function JudgePool({ pool, onChange }: { pool: string[]; onChange: (fn: (p: string[]) => void) => void }) {
-  const [name, setName] = useState("");
-  const add = () => {
-    const v = name.trim();
-    if (!v) return;
-    if (pool.includes(v)) { alert("هذا المحكم مضاف بالفعل"); return; }
-    onChange((p) => { p.push(v); });
-    setName("");
-  };
-  return (
-    <div className="space-y-2 rounded-2xl bg-white p-3 shadow-sm text-sm">
-      <b style={{ color: PURPLE }}>👨‍⚖️ المحكمون ({pool.length})</b>
-      <div className="flex flex-wrap gap-1">
-        {pool.map((j, i) => (
-          <span key={j} className="rounded-full border px-2 py-0.5 text-xs">
-            {j} <button onClick={() => onChange((p) => { p.splice(i, 1); })} className="text-red-400">✕</button>
-          </span>
-        ))}
-      </div>
-      <div className="flex gap-1">
-        <input value={name} onChange={(e) => setName(e.target.value)} placeholder="اسم المحكم"
-          onKeyDown={(e) => { if (e.key === "Enter") add(); }} className="flex-1 rounded border px-2 py-1" />
-        <button onClick={add} className="text-xs font-bold" style={{ color: PURPLE }}>إضافة</button>
-      </div>
-    </div>
   );
 }

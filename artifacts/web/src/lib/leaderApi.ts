@@ -27,6 +27,8 @@ export interface LeaderInfo {
   days: LeaderDay[];
   /** Judges registered for the tournament; rooms pick from this list. */
   judgePool?: string[];
+  /** Registered individuals; rooms pick from this list. */
+  individualPool?: LeaderIndividual[];
 }
 export interface LeaderSheet {
   roomId: string;
