@@ -29,6 +29,9 @@ import PublicRoundPage from "@/pages/public-round";
 import ImportPage from "@/pages/import";
 import StatsPage from "@/pages/stats";
 import NotFound from "@/pages/not-found";
+import LeaderHomePage from "@/pages/leader-home";
+import LeaderDetailPage from "@/pages/leader-detail";
+import LeaderJudgePage from "@/pages/leader-judge";
 
 const clerkPubKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY as
   | string
@@ -192,6 +195,10 @@ function Router() {
       <Route path="/import" component={ImportPage} />
       <Route path="/judge/round/:sessionId" component={JudgeRoundPage} />
       <Route path="/judge/:sessionId" component={JudgePage} />
+      {/* مناظرة قيادية — individuals, scored per room */}
+      <Route path="/leader/judge/:id" component={LeaderJudgePage} />
+      <Route path="/leader/:id" component={LeaderDetailPage} />
+      <Route path="/leader" component={LeaderHomePage} />
 
       <Route path="/" component={Home} />
       <Route path="/group/:id" component={GroupDetail} />

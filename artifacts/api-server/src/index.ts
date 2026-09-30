@@ -13,6 +13,7 @@ import { eq, and, sql, desc } from "drizzle-orm";
 import { profilesRouter } from "./routes/profiles";
 import { draftsRouter } from "./routes/drafts";
 import { publicViewStatsRouter } from "./routes/public-view-stats";
+import { leaderRouter } from "./routes/leader";
 import { serveWebClient } from "./static";
 
 const app = express();
@@ -21,6 +22,7 @@ app.use(express.json({ limit: "2mb" }));
 app.use(profilesRouter);
 app.use(draftsRouter);
 app.use(publicViewStatsRouter);
+app.use(leaderRouter);
 
 const PORT = parseInt(process.env.PORT || "5050", 10);
 
