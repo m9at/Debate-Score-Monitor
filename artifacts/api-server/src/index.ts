@@ -209,6 +209,10 @@ app.put(
       res.status(400).json({ error: "missing scores body" });
       return;
     }
+    if (typeof scores.judgeName !== "string" || !scores.judgeName.trim()) {
+      res.status(400).json({ error: "missing judgeName" });
+      return;
+    }
     const entry = { ...scores, submittedAt: Date.now() };
     const room = param(req, "room");
     // Stamp the result with the match the room held at submit time, so a later

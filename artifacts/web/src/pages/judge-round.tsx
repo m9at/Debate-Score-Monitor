@@ -199,8 +199,8 @@ function RoomLocked({ room, tournamentName, roundNumber, onBack }: {
       />
       <div className="judge-wrap">
         <div className="judge-success">
-          <div className="judge-success-icon">✅</div>
-          <div className="judge-success-title">تم إرسال النتيجة</div>
+          <div className="judge-success-icon">🔒✅</div>
+          <div className="judge-success-title">تم تسجيل النتيجة — القاعة مقفلة</div>
           <div className="judge-success-sub">وصلت نتيجة هذه القاعة ولا يمكن تعبئتها أو تعديلها مرة أخرى.</div>
         </div>
         {onBack && (
@@ -329,6 +329,10 @@ function RoomScoring({ room, sessionId, tournamentName, roundNumber, replySpeech
 
   const handleSubmit = () => {
     if (tied) return;
+    if (!judgeName.trim()) {
+      setWarning("يجب اختيار/إدخال اسم المحكم قبل تسليم النتيجة");
+      return;
+    }
     if (!allNamesPicked) {
       setWarning("يجب اختيار اسم كل متحدث (الأول والثاني والثالث)");
       return;
@@ -618,8 +622,9 @@ function RoomScoring({ room, sessionId, tournamentName, roundNumber, replySpeech
         {warning && <div className="judge-warn">{warning}</div>}
         {tied && <div className="judge-warn">⚠️ لا يمكن أن يتساوى مجموع الفريقين</div>}
 
-        <button onClick={handleSubmit} disabled={tied || !allScoresValid || !allNamesPicked}
-          className={`judge-btn ${tied || !allScoresValid || !allNamesPicked ? "judge-btn-disabled" : "judge-btn-submit"}`}>
+        {!judgeName.trim() && <div className="judge-warn">👨‍⚖️ اختر اسمك كمحكم لتفعيل زر التسليم</div>}
+        <button onClick={handleSubmit} disabled={tied || !allScoresValid || !allNamesPicked || !judgeName.trim()}
+          className={`judge-btn ${tied || !allScoresValid || !allNamesPicked || !judgeName.trim() ? "judge-btn-disabled" : "judge-btn-submit"}`}>
           📤 تسليم النتيجة
         </button>
       </div>
