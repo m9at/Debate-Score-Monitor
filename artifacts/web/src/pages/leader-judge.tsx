@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams } from "wouter";
 import {
-  dayRange, getLeader, roomPanel, saveLeaderDraft, submitLeaderSheet, type LeaderRoom, type LeaderTournament,
+  dayRange, getLeader, roomPanel, saveLeaderDraft, submitLeaderSheet, type JudgeEntry, type LeaderRoom, type LeaderTournament,
 } from "@/lib/leaderApi";
 
 /** Judge link for a leadership debate: pick room → pick name → score each individual. */
@@ -71,19 +71,20 @@ function Scoring({ t, day, room, onBack, onSent }: {
   // Restore any autosaved draft so a judge who leaves the page loses nothing.
   const draft = t.drafts?.[room.id];
   const [judgeName, setJudgeName] = useState(draft?.judgeName ?? "");
-  const [scores, setScores] = useState<Record<string, string>>(
-    () => Object.fromEntries(Object.entries(draft?.scores ?? {}).map(([k, v]) => [k, String(v)])));
+  // Rows start with the room's registered debaters; the judge adds more with "+".
+  const [entries, setEntries] = useState<JudgeEntry[]>(() => draft?.entries?.length ? draft.entries
+    : room.individuals.map((i) => ({ id: i.id, name: i.name, score: draft?.scores?.[i.id] != null ? String(draft.scores[i.id]) : "" })));
+  const [touched, setTouched] = useState(false);
   const [saved, setSaved] = useState<"" | "saving" | "saved">("");
-  const dirty = judgeName !== (draft?.judgeName ?? "") || Object.keys(scores).length > 0;
   useEffect(() => {
-    if (!dirty || t.results[room.id] || room.locked) return;
+    if (!touched || t.results[room.id] || room.locked) return;
     setSaved("saving");
     const h = setTimeout(() => {
-      const nums = Object.fromEntries(Object.entries(scores).filter(([, v]) => v !== "").map(([k, v]) => [k, +v]));
-      saveLeaderDraft(t.id, room.id, judgeName, nums).then(() => setSaved("saved")).catch(() => setSaved(""));
+      saveLeaderDraft(t.id, room.id, judgeName, entries).then(() => setSaved("saved")).catch(() => setSaved(""));
     }, 800);
     return () => clearTimeout(h);
-  }, [judgeName, scores]);
+  }, [judgeName, entries]);
+  const change = (fn: (e: JudgeEntry[]) => JudgeEntry[]) => { setTouched(true); setEntries(fn); };
   const [confirming, setConfirming] = useState(false);
   const [status, setStatus] = useState<"idle" | "sending" | "sent" | "failed" | "dup" | "locked">("idle");
 
@@ -112,14 +113,14 @@ function Scoring({ t, day, room, onBack, onSent }: {
   }
 
   const valid = (v?: string) => !!v && /^\d+$/.test(v) && +v >= min && +v <= max;
-  const allValid = room.individuals.length > 0 && room.individuals.every((i) => valid(scores[i.id]));
+  const allValid = entries.length > 0 && entries.every((e) => e.name.trim() !== "" && valid(e.score));
   const canSend = allValid && judgeName.trim() !== "";
 
   const send = async () => {
     setStatus("sending");
     try {
       await submitLeaderSheet(t.id, room.id, judgeName.trim(),
-        Object.fromEntries(room.individuals.map((i) => [i.id, parseInt(scores[i.id])])));
+        entries.map((e) => ({ id: e.id || undefined, name: e.name.trim(), score: parseInt(e.score) })));
       setStatus("sent");
       onSent();
     } catch (e) {
@@ -134,9 +135,9 @@ function Scoring({ t, day, room, onBack, onSent }: {
       <Shell title={title} subtitle="تأكيد الإرسال">
         <div className="judge-card judge-card-info">
           <div className="judge-info-label">👨‍⚖️ المحكم: {judgeName}</div>
-          {room.individuals.map((i) => (
-            <div key={i.id} style={{ display: "flex", justifyContent: "space-between", padding: "6px 0" }}>
-              <span>{i.name}</span><b>{scores[i.id]}</b>
+          {entries.map((e, n) => (
+            <div key={e.id || `c-${n}`} style={{ display: "flex", justifyContent: "space-between", padding: "6px 0" }}>
+              <span>{e.name}{!e.id && " (جديد)"}</span><b>{e.score}</b>
             </div>
           ))}
         </div>
@@ -152,37 +153,40 @@ function Scoring({ t, day, room, onBack, onSent }: {
     <Shell title={title} subtitle={t.info.name}>
       <div className="judge-card judge-card-info">
         <div className="judge-info-label">👨‍⚖️ اسم المحكم</div>
-        {roomPanel(room).length > 0 ? (
-          <select value={judgeName} onChange={(e) => setJudgeName(e.target.value)} className="judge-text-input" style={{ fontWeight: 700 }}>
-            <option value="">— اختر اسمك —</option>
-            {roomPanel(room).map((j) => <option key={j} value={j}>{j === room.chair ? `${j} (رئيس الجلسة)` : j}</option>)}
-          </select>
-        ) : (
-          <input value={judgeName} onChange={(e) => setJudgeName(e.target.value)} placeholder="أدخل اسمك" className="judge-text-input" />
-        )}
+        <input value={judgeName} onChange={(e) => { setTouched(true); setJudgeName(e.target.value); }}
+          placeholder="اكتب اسمك" list="leader-judge-names" className="judge-text-input" style={{ fontWeight: 700 }} />
+        <datalist id="leader-judge-names">{roomPanel(room).map((j) => <option key={j} value={j} />)}</datalist>
       </div>
 
       <div className="judge-card judge-card-gov">
-        <div className="judge-info-label">الدرجات ({min}–{max}، أرقام صحيحة)</div>
-        {room.individuals.map((i, n) => {
-          const v = scores[i.id] ?? "";
-          const bad = v !== "" && !valid(v);
+        <div className="judge-info-label">المتناظرون والدرجات ({min}–{max})</div>
+        {entries.map((e, n) => {
+          const bad = e.score !== "" && !valid(e.score);
+          const set = (patch: Partial<JudgeEntry>) => change((l) => l.map((x, k) => (k === n ? { ...x, ...patch } : x)));
           return (
-            <div key={i.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 0" }}>
-              <span style={{ flex: 1, fontWeight: 700 }}>{n + 1}. {i.name || `الفرد ${n + 1}`}</span>
-              <select value={v} onChange={(e) => setScores((s) => ({ ...s, [i.id]: e.target.value }))}
+            <div key={e.id || `new-${n}`} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 0" }}>
+              <span style={{ fontWeight: 700, minWidth: 20 }}>{n + 1}.</span>
+              {e.id ? <span style={{ flex: 1, fontWeight: 700 }}>{e.name}</span> : (
+                <input value={e.name} onChange={(ev) => set({ name: ev.target.value })} placeholder="اسم المتناظر"
+                  className="judge-text-input" style={{ flex: 1, fontWeight: 700 }} />
+              )}
+              <select value={e.score} onChange={(ev) => set({ score: ev.target.value })}
                 className="judge-text-input" style={{ width: 96, textAlign: "center", fontWeight: 700, borderColor: bad ? "#dc2626" : undefined }}>
                 <option value="">—</option>
-                {Array.from({ length: max - min + 1 }, (_, k) => min + k).map((n) => <option key={n} value={n}>{n}</option>)}
+                {Array.from({ length: max - min + 1 }, (_, k) => min + k).map((v) => <option key={v} value={v}>{v}</option>)}
               </select>
+              {!e.id && <button onClick={() => change((l) => l.filter((_, k) => k !== n))} aria-label="حذف"
+                style={{ border: 0, background: "none", color: "#dc2626", fontSize: 18, cursor: "pointer" }}>✕</button>}
             </div>
           );
         })}
-        {!room.individuals.length && <p className="judge-success-sub">لا يوجد أفراد في هذه القاعة بعد.</p>}
+        <button onClick={() => change((l) => [...l, { id: "", name: "", score: "" }])} className="judge-btn judge-btn-back"
+          style={{ marginTop: 8 }}>＋ إضافة متناظر</button>
       </div>
 
       {status === "failed" && <div className="judge-warn">تعذّر الإرسال — تأكد من الاتصال وحاول مرة أخرى</div>}
-      {!judgeName.trim() && <div className="judge-warn">يجب اختيار/إدخال اسم المحكم</div>}
+      {!judgeName.trim() && <div className="judge-warn">يجب كتابة اسم المحكم</div>}
+      {!entries.length && <div className="judge-warn">أضف متناظراً واحداً على الأقل</div>}
 
       <button onClick={() => setConfirming(true)} disabled={!canSend}
         className={`judge-btn ${canSend ? "judge-btn-submit" : "judge-btn-disabled"}`}>🏁 إنهاء التحكيم</button>

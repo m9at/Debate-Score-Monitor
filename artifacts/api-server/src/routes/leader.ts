@@ -18,8 +18,9 @@ const wrap =
 
 const id = (req: Request) => String(req.params.id ?? "");
 
-type Room = { id: string; locked?: boolean; individuals?: { id: string }[] };
-type Info = { scoreMin: number; scoreMax: number; days: { scoreMin?: number; scoreMax?: number; closed?: boolean; rooms: Room[] }[] };
+type Person = { id: string; name: string };
+type Room = { id: string; locked?: boolean; individuals: Person[] };
+type Info = { individualPool?: Person[]; scoreMin: number; scoreMax: number; days: { scoreMin?: number; scoreMax?: number; closed?: boolean; rooms: Room[] }[] };
 
 const DRAFTS = "__drafts";
 
@@ -105,19 +106,31 @@ leaderRouter.put(
       res.status(400).json({ error: "missing judgeName" });
       return;
     }
-    const scores = req.body?.scores as Record<string, number> | undefined;
-    const ids = (room.individuals ?? []).map((i) => i.id);
     const dayCfg = info.days.find((d) => d.rooms.some((r) => r.id === roomId));
     const lo = dayCfg?.scoreMin ?? info.scoreMin;
     const hi = dayCfg?.scoreMax ?? info.scoreMax;
+    // The judge sends one row per debater; rows without a known id are new
+    // debaters typed by the judge and get added to the room and the registry.
+    const rawEntries = Array.isArray(req.body?.entries)
+      ? (req.body.entries as { id?: string; name?: string; score?: number }[])
+      : Object.entries((req.body?.scores ?? {}) as Record<string, number>).map(([eid, score]) => ({
+          id: eid, name: room.individuals.find((i) => i.id === eid)?.name, score,
+        }));
+    const known = new Set((room.individuals ??= []).map((i) => i.id));
+    const entries = rawEntries.map((e) => ({
+      id: e.id && known.has(e.id) ? e.id : undefined,
+      name: String(e.name ?? "").trim().slice(0, 100),
+      score: e.score,
+    }));
     const valid =
-      !!scores &&
-      ids.length > 0 &&
-      ids.every(
-        (i) =>
-          Number.isInteger(scores[i]) &&
-          scores[i] >= lo &&
-          scores[i] <= hi,
+      entries.length > 0 &&
+      [...known].every((k) => entries.some((e) => e.id === k)) &&
+      entries.every(
+        (e) =>
+          (e.id || e.name) &&
+          Number.isInteger(e.score) &&
+          (e.score as number) >= lo &&
+          (e.score as number) <= hi,
       );
     if (!valid) {
       res.status(400).json({ error: `scores must be integers ${lo}-${hi}` });
@@ -138,12 +151,25 @@ leaderRouter.put(
       res.status(409).json({ error: "already submitted" });
       return;
     }
-    const clean = Object.fromEntries(ids.map((i) => [i, scores![i]]));
+    // Register the judge's new debaters in the room and the tournament registry.
+    const pool = (info.individualPool ??= []);
+    let infoChanged = false;
+    for (const e of entries) {
+      if (e.id) continue;
+      e.id = Math.random().toString(36).slice(2, 10);
+      room.individuals.push({ id: e.id, name: e.name });
+      if (!pool.some((p) => p.name.trim() === e.name)) pool.push({ id: e.id, name: e.name });
+      infoChanged = true;
+    }
+    const clean = Object.fromEntries(entries.map((e) => [e.id!, e.score as number]));
     results[key] = { roomId, judgeName, scores: clean, submittedAt: Date.now() };
     const drafts = { ...((results[DRAFTS] || {}) as Record<string, unknown>) };
     delete drafts[roomId];
     results[DRAFTS] = drafts;
-    await db.update(judgeSessions).set({ results }).where(eq(judgeSessions.id, row.id));
+    await db
+      .update(judgeSessions)
+      .set(infoChanged ? { results, info } : { results })
+      .where(eq(judgeSessions.id, row.id));
     res.json({ ok: true });
   }),
 );
@@ -184,6 +210,14 @@ leaderRouter.put(
     drafts[roomId] = {
       judgeName: String(req.body?.judgeName ?? "").slice(0, 100),
       scores: Object.fromEntries(Object.entries(scores).filter(([, v]) => Number.isInteger(v))),
+      // Unsent rows (incl. debaters the judge typed) so the form restores exactly.
+      entries: Array.isArray(req.body?.entries)
+        ? (req.body.entries as { id?: string; name?: string; score?: string }[]).slice(0, 50).map((e) => ({
+            id: String(e.id ?? "").slice(0, 20),
+            name: String(e.name ?? "").slice(0, 100),
+            score: String(e.score ?? "").slice(0, 3),
+          }))
+        : undefined,
       updatedAt: Date.now(),
     };
     results[DRAFTS] = drafts;

@@ -95,7 +95,7 @@ export interface LeaderTournament {
   info: LeaderInfo;
   results: Record<string, LeaderSheet>;
   /** Judges' autosaved, not-yet-submitted scores keyed by room id. */
-  drafts?: Record<string, { judgeName: string; scores: Record<string, number>; updatedAt: number }>;
+  drafts?: Record<string, { judgeName: string; scores: Record<string, number>; entries?: JudgeEntry[]; updatedAt: number }>;
 }
 
 export const PERIOD_NAMES = ["الأولى", "الثانية", "الثالثة", "الرابعة", "الخامسة"];
@@ -139,13 +139,18 @@ export const createLeader = (info: LeaderInfo) =>
 export const getLeader = (id: string) => http<LeaderTournament>(`/${encodeURIComponent(id)}`);
 export const saveLeaderInfo = (id: string, info: LeaderInfo) =>
   http(`/${encodeURIComponent(id)}/info`, { method: "PUT", body: JSON.stringify({ info }) });
-export const submitLeaderSheet = (id: string, roomId: string, judgeName: string, scores: Record<string, number>) =>
+/** One debater row on the judge form; `id` is empty for a debater the judge typed in. */
+export interface JudgeEntry { id: string; name: string; score: string }
+export const submitLeaderSheet = (id: string, roomId: string, judgeName: string, entries: { id?: string; name: string; score: number }[]) =>
   http(`/${encodeURIComponent(id)}/results/${encodeURIComponent(roomId)}`, {
-    method: "PUT", body: JSON.stringify({ judgeName, scores }),
+    method: "PUT", body: JSON.stringify({ judgeName, entries }),
   });
-export const saveLeaderDraft = (id: string, roomId: string, judgeName: string, scores: Record<string, number>) =>
+export const saveLeaderDraft = (id: string, roomId: string, judgeName: string, entries: JudgeEntry[]) =>
   http(`/${encodeURIComponent(id)}/drafts/${encodeURIComponent(roomId)}`, {
-    method: "PUT", body: JSON.stringify({ judgeName, scores }),
+    method: "PUT", body: JSON.stringify({
+      judgeName, entries,
+      scores: Object.fromEntries(entries.filter((e) => e.id && e.score !== "").map((e) => [e.id, +e.score])),
+    }),
   });
 export const deleteLeaderSheet = (id: string, key: string) =>
   http(`/${encodeURIComponent(id)}/results/${encodeURIComponent(key)}`, { method: "DELETE" });
