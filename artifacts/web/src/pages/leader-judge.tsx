@@ -54,7 +54,7 @@ export default function LeaderJudgePage() {
                   {sent && <div style={{ fontSize: 12 }}>أرسلها: {sent.judgeName} · {new Date(sent.submittedAt).toLocaleTimeString("ar", { timeStyle: "short" })}</div>}
                   {!sent && r.chair && <div style={{ fontSize: 12, opacity: 0.8 }}>رئيس الجلسة: {r.chair}</div>}
                 </div>
-                <span style={{ fontWeight: 700 }}>{sent ? "✅ تم الإرسال" : blocked ? "🔒 مغلقة" : `${r.individuals.length} أفرقاء ←`}</span>
+                <span style={{ fontWeight: 700 }}>{sent ? "✅ تم الإرسال" : blocked ? "🔒 مغلقة" : `${r.individuals.length} فرق ←`}</span>
               </div>
             );
           })}

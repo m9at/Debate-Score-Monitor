@@ -96,7 +96,7 @@ export default function RoundsPanel({ t, info, edit, onToggleLock, onDeleteSheet
             <button onClick={() => setSettingsFor(dayIdx)} className={`${BTN.base} ${BTN.secondary}`}><Pencil className="w-4 h-4" /> إعدادات الجولة</button>
             <button onClick={() => edit((d) => {
               Object.assign(d, drawLeaderRound(d, dayIdx, d.individualsPerRoom ?? 4, d.judgesPerRoom ?? 1));
-              logActivity(d, `تم توزيع ${people.length} أفرقاء على قاعات الجولة ${day.day}`);
+              logActivity(d, `تم توزيع ${people.length} فرق على قاعات الجولة ${day.day}`);
             })} className={`${BTN.base} ${BTN.secondary}`}><Shuffle className="w-4 h-4" /> توزيع تلقائي</button>
             <PdfMenu t={tl} day={day.day} />
             <button onClick={() => edit((d) => { d.days[dayIdx].rooms.push(newRoom(d.days[dayIdx].rooms.length + 1)); })}
@@ -139,7 +139,7 @@ function RoundSummary({ t, day }: { t: LeaderTournament; day: LeaderDay }) {
   const scores = done.flatMap((r) => Object.values(t.results[r.id].scores));
   const avg = scores.length ? Math.round((scores.reduce((a, b) => a + b, 0) / scores.length) * 10) / 10 : "—";
   const stats: [string, string | number][] = [
-    ["الأفرقاء", day.rooms.reduce((n, r) => n + r.individuals.length, 0)],
+    ["الفرق", day.rooms.reduce((n, r) => n + r.individuals.length, 0)],
     ["القاعات", day.rooms.length],
     ["المحكمون", day.rooms.reduce((n, r) => n + roomPanel(r).length, 0)],
     ["التحكيم المكتمل", `${done.length}/${day.rooms.length}`],

@@ -67,13 +67,13 @@ export default function LeaderSettings({ t, info, edit, onReset }: {
         </Card>
 
         <Card icon="👤" title="إعدادات المشاركين">
-          <Info label="عدد الأفرقاء المسجلين" value={info.individualPool?.length ?? 0} />
+          <Info label="عدد الفرق المسجلين" value={info.individualPool?.length ?? 0} />
           <Note>يُسجَّل كل مشارك بشكل مستقل (بدون فرق) من قسم «المتناظرون»، ويُرقَّم تلقائياً داخل كل قاعة.</Note>
         </Card>
 
         <Card icon="🏛️" title="إعدادات القاعات">
-          <Field label="سعة القاعة (عدد الأفرقاء في القاعة)"><input min={1} {...num("individualsPerRoom", 4)} /></Field>
-          <Note>يستخدم التوزيع التلقائي هذه السعة لتقسيم الأفرقاء بالتساوي، وتُسمّى القاعات من بطاقة كل قاعة.</Note>
+          <Field label="سعة القاعة (عدد الفرق في القاعة)"><input min={1} {...num("individualsPerRoom", 4)} /></Field>
+          <Note>يستخدم التوزيع التلقائي هذه السعة لتقسيم الفرق بالتساوي، وتُسمّى القاعات من بطاقة كل قاعة.</Note>
         </Card>
 
         <Card icon="⚔️" title="إعدادات الجولات والفترات" wide>

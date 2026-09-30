@@ -72,7 +72,7 @@ export default function RoomCard({ room, day, state, sheet, draft, people, judge
         <div className="mt-3 space-y-1.5 text-[12.5px]" style={{ color: BRAND.ink }}>
           <Line icon={<Crown className="h-3.5 w-3.5" />} label="رئيس الجلسة" value={room.chair || "—"} />
           <Line icon={<Gavel className="h-3.5 w-3.5" />} label="المحكمون" value={`${room.judges.length} محكمين`} />
-          <Line icon={<UserRound className="h-3.5 w-3.5" />} label="الأفرقاء" value={room.individuals.length} />
+          <Line icon={<UserRound className="h-3.5 w-3.5" />} label="الفرق" value={room.individuals.length} />
           <Line icon={<CheckCircle2 className="h-3.5 w-3.5" />} label="الدرجات" value={`${scored} / ${room.individuals.length} مكتملة`} />
         </div>
 
@@ -113,7 +113,7 @@ export default function RoomCard({ room, day, state, sheet, draft, people, judge
               onPick={(j) => onChange((r) => { r.judges.push(j); }, `تم تعيين المحكم ${j} — ${where}`)} />
           </Section>
 
-          <Section icon={<UserRound className="w-3.5 h-3.5" />} title={`الأفرقاء (${room.individuals.length})`}>
+          <Section icon={<UserRound className="w-3.5 h-3.5" />} title={`الفرق (${room.individuals.length})`}>
             {room.individuals.length === 0 && <p className="text-[12px]" style={{ color: `${BRAND.ink}66` }}>لم يوزَّع أحد على هذه القاعة بعد</p>}
             {room.individuals.map((ind, i) => (
               <Row key={ind.id} n={i + 1} name={ind.name} score={sheet?.scores[ind.id] ?? draft?.scores[ind.id]}

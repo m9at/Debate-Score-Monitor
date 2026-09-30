@@ -31,7 +31,7 @@ export default function LeaderOverview({ t, copyLink }: { t: LeaderTournament; c
   const lastUpdate = events[0]?.at;
 
   const stats: [React.ReactNode, string, string | number][] = [
-    [<Users key="1" />, "إجمالي الأفرقاء", info.individualPool?.length ?? 0],
+    [<Users key="1" />, "إجمالي الفرق", info.individualPool?.length ?? 0],
     [<Layers key="2" />, "إجمالي الجولات", info.days.length],
     [<LayoutGrid key="3" />, "إجمالي القاعات", rooms.length],
     [<Gavel key="4" />, "إجمالي المحكمين", judges.size],

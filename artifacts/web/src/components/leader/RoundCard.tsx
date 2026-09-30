@@ -10,7 +10,7 @@ export default function RoundCard({ t, d, active, onManage, menu }: {
   const done = d.rooms.filter((r) => t.results[r.id]).length;
   const pct = d.rooms.length ? Math.round((done / d.rooms.length) * 100) : 0;
   const stats: [React.ReactNode, string, number][] = [
-    [<Users key="u" className="h-3.5 w-3.5" />, "الأفرقاء", d.rooms.reduce((n, r) => n + r.individuals.length, 0)],
+    [<Users key="u" className="h-3.5 w-3.5" />, "الفرق", d.rooms.reduce((n, r) => n + r.individuals.length, 0)],
     [<LayoutGrid key="l" className="h-3.5 w-3.5" />, "القاعات", d.rooms.length],
     [<Gavel key="g" className="h-3.5 w-3.5" />, "المحكمون", d.rooms.reduce((n, r) => n + roomPanel(r).length, 0)],
   ];
