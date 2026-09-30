@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams } from "wouter";
 import {
-  getLeader, submitLeaderSheet, type LeaderRoom, type LeaderTournament,
+  dayRange, getLeader, submitLeaderSheet, type LeaderRoom, type LeaderTournament,
 } from "@/lib/leaderApi";
 
 /** Judge link for a leadership debate: pick room → pick name → score each individual. */
@@ -52,7 +52,7 @@ export default function LeaderJudgePage() {
 function Scoring({ t, day, room, onBack, onSent }: {
   t: LeaderTournament; day: number; room: LeaderRoom; onBack?: () => void; onSent: () => void;
 }) {
-  const { scoreMin: min, scoreMax: max } = t.info;
+  const { min, max } = dayRange(t.info, t.info.days.find((d) => d.day === day));
   const [judgeName, setJudgeName] = useState("");
   const [scores, setScores] = useState<Record<string, string>>({});
   const [confirming, setConfirming] = useState(false);

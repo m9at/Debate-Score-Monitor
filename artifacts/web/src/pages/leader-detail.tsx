@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useLocation, useParams } from "wouter";
 import {
-  deleteLeaderSheet, getLeader, newIndividual, newRoom, saveLeaderInfo,
+  dayRange, deleteLeaderSheet, getLeader, newIndividual, newRoom, saveLeaderInfo,
   type LeaderInfo, type LeaderRoom, type LeaderTournament,
 } from "@/lib/leaderApi";
 import LeaderResults from "@/components/leader/LeaderResults";
@@ -104,13 +104,35 @@ export default function LeaderDetailPage() {
 
         {tab === "results" && <LeaderResults t={t} />}
 
+        {tab !== "results" && (
+          <JudgePool pool={info.judgePool ?? []}
+            onChange={(fn) => edit((dr) => { dr.judgePool = dr.judgePool ?? []; fn(dr.judgePool); })} />
+        )}
+
         {day && (
           <>
+            <div className="flex flex-wrap items-center gap-2 rounded-2xl bg-white p-3 shadow-sm text-sm">
+              <b style={{ color: PURPLE }}>نظام الجولة {day.day}:</b>
+              <input value={day.title ?? ""} placeholder="عنوان / موضوع الجولة"
+                onChange={(e) => edit((dr) => { dr.days[dayIdx].title = e.target.value; })}
+                className="min-w-[140px] flex-1 rounded border px-2 py-1" />
+              <label className="flex items-center gap-1">من
+                <input type="number" value={dayRange(info, day).min}
+                  onChange={(e) => edit((dr) => { dr.days[dayIdx].scoreMin = +e.target.value; })}
+                  className="w-16 rounded border px-2 py-1" />
+              </label>
+              <label className="flex items-center gap-1">إلى
+                <input type="number" value={dayRange(info, day).max}
+                  onChange={(e) => edit((dr) => { dr.days[dayIdx].scoreMax = +e.target.value; })}
+                  className="w-16 rounded border px-2 py-1" />
+              </label>
+            </div>
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
               {day.rooms.map((room, ri) => (
                 <RoomCard
                   key={room.id}
                   room={room}
+                  pool={info.judgePool ?? []}
                   usedJudges={day.rooms.filter((_, i) => i !== ri).flatMap((r) => r.judges.map((j) => j.trim()))}
                   sheets={Object.entries(t.results).filter(([, s]) => s.roomId === room.id)}
                   onChange={(fn) => edit((dr) => fn(dr.days[dayIdx].rooms[ri]))}
@@ -142,8 +164,9 @@ function TabBtn({ active, onClick, children }: { active: boolean; onClick: () =>
   );
 }
 
-function RoomCard({ room, usedJudges, sheets, onChange, onRemove, onToggleLock, onCopyLink, onDeleteSheet }: {
+function RoomCard({ room, pool, usedJudges, sheets, onChange, onRemove, onToggleLock, onCopyLink, onDeleteSheet }: {
   room: LeaderRoom;
+  pool: string[];
   usedJudges: string[];
   sheets: [string, { judgeName: string }][];
   onChange: (fn: (r: LeaderRoom) => void) => void;
@@ -208,11 +231,14 @@ function RoomCard({ room, usedJudges, sheets, onChange, onRemove, onToggleLock, 
           ))}
         </div>
         <div className="mt-1 flex gap-1">
-          <input value={judgeDraft} onChange={(e) => setJudgeDraft(e.target.value)} placeholder="اسم المحكم"
-            onKeyDown={(e) => { if (e.key === "Enter") addJudge(); }}
-            className="flex-1 rounded border px-2 py-1 text-sm" />
-          <button onClick={addJudge}
-            className="text-xs font-bold" style={{ color: PURPLE }}>إضافة</button>
+          <select value={judgeDraft} onChange={(e) => setJudgeDraft(e.target.value)}
+            className="flex-1 rounded border px-2 py-1 text-sm">
+            <option value="">اختر المحكم من القائمة</option>
+            {pool.filter((j) => !usedJudges.includes(j) && !room.judges.includes(j)).map((j) => (
+              <option key={j} value={j}>{j}</option>
+            ))}
+          </select>
+          <button onClick={addJudge} className="text-xs font-bold" style={{ color: PURPLE }}>إضافة</button>
         </div>
       </div>
 
@@ -224,6 +250,35 @@ function RoomCard({ room, usedJudges, sheets, onChange, onRemove, onToggleLock, 
             <button onClick={() => onDeleteSheet(key)} className="text-red-400">حذف</button>
           </div>
         ))}
+      </div>
+    </div>
+  );
+}
+
+/** Tournament-level judge list; rooms pick from it, so a judge can't be typed twice. */
+function JudgePool({ pool, onChange }: { pool: string[]; onChange: (fn: (p: string[]) => void) => void }) {
+  const [name, setName] = useState("");
+  const add = () => {
+    const v = name.trim();
+    if (!v) return;
+    if (pool.includes(v)) { alert("هذا المحكم مضاف بالفعل"); return; }
+    onChange((p) => { p.push(v); });
+    setName("");
+  };
+  return (
+    <div className="space-y-2 rounded-2xl bg-white p-3 shadow-sm text-sm">
+      <b style={{ color: PURPLE }}>👨‍⚖️ المحكمون ({pool.length})</b>
+      <div className="flex flex-wrap gap-1">
+        {pool.map((j, i) => (
+          <span key={j} className="rounded-full border px-2 py-0.5 text-xs">
+            {j} <button onClick={() => onChange((p) => { p.splice(i, 1); })} className="text-red-400">✕</button>
+          </span>
+        ))}
+      </div>
+      <div className="flex gap-1">
+        <input value={name} onChange={(e) => setName(e.target.value)} placeholder="اسم المحكم"
+          onKeyDown={(e) => { if (e.key === "Enter") add(); }} className="flex-1 rounded border px-2 py-1" />
+        <button onClick={add} className="text-xs font-bold" style={{ color: PURPLE }}>إضافة</button>
       </div>
     </div>
   );

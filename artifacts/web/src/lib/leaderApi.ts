@@ -8,12 +8,25 @@ export interface LeaderRoom {
   individuals: LeaderIndividual[];
   judges: string[];
 }
-export interface LeaderDay { day: number; rooms: LeaderRoom[] }
+export interface LeaderDay {
+  day: number;
+  rooms: LeaderRoom[];
+  /** Per-round system: optional title and score range overriding the tournament's. */
+  title?: string;
+  scoreMin?: number;
+  scoreMax?: number;
+}
+export const dayRange = (info: LeaderInfo, d?: LeaderDay) => ({
+  min: d?.scoreMin ?? info.scoreMin,
+  max: d?.scoreMax ?? info.scoreMax,
+});
 export interface LeaderInfo {
   name: string;
   scoreMin: number;
   scoreMax: number;
   days: LeaderDay[];
+  /** Judges registered for the tournament; rooms pick from this list. */
+  judgePool?: string[];
 }
 export interface LeaderSheet {
   roomId: string;

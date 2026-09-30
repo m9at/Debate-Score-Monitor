@@ -19,7 +19,7 @@ const wrap =
 const id = (req: Request) => String(req.params.id ?? "");
 
 type Room = { id: string; locked?: boolean; individuals?: { id: string }[] };
-type Info = { scoreMin: number; scoreMax: number; days: { rooms: Room[] }[] };
+type Info = { scoreMin: number; scoreMax: number; days: { scoreMin?: number; scoreMax?: number; rooms: Room[] }[] };
 
 async function load(sessionId: string) {
   const rows = await db
@@ -103,17 +103,20 @@ leaderRouter.put(
     }
     const scores = req.body?.scores as Record<string, number> | undefined;
     const ids = (room.individuals ?? []).map((i) => i.id);
+    const dayCfg = info.days.find((d) => d.rooms.some((r) => r.id === roomId));
+    const lo = dayCfg?.scoreMin ?? info.scoreMin;
+    const hi = dayCfg?.scoreMax ?? info.scoreMax;
     const valid =
       !!scores &&
       ids.length > 0 &&
       ids.every(
         (i) =>
           Number.isInteger(scores[i]) &&
-          scores[i] >= info.scoreMin &&
-          scores[i] <= info.scoreMax,
+          scores[i] >= lo &&
+          scores[i] <= hi,
       );
     if (!valid) {
-      res.status(400).json({ error: `scores must be integers ${info.scoreMin}-${info.scoreMax}` });
+      res.status(400).json({ error: `scores must be integers ${lo}-${hi}` });
       return;
     }
     // A judge scores one room per round.
