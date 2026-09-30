@@ -2,6 +2,7 @@ import {
   Archive,
   ArchiveRestore,
   FolderInput,
+  Link2,
   LogIn,
   MoreVertical,
   Pencil,
@@ -19,6 +20,8 @@ import {
 import { BRAND } from "@/lib/brand";
 
 interface Props {
+  /** App path of the shareable tournament link. */
+  linkPath: string;
   archived?: boolean;
   onOpen: () => void;
   onEdit: () => void;
@@ -33,6 +36,7 @@ interface Props {
  * ones (archive, move, delete) live here so they can't be hit by accident.
  */
 export default function TournamentCardMenu({
+  linkPath,
   archived,
   onOpen,
   onEdit,
@@ -60,6 +64,18 @@ export default function TournamentCardMenu({
         <DropdownMenuItem onClick={onOpen} data-testid="menu-open-tournament">
           <LogIn className="w-4 h-4" />
           فتح البطولة
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          onClick={async () => {
+            await navigator.clipboard.writeText(
+              `${window.location.origin}${import.meta.env.BASE_URL.replace(/\/$/, "")}${linkPath}`,
+            );
+            alert("تم نسخ رابط البطولة — إن كانت محمية سيُطلب من المستلم إدخال كلمة المرور");
+          }}
+          data-testid="menu-copy-link"
+        >
+          <Link2 className="w-4 h-4" />
+          نسخ رابط البطولة
         </DropdownMenuItem>
         <DropdownMenuItem onClick={onEdit} data-testid="menu-edit-tournament">
           <Pencil className="w-4 h-4" />

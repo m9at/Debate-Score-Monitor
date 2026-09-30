@@ -14,7 +14,7 @@ function shuffled<T>(items: T[]): T[] {
  * registered individuals are shuffled into rooms of `perRoom`, and each room gets
  * one registered judge, preferring judges who haven't judged those individuals before.
  */
-export function drawLeaderRound(info: LeaderInfo, dayIdx: number, perRoom: number): LeaderInfo {
+export function drawLeaderRound(info: LeaderInfo, dayIdx: number, perRoom: number, panel = 1): LeaderInfo {
   const next = structuredClone(info);
   const people = shuffled((next.individualPool ?? []).filter((p) => p.name.trim()));
   const size = Math.max(1, perRoom);
@@ -24,7 +24,7 @@ export function drawLeaderRound(info: LeaderInfo, dayIdx: number, perRoom: numbe
   // Keep existing room ids/labels where possible so room links stay valid.
   const rooms = Array.from({ length: roomCount }, (_, i) => {
     const r = day.rooms[i] ?? newRoom(i + 1);
-    return { ...r, individuals: [] as typeof people, judges: [] as string[] };
+    return { ...r, individuals: [] as typeof people, judges: [] as string[], chair: undefined as string | undefined };
   });
   // Deal round-robin so rooms stay balanced.
   people.forEach((p, i) => rooms[i % roomCount].individuals.push({ ...p }));
@@ -33,17 +33,24 @@ export function drawLeaderRound(info: LeaderInfo, dayIdx: number, perRoom: numbe
   const seen = new Set<string>();
   next.days.forEach((d, k) => {
     if (k === dayIdx) return;
-    d.rooms.forEach((r) => r.judges.forEach((j) => r.individuals.forEach((x) => seen.add(`${j}|${x.id}`))));
+    d.rooms.forEach((r) => [...(r.chair ? [r.chair] : []), ...r.judges].forEach((j) => r.individuals.forEach((x) => seen.add(`${j}|${x.id}`))));
   });
   const free = shuffled(next.judgePool ?? []);
-  for (const room of rooms) {
-    if (!free.length) break;
+  const pick = (room: (typeof rooms)[number]) => {
     let best = 0, bestClash = Infinity;
     free.forEach((j, i) => {
       const clash = room.individuals.filter((x) => seen.has(`${j}|${x.id}`)).length;
       if (clash < bestClash) { best = i; bestClash = clash; }
     });
-    room.judges = [free.splice(best, 1)[0]];
+    return free.splice(best, 1)[0];
+  };
+  // Seat panels in passes so every room gets a chair before any room gets a 2nd judge.
+  for (let seat = 0; seat < Math.max(1, panel); seat++) {
+    for (const room of rooms) {
+      if (!free.length) break;
+      const j = pick(room);
+      if (seat === 0) room.chair = j; else room.judges.push(j);
+    }
   }
   day.rooms = rooms;
   return next;

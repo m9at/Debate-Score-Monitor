@@ -141,6 +141,8 @@ export default function TournamentNewPage() {
       const info = buildInfo(setup.name.trim(), setup.totalRounds, labels?.length ?? 8,
         59, 82); // Leadership debates are scored 59–82.
       if (labels) info.days.forEach((d) => d.rooms.forEach((r, i) => { r.label = labels[i]; }));
+      if (setup.protection.enabled && setup.protection.code)
+        info.protection = { enabled: true, code: setup.protection.code, protectView: true, protectEdit: true };
       try {
         const leaderId = await createLeader(info);
         const id = createTournamentFromSetup({ ...setup, leaderId });

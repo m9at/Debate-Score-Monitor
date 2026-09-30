@@ -133,6 +133,7 @@ export default function TournamentCard({
             )}
             <div className="ms-auto shrink-0 -mt-1">
               <TournamentCardMenu
+                linkPath={tournament.kind === "leadership" && tournament.leaderId ? `/leader/${tournament.leaderId}` : `/tournament/${tournament.id}`}
                 archived={tournament.archived}
                 onOpen={onOpen}
                 onEdit={onRename}

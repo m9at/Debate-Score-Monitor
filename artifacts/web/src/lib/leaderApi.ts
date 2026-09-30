@@ -6,7 +6,9 @@ export interface LeaderRoom {
   label: string;
   locked?: boolean;
   individuals: LeaderIndividual[];
+  /** Panel judges; the session chair (رئيس الجلسة) is kept separately. */
   judges: string[];
+  chair?: string;
 }
 export interface LeaderDay {
   day: number;
@@ -15,6 +17,9 @@ export interface LeaderDay {
   title?: string;
   /** Session (الفترة) this round belongs to — 1 = first period. */
   period?: number;
+  createdAt?: number;
+  /** Organiser closed the round — no more submissions. */
+  closed?: boolean;
   scoreMin?: number;
   scoreMax?: number;
 }
@@ -24,6 +29,8 @@ export const dayRange = (info: LeaderInfo, d?: LeaderDay) => ({
 });
 export interface LeaderInfo {
   name: string;
+  /** Access code (same model as team tournaments), stored with the tournament so every device asks for it. */
+  protection?: import("@/types/tournament").TournamentProtection;
   scoreMin: number;
   scoreMax: number;
   days: LeaderDay[];
@@ -38,7 +45,45 @@ export interface LeaderInfo {
   description?: string;
   /** Target individuals per room used by the auto-draw. */
   individualsPerRoom?: number;
+  endDate?: string;
+  /** Panel size per room including the chair (auto-draw). */
+  judgesPerRoom?: number;
+  /** Logo shown on reports; defaults to the centre's logo. */
+  logoUrl?: string;
+  watermarkText?: string;
+  /** Organiser activity feed (newest last). */
+  activity?: { at: number; text: string }[];
 }
+
+/** Everyone who may score a room: chair first, then the panel. */
+export const roomPanel = (r: LeaderRoom) => [...(r.chair ? [r.chair] : []), ...r.judges];
+
+export const logActivity = (d: LeaderInfo, text: string) => {
+  d.activity = [...(d.activity ?? []), { at: Date.now(), text }].slice(-50);
+};
+
+export type RoundStatus = RoomStatus | "closed";
+export const ROUND_STATUS: Record<RoundStatus, { label: string; color: string }> = {
+  pending: { label: "لم تبدأ", color: "#2B1B4599" },
+  progress: { label: "قيد التحكيم", color: "#1B87B8" },
+  done: { label: "مكتملة", color: "#7B2D8E" },
+  closed: { label: "مغلقة", color: "#5D1F6D" },
+};
+export function roundStatus(t: LeaderTournament, d: LeaderDay): RoundStatus {
+  if (d.closed) return "closed";
+  const got = d.rooms.filter((r) => t.results[r.id]).length;
+  if (d.rooms.length && got === d.rooms.length) return "done";
+  if (got || d.rooms.some((r) => t.drafts?.[r.id])) return "progress";
+  return "pending";
+}
+
+export const timeAgo = (at: number) => {
+  const m = Math.round((Date.now() - at) / 60000);
+  if (m < 1) return "الآن";
+  if (m < 60) return `قبل ${m} دقيقة`;
+  const h = Math.round(m / 60);
+  return h < 24 ? `قبل ${h} ساعة` : new Date(at).toLocaleDateString("ar");
+};
 export interface LeaderSheet {
   roomId: string;
   judgeName: string;

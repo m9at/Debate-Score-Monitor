@@ -1,11 +1,13 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useLocation, useParams } from "wouter";
-import { BarChart2, CheckCircle2, FileText, Layers, LayoutDashboard, Save, Settings, UserCheck, Users } from "lucide-react";
+import { BarChart2, CheckCircle2, CloudUpload, FileText, Layers, LayoutDashboard, Settings, TriangleAlert, UserCheck, Users } from "lucide-react";
 import {
   deleteLeaderSheet, getLeader, newIndividual, saveLeaderInfo,
   type LeaderInfo, type LeaderTournament,
 } from "@/lib/leaderApi";
-import { BRAND, BTN, BTN_PRIMARY_STYLE } from "@/lib/brand";
+import { BRAND } from "@/lib/brand";
+import PdfMenu from "@/components/leader/PdfMenu";
+import { judgeUrl } from "@/components/leader/JudgeLinkCard";
 import TournamentSidebar, { type SidebarGroup } from "@/components/tournament/TournamentSidebar";
 import LeaderResults from "@/components/leader/LeaderResults";
 import LeaderReport from "@/components/leader/LeaderReport";
@@ -14,6 +16,9 @@ import NamePool from "@/components/leader/NamePool";
 import RoundsPanel from "@/components/leader/RoundsPanel";
 import LeaderSettings from "@/components/leader/LeaderSettings";
 import { SectionHeader } from "@/components/leader/ui";
+import UnlockGate from "@/components/tournament/UnlockGate";
+import { useTournament } from "@/context/TournamentContext";
+import { isOwnerCode } from "@/lib/ownerCode";
 
 type Tab = "overview" | "rounds" | "people" | "judges" | "results" | "reports" | "settings";
 
@@ -26,50 +31,83 @@ export default function LeaderDetailPage() {
   const [dirty, setDirty] = useState(false);
   const [msg, setMsg] = useState("");
   const [missing, setMissing] = useState(false);
+  const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const dirtyRef = useRef(false);
+  dirtyRef.current = dirty;
+  const lastJson = useRef("");
+  const unlockKey = `leader_unlocked_${id}`;
+  const [unlocked, setUnlocked] = useState(false);
+  // Tournaments created before the code moved to the server keep it only locally.
+  const localProtection = useTournament().tournaments.find((x) => x.leaderId === id)?.protection;
 
+  const flash = (m: string) => { setMsg(m); setTimeout(() => setMsg(""), 3000); };
   const refresh = async () => {
     try {
       const data = await getLeader(id);
+      if (!data.info.protection && localProtection?.enabled && localProtection.code) {
+        data.info.protection = localProtection;
+        void saveLeaderInfo(id, data.info);
+      }
+      const json = JSON.stringify([data.info, data.results, data.drafts]);
+      if (lastJson.current && json !== lastJson.current && !dirtyRef.current) flash("🔄 تحديث مباشر: تمت إضافة تغييرات جديدة");
+      lastJson.current = json;
       setT(data);
-      setInfo((prev) => (prev && dirty ? prev : data.info));
+      // Never overwrite what this user is typing right now.
+      if (!dirtyRef.current) setInfo(data.info);
     } catch { setMissing(true); }
   };
   useEffect(() => { void refresh(); }, [id]);
-  // Pull new judge sheets while the organiser watches.
+  // Live sync: pick up other editors' changes and judges' scores every 2 seconds.
   useEffect(() => {
-    const h = setInterval(() => { if (!dirty) void refresh(); }, 5000);
+    const h = setInterval(() => { if (!dirtyRef.current && !document.hidden) void refresh(); }, 2000);
     return () => clearInterval(h);
-  }, [id, dirty]);
+  }, [id]);
 
   if (missing) return <div className="p-10 text-center" dir="rtl">البطولة غير موجودة</div>;
   if (!t || !info) return <div className="p-10 text-center" dir="rtl">جارٍ التحميل…</div>;
 
-  const flash = (m: string) => { setMsg(m); setTimeout(() => setMsg(""), 2000); };
+  const prot = info.protection;
+  const stored = sessionStorage.getItem(unlockKey);
+  if (prot?.enabled && prot.code && !unlocked && stored !== prot.code && !(stored !== null && isOwnerCode(stored))) {
+    return (
+      <UnlockGate tournamentName={info.name} codeLength={prot.code.length}
+        onSubmit={(code) => {
+          if (code !== prot.code && !isOwnerCode(code)) return false;
+          sessionStorage.setItem(unlockKey, code);
+          setUnlocked(true);
+          return true;
+        }}
+        onBack={() => setLocation("/")} />
+    );
+  }
+
+  /** Every edit autosaves shortly after the user stops typing. */
   const edit = (fn: (draft: LeaderInfo) => void) => {
     const draft = structuredClone(info);
     fn(draft);
     setInfo(draft);
     setDirty(true);
+    setSaveState("saving");
+    clearTimeout(timer.current);
+    timer.current = setTimeout(() => void save(draft), 700);
   };
-  const save = async (next = info) => {
+  const save = async (next: LeaderInfo) => {
     try {
       await saveLeaderInfo(id, next);
+      lastJson.current = "";
       setDirty(false);
-      flash("تم الحفظ");
+      dirtyRef.current = false;
+      setSaveState("saved");
       await refresh();
-    } catch { flash("تعذّر الحفظ"); }
+    } catch { setSaveState("error"); }
   };
   /** Lock/unlock saves immediately — it must reach judges right away. */
   const toggleLock = (dayIdx: number, roomIdx: number) => {
-    const draft = structuredClone(info);
-    const room = draft.days[dayIdx].rooms[roomIdx];
-    room.locked = !room.locked;
-    setInfo(draft);
-    void save(draft);
+    edit((d) => { const room = d.days[dayIdx].rooms[roomIdx]; room.locked = !room.locked; });
   };
   const copyLink = (query = "") => {
-    const url = `${window.location.origin}${import.meta.env.BASE_URL.replace(/\/$/, "")}/leader/judge/${id}${query}`;
-    void navigator.clipboard.writeText(url);
+    void navigator.clipboard.writeText(judgeUrl(id, query));
     flash("تم نسخ الرابط");
   };
 
@@ -98,28 +136,26 @@ export default function LeaderDetailPage() {
 
   return (
     <div className="min-h-screen md:flex" style={{ background: BRAND.surface }} dir="rtl">
-      <TournamentSidebar<Tab> groups={groups} activeTab={tab} onTabChange={(k) => setTab(k)} onHome={() => setLocation("/")} />
+      <div className="print:hidden"><TournamentSidebar<Tab> groups={groups} activeTab={tab} onTabChange={(k) => setTab(k)} onHome={() => setLocation("/")} /></div>
 
       <main className="min-w-0 flex-1">
         {/* Top bar: tournament identity on the right, actions on the left */}
-        <div className="sticky top-0 z-20 flex flex-wrap items-center gap-3 border-b bg-white/90 px-4 py-3 backdrop-blur md:px-8"
+        <div className="sticky top-0 z-20 flex flex-wrap print:hidden items-center gap-3 border-b bg-white/90 px-4 py-3 backdrop-blur md:px-8"
           style={{ borderColor: BRAND.border }}>
           <div className="min-w-0 flex-1">
             <div className="text-[11.5px] font-bold" style={{ color: BRAND.purple }}>مناظرة قيادية · فردية</div>
             <h1 className="truncate text-[18px] font-extrabold" style={{ color: BRAND.ink }}>{info.name}</h1>
           </div>
-          {msg && <span className="inline-flex items-center gap-1 text-[12px] font-bold" style={{ color: BRAND.success }}><CheckCircle2 className="w-4 h-4" />{msg}</span>}
-          {dirty && !msg && <span className="text-[12px] font-bold" style={{ color: BRAND.warning }}>تعديلات غير محفوظة</span>}
-          <button onClick={() => save()} disabled={!dirty} className={`${BTN.base} ${BTN.primary}`} style={BTN_PRIMARY_STYLE}
-            data-testid="button-save-leader">
-            <Save className="w-4 h-4" /> حفظ
-          </button>
+          {msg && <span className="inline-flex items-center gap-1 text-[12px] font-bold" style={{ color: BRAND.purple }}><CheckCircle2 className="w-4 h-4" />{msg}</span>}
+          {saveState === "saving" && <span className="inline-flex items-center gap-1 text-[12px] font-bold" style={{ color: BRAND.warning }}><CloudUpload className="w-4 h-4" />جاري الحفظ…</span>}
+          {saveState === "saved" && <span className="inline-flex items-center gap-1 text-[12px] font-bold" style={{ color: BRAND.success }}><CheckCircle2 className="w-4 h-4" />تم الحفظ تلقائياً</span>}
+          {saveState === "error" && <button onClick={() => save(info)} className="inline-flex items-center gap-1 text-[12px] font-bold" style={{ color: BRAND.danger }}><TriangleAlert className="w-4 h-4" />تعذّر الحفظ — إعادة المحاولة</button>}
         </div>
 
         <div className="mx-auto max-w-6xl p-4 md:p-8">
           {tab === "overview" && (
             <div>
-              <SectionHeader title="نظرة عامة" subtitle="حالة كل جولة ورابط التحكيم الخاص بها" />
+              <SectionHeader title="نظرة عامة" subtitle="لوحة متابعة البطولة القيادية" />
               <LeaderOverview t={{ ...t, info }} copyLink={copyLink} />
             </div>
           )}
@@ -152,7 +188,7 @@ export default function LeaderDetailPage() {
             <div>
               <SectionHeader title="المحكمون" subtitle="محكم واحد لكل قاعة، ولا يتكرر المحكم في قاعتين داخل نفس الجولة" />
               <NamePool noun="المحكم" placeholder="اسم المحكم" names={judges}
-                assigned={(i) => placement((r) => r.judges.includes(judges[i]))}
+                assigned={(i) => placement((r) => [...(r.chair ? [r.chair] : []), ...r.judges].includes(judges[i]))}
                 onAdd={(n) => edit((d) => { d.judgePool = [...(d.judgePool ?? []), n]; })}
                 onRename={(i, n) => edit((d) => {
                   const old = d.judgePool![i];
@@ -170,6 +206,7 @@ export default function LeaderDetailPage() {
           {tab === "results" && (
             <div>
               <SectionHeader title="النتائج" subtitle="الترتيب حسب المجموع الكلي، الجولة، أو القاعة — مع تصدير Excel" />
+              <div className="mb-3 flex justify-end"><PdfMenu t={{ ...t, info }} /></div>
               <LeaderResults t={t} />
             </div>
           )}
@@ -181,7 +218,7 @@ export default function LeaderDetailPage() {
             </div>
           )}
 
-          {tab === "settings" && <LeaderSettings info={info} edit={edit} />}
+          {tab === "settings" && <LeaderSettings t={t} info={info} edit={edit} />}
         </div>
       </main>
     </div>

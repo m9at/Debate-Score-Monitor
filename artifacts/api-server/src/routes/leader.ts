@@ -19,7 +19,7 @@ const wrap =
 const id = (req: Request) => String(req.params.id ?? "");
 
 type Room = { id: string; locked?: boolean; individuals?: { id: string }[] };
-type Info = { scoreMin: number; scoreMax: number; days: { scoreMin?: number; scoreMax?: number; rooms: Room[] }[] };
+type Info = { scoreMin: number; scoreMax: number; days: { scoreMin?: number; scoreMax?: number; closed?: boolean; rooms: Room[] }[] };
 
 const DRAFTS = "__drafts";
 
@@ -96,7 +96,7 @@ leaderRouter.put(
       res.status(404).json({ error: "room not found" });
       return;
     }
-    if (room.locked) {
+    if (room.locked || info.days.find((d) => d.rooms.some((r) => r.id === roomId))?.closed) {
       res.status(423).json({ error: "room locked" });
       return;
     }

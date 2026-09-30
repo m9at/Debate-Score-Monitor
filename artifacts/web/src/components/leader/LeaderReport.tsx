@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { roomRows, totalRows, type LeaderTournament } from "@/lib/leaderApi";
+import { roomPanel, roomRows, totalRows, type LeaderTournament } from "@/lib/leaderApi";
 
 const PURPLE = "#7B2D8E";
 const CYAN = "#29ABE2";
@@ -25,8 +25,25 @@ export default function LeaderReport({ t }: { t: LeaderTournament }) {
     ["أدنى درجة", scores.length ? Math.min(...scores) : "—"],
   ];
 
+  const logo = t.info.logoUrl || `${import.meta.env.BASE_URL.replace(/\/$/, "")}/logo-mark.png`;
   return (
-    <div className="space-y-5">
+    <div className="relative space-y-5">
+      {/* Official print identity: header, watermark and footer appear only on paper */}
+      <div aria-hidden className="pointer-events-none fixed inset-0 z-0 hidden place-items-center opacity-[0.06] print:grid">
+        <div className="-rotate-[25deg] text-center"><img src={logo} className="mx-auto h-64" alt="" />
+          <div className="mt-2 text-5xl font-extrabold" style={{ color: PURPLE }}>{t.info.watermarkText || "مركز عُمان للمناظرات"}</div></div>
+      </div>
+      <div className="hidden items-center gap-4 border-b-4 pb-3 print:flex" style={{ borderColor: CYAN }}>
+        <img src={logo} className="h-16" alt="" />
+        <div className="flex-1">
+          <div className="text-xl font-extrabold" style={{ color: PURPLE }}>مركز عُمان للمناظرات</div>
+          <div className="font-bold">{t.info.name} — التقرير الشامل</div>
+        </div>
+        <div className="text-xs text-gray-500">{new Date().toLocaleDateString("ar")}</div>
+      </div>
+      <div className="fixed bottom-0 left-0 right-0 hidden border-t py-1 text-center text-[10px] text-gray-500 print:block">
+        وثيقة رسمية صادرة عن مركز عُمان للمناظرات
+      </div>
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {cards.map(([l, v]) => (
           <div key={l} className="rounded-xl bg-white p-3 text-center shadow-sm" style={{ borderTop: `3px solid ${CYAN}` }}>
@@ -50,7 +67,7 @@ export default function LeaderReport({ t }: { t: LeaderTournament }) {
         rows={allRooms.map(({ day, room }) => {
           const sh = t.results[room.id];
           const s = sh ? Object.values(sh.scores) : [];
-          return [day, room.label, sh?.judgeName || room.judges.join("، ") || "—", room.individuals.length,
+          return [day, room.label, sh ? `${sh.judgeName} (أرسل)` : roomPanel(room).join("، ") || "—", room.individuals.length,
             sh ? "✅ مرسلة" : room.locked ? "🔒 مغلقة" : "⏳ بانتظار الدرجات", s.length ? avg(s) : "—"];
         })} />
 
@@ -65,7 +82,7 @@ export default function LeaderReport({ t }: { t: LeaderTournament }) {
       <H>تقرير المحكمين</H>
       <Tbl head={["المحكم", "القاعات المسندة", "الأوراق المرسلة", "الجولات", "متوسط ما منحه", "الأعلى", "الأدنى"]}
         rows={(t.info.judgePool ?? []).map((j) => {
-          const mine = allRooms.filter((x) => x.room.judges.includes(j));
+          const mine = allRooms.filter((x) => roomPanel(x.room).includes(j));
           const given = rows.filter((r) => r.judge === j).map((r) => r.score);
           return [j, mine.length, mine.filter((x) => t.results[x.room.id]).length,
             [...new Set(mine.map((x) => x.day))].join("، ") || "—",
@@ -76,7 +93,7 @@ export default function LeaderReport({ t }: { t: LeaderTournament }) {
       <Tbl head={["المتناظر", ...days.map((d) => `الجولة ${d.day}`), "عدد المشاركات"]}
         rows={(t.info.individualPool ?? []).map((p) => {
           const at = days.map((d) => d.rooms.find((r) => r.individuals.some((x) => x.id === p.id)));
-          return [p.name, ...at.map((r) => r ? `${r.label} · ${r.judges[0] ?? "بلا محكم"}` : "—"), at.filter(Boolean).length];
+          return [p.name, ...at.map((r) => r ? `${r.label} · ${r.chair ?? r.judges[0] ?? "بلا محكم"}` : "—"), at.filter(Boolean).length];
         })} />
 
       <button onClick={() => window.print()} className="rounded-lg border px-3 py-1.5 text-sm font-bold print:hidden">🖨️ طباعة التقرير</button>

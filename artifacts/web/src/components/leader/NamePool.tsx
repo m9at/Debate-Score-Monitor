@@ -61,7 +61,7 @@ export default function NamePool({ noun, placeholder, names, assigned, onAdd, on
                     <input autoFocus value={editing.v} onChange={(e) => setEditing({ i, v: e.target.value })}
                       onKeyDown={(e) => { if (e.key === "Enter") commit(); if (e.key === "Escape") setEditing(null); }}
                       className={`${inputClass} h-9`} style={inputStyle} />
-                    <button onClick={commit} className="p-1" style={{ color: BRAND.success }}><Check className="w-4 h-4" /></button>
+                    <button onClick={commit} className="p-1" style={{ color: BRAND.purple }}><Check className="w-4 h-4" /></button>
                     <button onClick={() => setEditing(null)} className="p-1" style={{ color: `${BRAND.ink}80` }}><X className="w-4 h-4" /></button>
                   </>
                 ) : (

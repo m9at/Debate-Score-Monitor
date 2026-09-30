@@ -70,6 +70,11 @@ export default function LeaderHomePage() {
           {items.map((i) => (
             <div key={i.id} className="flex items-center justify-between rounded-xl bg-white p-4 shadow-sm">
               <button onClick={() => setLocation(`/leader/${i.id}`)} className="font-bold text-right">{i.name}</button>
+              <button onClick={async () => {
+                await navigator.clipboard.writeText(`${window.location.origin}${import.meta.env.BASE_URL.replace(/\/$/, "")}/leader/${i.id}`);
+                alert("تم نسخ رابط البطولة");
+              }} className="mr-auto ml-4 rounded-lg px-3 py-1.5 text-xs font-bold text-white"
+                style={{ background: "linear-gradient(135deg, #7B2D8E, #29ABE2)" }}>نسخ رابط البطولة</button>
               <button onClick={() => { if (confirm("إزالة من القائمة؟")) { removeLocal(i.id); setItems(listLocal()); } }}
                 className="text-xs text-red-500">إزالة</button>
             </div>

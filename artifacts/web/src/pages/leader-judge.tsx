@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams } from "wouter";
 import {
-  dayRange, getLeader, saveLeaderDraft, submitLeaderSheet, type LeaderRoom, type LeaderTournament,
+  dayRange, getLeader, roomPanel, saveLeaderDraft, submitLeaderSheet, type LeaderRoom, type LeaderTournament,
 } from "@/lib/leaderApi";
 
 /** Judge link for a leadership debate: pick room → pick name → score each individual. */
@@ -37,14 +37,27 @@ export default function LeaderJudgePage() {
     <Shell title={t.info.name} subtitle="مناظرة قيادية · اختر قاعتك">
       {t.info.days.filter((d) => !fixedDay || d.day === fixedDay).map((d) => (
         <div key={d.day}>
-          <div className="judge-info-label" style={{ margin: "12px 0 6px" }}>الجولة {d.day}</div>
-          {d.rooms.map((r) => (
-            <div key={r.id} className="judge-card judge-card-room" onClick={() => setRoomId(r.id)}
-              style={{ display: "flex", justifyContent: "space-between", opacity: r.locked ? 0.6 : 1 }}>
-              <b>{r.label}</b>
-              <span>{r.locked ? "🔒 مغلقة" : `${r.individuals.length} أفراد ←`}</span>
-            </div>
-          ))}
+          <div className="judge-info-label" style={{ margin: "12px 0 6px" }}>الجولة {d.day}{d.closed ? " · 🔒 مغلقة" : ""}</div>
+          {d.rooms.map((r) => {
+            // Once a sheet is sent the room is final: green, not clickable, shows the sender.
+            const sent = t.results[r.id];
+            const blocked = !!sent || r.locked || d.closed;
+            return (
+              <div key={r.id} className="judge-card judge-card-room" onClick={() => !blocked && setRoomId(r.id)}
+                style={{
+                  display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8,
+                  cursor: blocked ? "not-allowed" : "pointer",
+                  ...(sent ? { background: "#DCFCE7", borderColor: "#22C55E", color: "#166534" } : blocked ? { opacity: 0.6 } : {}),
+                }}>
+                <div>
+                  <b>{r.label}</b>
+                  {sent && <div style={{ fontSize: 12 }}>أرسلها: {sent.judgeName} · {new Date(sent.submittedAt).toLocaleTimeString("ar", { timeStyle: "short" })}</div>}
+                  {!sent && r.chair && <div style={{ fontSize: 12, opacity: 0.8 }}>رئيس الجلسة: {r.chair}</div>}
+                </div>
+                <span style={{ fontWeight: 700 }}>{sent ? "✅ تم الإرسال" : blocked ? "🔒 مغلقة" : `${r.individuals.length} أفرقاء ←`}</span>
+              </div>
+            );
+          })}
         </div>
       ))}
     </Shell>
@@ -78,7 +91,8 @@ function Scoring({ t, day, room, onBack, onSent }: {
   // One judge per room — once any sheet arrives the room is final.
   const sent = t.results[room.id];
 
-  if (room.locked || status === "locked") {
+  const closed = t.info.days.find((d) => d.day === day)?.closed;
+  if (room.locked || closed || status === "locked") {
     return (
       <Shell title={title} subtitle={t.info.name}>
         <Done icon="🔒" head="رابط هذه القاعة مغلق" sub="أغلق المنظّم إدخال الدرجات لهذه القاعة." />
@@ -89,7 +103,9 @@ function Scoring({ t, day, room, onBack, onSent }: {
   if (status === "sent" || status === "dup" || sent) {
     return (
       <Shell title={title} subtitle={t.info.name}>
-        <Done icon="🔒✅" head="تم تسجيل الدرجات" sub={`أرسل المحكم «${sent?.judgeName || judgeName}» درجات هذه القاعة ولا يمكن تعديلها.`} />
+        <div style={{ background: "#DCFCE7", border: "2px solid #22C55E", borderRadius: 16, padding: 4 }}>
+          <Done icon="✅" head="تم الإرسال — القاعة مغلقة" sub={`أرسل «${sent?.judgeName || judgeName}» درجات هذه القاعة${sent ? ` الساعة ${new Date(sent.submittedAt).toLocaleTimeString("ar", { timeStyle: "short" })}` : ""}. لا يمكن لأي أحد الدخول أو التعديل.`} />
+        </div>
         {onBack && <button onClick={onBack} className="judge-btn judge-btn-back">← الرجوع للقاعات</button>}
       </Shell>
     );
@@ -136,10 +152,10 @@ function Scoring({ t, day, room, onBack, onSent }: {
     <Shell title={title} subtitle={t.info.name}>
       <div className="judge-card judge-card-info">
         <div className="judge-info-label">👨‍⚖️ اسم المحكم</div>
-        {room.judges.length > 0 ? (
+        {roomPanel(room).length > 0 ? (
           <select value={judgeName} onChange={(e) => setJudgeName(e.target.value)} className="judge-text-input" style={{ fontWeight: 700 }}>
             <option value="">— اختر اسمك —</option>
-            {room.judges.map((j) => <option key={j} value={j}>{j}</option>)}
+            {roomPanel(room).map((j) => <option key={j} value={j}>{j === room.chair ? `${j} (رئيس الجلسة)` : j}</option>)}
           </select>
         ) : (
           <input value={judgeName} onChange={(e) => setJudgeName(e.target.value)} placeholder="أدخل اسمك" className="judge-text-input" />
