@@ -8,6 +8,10 @@ export interface TournamentSetup {
    * on creation — so registration links exist and stay valid from step one.
    */
   draftId: string;
+  /** "leadership" = مناظرة قيادية: individuals, one judge per room, no winner. */
+  kind?: "teams" | "leadership";
+  /** Server id of the leadership session, set right before creation. */
+  leaderId?: string;
   name: string;
   description?: string;
   logoDataUrl?: string;

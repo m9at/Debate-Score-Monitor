@@ -14,11 +14,11 @@ export default function LeaderResults({ t }: { t: LeaderTournament }) {
   const exportXlsx = async () => {
     const wb = new ExcelJS.Workbook();
     const total = wb.addWorksheet("المجموع", { views: [{ rightToLeft: true }] });
-    total.addRow(["الترتيب", "الاسم", ...days.map((d) => `اليوم ${d}`), "المجموع"]);
+    total.addRow(["الترتيب", "الاسم", ...days.map((d) => `الجولة ${d}`), "المجموع"]);
     totals.forEach((r, i) => total.addRow([i + 1, r.name, ...days.map((d) => r.perDay?.[d] ?? ""), r.score]));
     const byRoom = wb.addWorksheet("القاعات", { views: [{ rightToLeft: true }] });
-    byRoom.addRow(["اليوم", "القاعة", "الاسم", "الدرجة", "عدد المحكمين"]);
-    rooms.forEach((r) => byRoom.addRow([r.day, r.room, r.name, r.score, r.judges]));
+    byRoom.addRow(["الجولة", "القاعة", "الاسم", "الدرجة", "المحكم"]);
+    rooms.forEach((r) => byRoom.addRow([r.day, r.room, r.name, r.score, r.judge]));
     const buf = await wb.xlsx.writeBuffer();
     const url = URL.createObjectURL(new Blob([buf]));
     const a = document.createElement("a");
@@ -31,7 +31,7 @@ export default function LeaderResults({ t }: { t: LeaderTournament }) {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2">
-        {([["total", "المجموع الكلي"], ["day", "حسب اليوم"], ["room", "حسب القاعة"]] as const).map(([k, l]) => (
+        {([["total", "المجموع الكلي"], ["day", "حسب الجولة"], ["room", "حسب القاعة"]] as const).map(([k, l]) => (
           <button key={k} onClick={() => setView(k)} className="rounded-lg px-3 py-1.5 text-sm font-bold"
             style={view === k ? { background: "#29ABE2", color: "#fff" } : { background: "#fff", color: "#29ABE2" }}>
             {l}
@@ -42,19 +42,19 @@ export default function LeaderResults({ t }: { t: LeaderTournament }) {
 
       {view === "total" && (
         <Table
-          head={["#", "الاسم", ...days.map((d) => `اليوم ${d}`), "المجموع"]}
+          head={["#", "الاسم", ...days.map((d) => `الجولة ${d}`), "المجموع"]}
           rows={totals.map((r, i) => [i + 1, r.name, ...days.map((d) => r.perDay?.[d] ?? "—"), <b key="s">{r.score}</b>])}
         />
       )}
 
       {view === "day" && days.map((d) => (
-        <Section key={d} title={`اليوم ${d}`}>
+        <Section key={d} title={`الجولة ${d}`}>
           <Ranked rows={rooms.filter((r) => r.day === d)} withRoom />
         </Section>
       ))}
 
       {view === "room" && t.info.days.map((d) => d.rooms.map((room) => (
-        <Section key={room.id} title={`اليوم ${d.day} · ${room.label}`}>
+        <Section key={room.id} title={`الجولة ${d.day} · ${room.label}`}>
           <Ranked rows={rooms.filter((r) => r.day === d.day && r.room === room.label)} />
         </Section>
       )))}
@@ -65,8 +65,8 @@ export default function LeaderResults({ t }: { t: LeaderTournament }) {
 function Ranked({ rows, withRoom }: { rows: RankRow[]; withRoom?: boolean }) {
   return (
     <Table
-      head={["#", "الاسم", ...(withRoom ? ["القاعة"] : []), "الدرجة", "المحكمون"]}
-      rows={rows.map((r, i) => [i + 1, r.name, ...(withRoom ? [r.room] : []), <b key="s">{r.score}</b>, r.judges])}
+      head={["#", "الاسم", ...(withRoom ? ["القاعة"] : []), "الدرجة", "المحكم"]}
+      rows={rows.map((r, i) => [i + 1, r.name, ...(withRoom ? [r.room] : []), <b key="s">{r.score}</b>, r.judge])}
     />
   );
 }

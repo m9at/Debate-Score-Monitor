@@ -116,7 +116,8 @@ leaderRouter.put(
       res.status(400).json({ error: `scores must be integers ${info.scoreMin}-${info.scoreMax}` });
       return;
     }
-    const key = `${roomId}::${judgeName}`;
+    // One judge per room: the first sheet is final and locks the room.
+    const key = roomId;
     const results = { ...((row.results || {}) as Record<string, unknown>) };
     if (results[key]) {
       res.status(409).json({ error: "already submitted" });

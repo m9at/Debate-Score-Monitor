@@ -10,7 +10,7 @@ import { ThemeProvider } from "@/context/ThemeContext";
 import { GroupProvider } from "@/context/GroupContext";
 import Home from "@/pages/home";
 import GroupDetail from "@/pages/group-detail";
-import TournamentDetail from "@/pages/tournament-detail";
+import TournamentRoute from "@/pages/tournament-route";
 import TournamentNewPage from "@/pages/tournament-new";
 import AnnouncePage from "@/pages/announce";
 import PresentPage from "@/pages/present";
@@ -203,7 +203,7 @@ function Router() {
       <Route path="/" component={Home} />
       <Route path="/group/:id" component={GroupDetail} />
       <Route path="/tournament/new" component={TournamentNewPage} />
-      <Route path="/tournament/:id" component={TournamentDetail} />
+      <Route path="/tournament/:id" component={TournamentRoute} />
       <Route
         path="/match/:tournamentId/:roundNumber/:matchId"
         component={MatchScoring}

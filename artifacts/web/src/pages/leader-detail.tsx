@@ -76,7 +76,7 @@ export default function LeaderDetailPage() {
       <div className="mx-auto max-w-6xl space-y-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <button onClick={() => setLocation("/leader")} className="text-sm text-gray-500">← المناظرات القيادية</button>
+            <button onClick={() => setLocation("/")} className="text-sm text-gray-500">← البطولات</button>
             <h1 className="text-2xl font-extrabold" style={{ color: PURPLE }}>{info.name}</h1>
             <p className="text-sm text-gray-500">مناظرة قيادية · الدرجات من {info.scoreMin} إلى {info.scoreMax} · بدون فائز</p>
           </div>
@@ -95,11 +95,11 @@ export default function LeaderDetailPage() {
 
         <div className="flex flex-wrap gap-2">
           {info.days.map((d) => (
-            <TabBtn key={d.day} active={tab === d.day} onClick={() => setTab(d.day)}>اليوم {d.day}</TabBtn>
+            <TabBtn key={d.day} active={tab === d.day} onClick={() => setTab(d.day)}>الجولة {d.day}</TabBtn>
           ))}
           <TabBtn active={tab === "results"} onClick={() => setTab("results")}>🏅 النتائج</TabBtn>
           <button onClick={() => edit((dr) => { dr.days.push({ day: dr.days.length + 1, rooms: [newRoom(1)] }); })}
-            className="rounded-full px-3 py-1.5 text-sm text-gray-500">+ يوم</button>
+            className="rounded-full px-3 py-1.5 text-sm text-gray-500">+ جولة</button>
         </div>
 
         {tab === "results" && <LeaderResults t={t} />}

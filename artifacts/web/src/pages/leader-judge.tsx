@@ -35,7 +35,7 @@ export default function LeaderJudgePage() {
     <Shell title={t.info.name} subtitle="مناظرة قيادية · اختر قاعتك">
       {t.info.days.map((d) => (
         <div key={d.day}>
-          <div className="judge-info-label" style={{ margin: "12px 0 6px" }}>اليوم {d.day}</div>
+          <div className="judge-info-label" style={{ margin: "12px 0 6px" }}>الجولة {d.day}</div>
           {d.rooms.map((r) => (
             <div key={r.id} className="judge-card judge-card-room" onClick={() => setRoomId(r.id)}
               style={{ display: "flex", justifyContent: "space-between", opacity: r.locked ? 0.6 : 1 }}>
@@ -58,8 +58,9 @@ function Scoring({ t, day, room, onBack, onSent }: {
   const [confirming, setConfirming] = useState(false);
   const [status, setStatus] = useState<"idle" | "sending" | "sent" | "failed" | "dup" | "locked">("idle");
 
-  const title = `${room.label} · اليوم ${day}`;
-  const alreadySent = judgeName && t.results[`${room.id}::${judgeName.trim()}`];
+  const title = `${room.label} · الجولة ${day}`;
+  // One judge per room — once any sheet arrives the room is final.
+  const sent = t.results[room.id];
 
   if (room.locked || status === "locked") {
     return (
@@ -69,10 +70,10 @@ function Scoring({ t, day, room, onBack, onSent }: {
       </Shell>
     );
   }
-  if (status === "sent" || status === "dup" || alreadySent) {
+  if (status === "sent" || status === "dup" || sent) {
     return (
       <Shell title={title} subtitle={t.info.name}>
-        <Done icon="🔒✅" head="تم تسجيل الدرجات" sub={`ورقة المحكم «${judgeName}» مسجّلة ولا يمكن تعديلها. شكراً لك.`} />
+        <Done icon="🔒✅" head="تم تسجيل الدرجات" sub={`أرسل المحكم «${sent?.judgeName || judgeName}» درجات هذه القاعة ولا يمكن تعديلها.`} />
         {onBack && <button onClick={onBack} className="judge-btn judge-btn-back">← الرجوع للقاعات</button>}
       </Shell>
     );

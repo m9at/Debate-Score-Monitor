@@ -84,9 +84,9 @@ export interface RankRow {
   name: string;
   room?: string;
   day?: number;
-  /** Average of all judges' scores (one room), or sum of day averages (total). */
+  /** The judge's score in one room, or the sum over all rounds (total). */
   score: number;
-  judges: number;
+  judge?: string;
   perDay?: Record<number, number>;
 }
 
@@ -99,14 +99,13 @@ export function roomRows(t: LeaderTournament): RankRow[] {
   const rows: RankRow[] = [];
   for (const d of t.info.days) {
     for (const r of d.rooms) {
-      const rs = sheets.filter((s) => s.roomId === r.id);
+      // One judge per room enters the scores — his score is the debater's score.
+      const sheet = sheets.find((s) => s.roomId === r.id);
+      if (!sheet) continue;
       for (const ind of r.individuals) {
-        const vals = rs.map((s) => s.scores[ind.id]).filter((v) => typeof v === "number");
-        if (!vals.length) continue;
-        rows.push({
-          name: ind.name.trim() || "—", room: r.label, day: d.day,
-          score: round2(vals.reduce((a, b) => a + b, 0) / vals.length), judges: vals.length,
-        });
+        const v = sheet.scores[ind.id];
+        if (typeof v !== "number") continue;
+        rows.push({ name: ind.name.trim() || "—", room: r.label, day: d.day, score: v, judge: sheet.judgeName });
       }
     }
   }
@@ -117,10 +116,9 @@ export function roomRows(t: LeaderTournament): RankRow[] {
 export function totalRows(t: LeaderTournament): RankRow[] {
   const map = new Map<string, RankRow>();
   for (const r of roomRows(t)) {
-    const cur = map.get(r.name) ?? { name: r.name, score: 0, judges: 0, perDay: {} };
+    const cur = map.get(r.name) ?? { name: r.name, score: 0, perDay: {} };
     cur.perDay![r.day!] = round2((cur.perDay![r.day!] ?? 0) + r.score);
     cur.score = round2(cur.score + r.score);
-    cur.judges += r.judges;
     map.set(r.name, cur);
   }
   return [...map.values()].sort(byScore);

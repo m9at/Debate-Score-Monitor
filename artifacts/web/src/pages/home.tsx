@@ -174,14 +174,6 @@ export default function Home() {
               مجلد جديد
             </button>
             <button
-              onClick={() => setLocation("/leader")}
-              className={`${BTN.base} ${BTN.secondary} ${BTN_SIZE.md}`}
-              data-testid="button-leader-debates"
-            >
-              <Trophy className="w-4 h-4" strokeWidth={2.5} />
-              مناظرة قيادية
-            </button>
-            <button
               onClick={() => setLocation("/tournament/new")}
               className={`${BTN.base} ${BTN.primary} ${BTN_SIZE.md} shadow-lg`}
               style={BTN_PRIMARY_STYLE}

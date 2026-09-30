@@ -24,6 +24,24 @@ export default function StepInfo({ setup, patch }: StepInfoProps) {
     <div className="space-y-4">
       <Panel>
         <div className="space-y-4">
+          <Field label="نوع البطولة" required>
+            <div className="grid grid-cols-2 gap-2">
+              {([["teams", "بطولة فرق"], ["leadership", "مناظرة قيادية (أفراد)"]] as const).map(([k, l]) => {
+                const active = (setup.kind ?? "teams") === k;
+                return (
+                  <button key={k} type="button" onClick={() => patch({ kind: k })}
+                    className="h-11 rounded-xl border text-[13.5px] font-bold"
+                    style={active
+                      ? { background: BRAND.purple, color: "#fff", borderColor: BRAND.purple }
+                      : { borderColor: BRAND.border, color: BRAND.ink }}
+                    data-testid={`button-kind-${k}`}>
+                    {l}
+                  </button>
+                );
+              })}
+            </div>
+          </Field>
+
           <Field label="اسم البطولة" required>
             <input
               value={setup.name}

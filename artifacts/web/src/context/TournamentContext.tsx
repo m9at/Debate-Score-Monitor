@@ -1817,6 +1817,8 @@ export function TournamentProvider({ children }: { children: ReactNode }) {
       rooms: setup.rooms,
       settings: setup.settings,
       openingCaseText: setup.caseText?.trim() || undefined,
+      kind: setup.kind,
+      leaderId: setup.leaderId,
       protection: setup.protection.enabled
         ? {
             enabled: true,
