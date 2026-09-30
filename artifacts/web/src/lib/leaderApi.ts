@@ -13,6 +13,8 @@ export interface LeaderDay {
   rooms: LeaderRoom[];
   /** Per-round system: optional title and score range overriding the tournament's. */
   title?: string;
+  /** Session (الفترة) this round belongs to — 1 = first period. */
+  period?: number;
   scoreMin?: number;
   scoreMax?: number;
 }
@@ -47,7 +49,17 @@ export interface LeaderTournament {
   id: string;
   info: LeaderInfo;
   results: Record<string, LeaderSheet>;
+  /** Judges' autosaved, not-yet-submitted scores keyed by room id. */
+  drafts?: Record<string, { judgeName: string; scores: Record<string, number>; updatedAt: number }>;
 }
+
+export const PERIOD_NAMES = ["الأولى", "الثانية", "الثالثة", "الرابعة", "الخامسة"];
+export const periodLabel = (p = 1) => `الفترة ${PERIOD_NAMES[p - 1] ?? p}`;
+
+export type RoomStatus = "pending" | "progress" | "done";
+export const ROOM_STATUS: Record<RoomStatus, string> = { pending: "لم تبدأ", progress: "قيد التحكيم", done: "مكتملة ✓" };
+export const roomStatus = (t: LeaderTournament, roomId: string): RoomStatus =>
+  t.results[roomId] ? "done" : t.drafts?.[roomId] ? "progress" : "pending";
 
 const uid = () => Math.random().toString(36).slice(2, 10);
 
@@ -84,6 +96,10 @@ export const saveLeaderInfo = (id: string, info: LeaderInfo) =>
   http(`/${encodeURIComponent(id)}/info`, { method: "PUT", body: JSON.stringify({ info }) });
 export const submitLeaderSheet = (id: string, roomId: string, judgeName: string, scores: Record<string, number>) =>
   http(`/${encodeURIComponent(id)}/results/${encodeURIComponent(roomId)}`, {
+    method: "PUT", body: JSON.stringify({ judgeName, scores }),
+  });
+export const saveLeaderDraft = (id: string, roomId: string, judgeName: string, scores: Record<string, number>) =>
+  http(`/${encodeURIComponent(id)}/drafts/${encodeURIComponent(roomId)}`, {
     method: "PUT", body: JSON.stringify({ judgeName, scores }),
   });
 export const deleteLeaderSheet = (id: string, key: string) =>

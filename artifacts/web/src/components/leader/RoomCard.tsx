@@ -1,15 +1,18 @@
 import { useState } from "react";
 import { CheckCircle2, ChevronDown, Gavel, Link2, Lock, LockOpen, Pencil, RotateCcw, Trash2, UserRound, X } from "lucide-react";
 import { BRAND } from "@/lib/brand";
-import type { LeaderIndividual, LeaderRoom } from "@/lib/leaderApi";
+import { ROOM_STATUS, type LeaderIndividual, type LeaderRoom, type RoomStatus } from "@/lib/leaderApi";
 import { ActionsMenu, ConfirmDialog } from "./ui";
 
 /**
  * One room of a round. Collapsed it shows a summary; click to open it and
  * see / place its debaters and its single judge (picked from the registries).
  */
-export default function RoomCard({ room, people, judges, sheets, onChange, onRemove, onToggleLock, onCopyLink, onDeleteSheet }: {
+export default function RoomCard({ room, state, scores, people, judges, sheets, onChange, onRemove, onToggleLock, onCopyLink, onDeleteSheet }: {
   room: LeaderRoom;
+  state: RoomStatus;
+  /** Submitted scores (by individual id) once judging is complete. */
+  scores?: Record<string, number>;
   /** Registered debaters not placed in another room of this round. */
   people: LeaderIndividual[];
   /** Registered judges not assigned to another room of this round. */
@@ -26,7 +29,10 @@ export default function RoomCard({ room, people, judges, sheets, onChange, onRem
   const [reopen, setReopen] = useState<string | null>(null);
   const freePeople = people.filter((p) => !room.individuals.some((x) => x.id === p.id));
   const done = sheets.length > 0;
-  const status = done ? { l: "تم الإرسال", c: BRAND.success } : room.locked ? { l: "مغلقة", c: BRAND.inkSoft } : { l: "مفتوحة", c: BRAND.blue };
+  const status = {
+    l: ROOM_STATUS[state] + (room.locked && !done ? " · 🔒" : ""),
+    c: state === "done" ? BRAND.success : state === "progress" ? BRAND.warning : BRAND.blue,
+  };
 
   return (
     <div className="rounded-2xl bg-white border shadow-sm" style={{ borderColor: open ? `${BRAND.purple}55` : BRAND.border }}>
@@ -65,7 +71,7 @@ export default function RoomCard({ room, people, judges, sheets, onChange, onRem
           <Section icon={<UserRound className="w-3.5 h-3.5" />} title={`المتناظرون في القاعة (${room.individuals.length})`}>
             {room.individuals.length === 0 && <Empty>لم يوزَّع أحد على هذه القاعة بعد</Empty>}
             {room.individuals.map((ind, i) => (
-              <Row key={ind.id} n={i + 1} name={ind.name} onRemove={() => onChange((r) => { r.individuals.splice(i, 1); })} />
+              <Row key={ind.id} n={i + 1} name={ind.name} score={scores?.[ind.id]} onRemove={() => onChange((r) => { r.individuals.splice(i, 1); })} />
             ))}
             <Picker placeholder={people.length ? "+ إضافة متناظر من القائمة" : "سجّل المتناظرين أولاً من قسم «المتناظرون»"}
               options={freePeople.map((p) => [p.id, p.name])}
@@ -115,11 +121,12 @@ const Empty = ({ children }: { children: React.ReactNode }) => (
   <p className="text-[12px]" style={{ color: `${BRAND.ink}66` }}>{children}</p>
 );
 
-function Row({ n, name, onRemove }: { n?: number; name: string; onRemove: () => void }) {
+function Row({ n, name, score, onRemove }: { n?: number; name: string; score?: number; onRemove: () => void }) {
   return (
     <div className="flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-[13.5px]" style={{ background: BRAND.surface, color: BRAND.ink }}>
       {n && <span className="text-[11px] font-bold" style={{ color: `${BRAND.ink}66` }}>{n}</span>}
       <span className="flex-1 font-medium">{name}</span>
+      {score !== undefined && <b className="rounded-md bg-white px-2 text-[13px]" style={{ color: BRAND.purple }}>{score}</b>}
       <button onClick={onRemove} title="إزالة من القاعة" style={{ color: `${BRAND.ink}66` }}><X className="w-3.5 h-3.5" /></button>
     </div>
   );

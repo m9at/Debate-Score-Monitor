@@ -3,7 +3,7 @@ import { Link2, Pencil, Plus, Settings2, Shuffle, Trash2 } from "lucide-react";
 import { BRAND, BRAND_GRADIENT, BTN, BTN_PRIMARY_STYLE } from "@/lib/brand";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Field, inputClass, inputStyle } from "@/components/wizard/ui";
-import { dayRange, newRoom, type LeaderInfo, type LeaderRoom, type LeaderTournament } from "@/lib/leaderApi";
+import { dayRange, newRoom, periodLabel, roomStatus, type LeaderInfo, type LeaderRoom, type LeaderTournament } from "@/lib/leaderApi";
 import { drawLeaderRound } from "@/lib/leaderDraw";
 import RoomCard from "./RoomCard";
 import { ActionsMenu, SectionHeader } from "./ui";
@@ -27,7 +27,7 @@ export default function RoundsPanel({ t, info, edit, onToggleLock, onDeleteSheet
   const judges = info.judgePool ?? [];
 
   const addRound = () => {
-    edit((d) => { d.days.push({ day: d.days.length + 1, rooms: [newRoom(1)] }); });
+    edit((d) => { d.days.push({ day: d.days.length + 1, period: d.days.at(-1)?.period ?? 1, rooms: [newRoom(1)] }); });
     setSel(info.days.length);
   };
   const removeRound = (i: number) => {
@@ -41,9 +41,13 @@ export default function RoundsPanel({ t, info, edit, onToggleLock, onDeleteSheet
         <button onClick={addRound} className={`${BTN.base} ${BTN.primary}`} style={BTN_PRIMARY_STYLE}><Plus className="w-4 h-4" /> جولة جديدة</button>
       </SectionHeader>
 
-      {/* Round cards */}
-      <div className="mb-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      {/* Round cards, grouped by period (الفترة) */}
+      {[...new Set(info.days.map((d) => d.period ?? 1))].sort((a, b) => a - b).map((p) => (
+      <div key={p} className="mb-5">
+      <h3 className="mb-2 font-bold text-[14px]" style={{ color: BRAND.purple }}>{periodLabel(p)}</h3>
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {info.days.map((d, i) => {
+          if ((d.period ?? 1) !== p) return null;
           const r = dayRange(info, d);
           const sent = d.rooms.filter((x) => t.results[x.id]).length;
           const active = i === dayIdx;
@@ -55,9 +59,12 @@ export default function RoundsPanel({ t, info, edit, onToggleLock, onDeleteSheet
               <div className="flex items-start gap-2 p-4">
                 <div className="flex-1">
                   <div className="text-[12px] font-bold" style={{ color: BRAND.purple }}>الجولة {d.day}</div>
-                  <div className="font-bold text-[15px]" style={{ color: BRAND.ink }}>{d.title || "بدون عنوان"}</div>
+                  <div className="font-bold text-[15px]" style={{ color: BRAND.ink }}>{d.title || "البطولة القيادية"}</div>
                   <div className="mt-1 text-[12px]" style={{ color: `${BRAND.ink}80` }}>
-                    {d.rooms.length} قاعات · الدرجات {r.min}–{r.max} · مستلم {sent}/{d.rooms.length}
+                    {d.rooms.length} قاعات · {sent}/{d.rooms.length} قاعات مكتملة · الدرجات {r.min}–{r.max}
+                  </div>
+                  <div className="text-[12px]" style={{ color: `${BRAND.ink}80` }}>
+                    عدد الأفرقاء: {d.rooms.reduce((n, x) => n + x.individuals.length, 0)} · المحكمون: {d.rooms.reduce((n, x) => n + x.judges.length, 0)}
                   </div>
                 </div>
                 <ActionsMenu actions={[
@@ -73,6 +80,8 @@ export default function RoundsPanel({ t, info, edit, onToggleLock, onDeleteSheet
           );
         })}
       </div>
+      </div>
+      ))}
 
       {/* Rooms of the selected round */}
       {day && (
@@ -89,12 +98,13 @@ export default function RoundsPanel({ t, info, edit, onToggleLock, onDeleteSheet
             <button onClick={() => edit((d) => { d.days[dayIdx].rooms.push(newRoom(d.days[dayIdx].rooms.length + 1)); })}
               className={`${BTN.base} ${BTN.primary}`} style={BTN_PRIMARY_STYLE}><Plus className="w-4 h-4" /> إضافة قاعة</button>
           </div>
+          <RoundSummary t={t} day={day} />
           <div className="space-y-2.5">
             {day.rooms.length === 0 && <p className="py-6 text-center text-[13px]" style={{ color: `${BRAND.ink}66` }}>لا توجد قاعات — أضف قاعة للبدء</p>}
             {day.rooms.map((room, ri) => {
               const others = day.rooms.filter((_, i) => i !== ri);
               return (
-                <RoomCard key={room.id} room={room}
+                <RoomCard key={room.id} room={room} state={roomStatus(t, room.id)} scores={t.results[room.id]?.scores}
                   people={people.filter((p) => !others.some((r) => r.individuals.some((x) => x.id === p.id)))}
                   judges={judges.filter((j) => !others.some((r) => r.judges.includes(j)))}
                   sheets={Object.entries(t.results).filter(([, s]) => s.roomId === room.id)}
@@ -130,6 +140,13 @@ function RoundSettingsDialog({ info, dayIdx, onClose, edit }: {
               <input value={d.title ?? ""} placeholder="مثال: الجولة التمهيدية"
                 onChange={(e) => edit((x) => { x.days[dayIdx].title = e.target.value; })} className={inputClass} style={inputStyle} />
             </Field>
+            <Field label="الفترة">
+              <select value={d.period ?? 1} onChange={(e) => edit((x) => { x.days[dayIdx].period = +e.target.value; })}
+                className={inputClass} style={inputStyle}>
+                {Array.from({ length: Math.max(...info.days.map((y) => y.period ?? 1)) + 1 }, (_, k) => k + 1)
+                  .map((k) => <option key={k} value={k}>{periodLabel(k)}</option>)}
+              </select>
+            </Field>
             <div className="grid grid-cols-2 gap-3">
               <Field label="أقل درجة">
                 <input type="number" value={r.min} onChange={(e) => edit((x) => { x.days[dayIdx].scoreMin = +e.target.value; })}
@@ -146,5 +163,29 @@ function RoundSettingsDialog({ info, dayIdx, onClose, edit }: {
         )}
       </DialogContent>
     </Dialog>
+  );
+}
+
+/** Round header stats — scores only, no winner. */
+function RoundSummary({ t, day }: { t: LeaderTournament; day: LeaderInfo["days"][number] }) {
+  const done = day.rooms.filter((r) => t.results[r.id]);
+  const scores = done.flatMap((r) => Object.values(t.results[r.id].scores));
+  const avg = scores.length ? Math.round((scores.reduce((a, b) => a + b, 0) / scores.length) * 10) / 10 : "—";
+  const stats: [string, string | number][] = [
+    ["الأفرقاء", day.rooms.reduce((n, r) => n + r.individuals.length, 0)],
+    ["القاعات", day.rooms.length],
+    ["المحكمون", day.rooms.reduce((n, r) => n + r.judges.length, 0)],
+    ["التحكيم المكتمل", `${done.length}/${day.rooms.length}`],
+    ["متوسط الدرجات", avg],
+  ];
+  return (
+    <div className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-5">
+      {stats.map(([l, v]) => (
+        <div key={l} className="rounded-xl border bg-white px-3 py-2 text-center" style={{ borderColor: BRAND.border }}>
+          <div className="text-[11px]" style={{ color: `${BRAND.ink}80` }}>{l}</div>
+          <div className="text-[17px] font-extrabold" style={{ color: BRAND.purple }}>{v}</div>
+        </div>
+      ))}
+    </div>
   );
 }

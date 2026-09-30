@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams } from "wouter";
 import {
-  dayRange, getLeader, submitLeaderSheet, type LeaderRoom, type LeaderTournament,
+  dayRange, getLeader, saveLeaderDraft, submitLeaderSheet, type LeaderRoom, type LeaderTournament,
 } from "@/lib/leaderApi";
 
 /** Judge link for a leadership debate: pick room → pick name → score each individual. */
@@ -55,8 +55,22 @@ function Scoring({ t, day, room, onBack, onSent }: {
   t: LeaderTournament; day: number; room: LeaderRoom; onBack?: () => void; onSent: () => void;
 }) {
   const { min, max } = dayRange(t.info, t.info.days.find((d) => d.day === day));
-  const [judgeName, setJudgeName] = useState("");
-  const [scores, setScores] = useState<Record<string, string>>({});
+  // Restore any autosaved draft so a judge who leaves the page loses nothing.
+  const draft = t.drafts?.[room.id];
+  const [judgeName, setJudgeName] = useState(draft?.judgeName ?? "");
+  const [scores, setScores] = useState<Record<string, string>>(
+    () => Object.fromEntries(Object.entries(draft?.scores ?? {}).map(([k, v]) => [k, String(v)])));
+  const [saved, setSaved] = useState<"" | "saving" | "saved">("");
+  const dirty = judgeName !== (draft?.judgeName ?? "") || Object.keys(scores).length > 0;
+  useEffect(() => {
+    if (!dirty || t.results[room.id] || room.locked) return;
+    setSaved("saving");
+    const h = setTimeout(() => {
+      const nums = Object.fromEntries(Object.entries(scores).filter(([, v]) => v !== "").map(([k, v]) => [k, +v]));
+      saveLeaderDraft(t.id, room.id, judgeName, nums).then(() => setSaved("saved")).catch(() => setSaved(""));
+    }, 800);
+    return () => clearTimeout(h);
+  }, [judgeName, scores]);
   const [confirming, setConfirming] = useState(false);
   const [status, setStatus] = useState<"idle" | "sending" | "sent" | "failed" | "dup" | "locked">("idle");
 
@@ -111,7 +125,7 @@ function Scoring({ t, day, room, onBack, onSent }: {
           ))}
         </div>
         <button onClick={send} disabled={status === "sending"} className="judge-btn judge-btn-submit">
-          {status === "sending" ? "جارٍ الإرسال…" : "✅ تأكيد وإرسال نهائي"}
+          {status === "sending" ? "جارٍ الإرسال…" : "✅ تأكيد إنهاء التحكيم"}
         </button>
         <button onClick={() => setConfirming(false)} className="judge-btn judge-btn-back">← تعديل</button>
       </Shell>
@@ -140,9 +154,11 @@ function Scoring({ t, day, room, onBack, onSent }: {
           return (
             <div key={i.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 0" }}>
               <span style={{ flex: 1, fontWeight: 700 }}>{n + 1}. {i.name || `الفرد ${n + 1}`}</span>
-              <input inputMode="numeric" value={v} placeholder={`${min}-${max}`}
-                onChange={(e) => setScores((s) => ({ ...s, [i.id]: e.target.value.replace(/\D/g, "") }))}
-                className="judge-text-input" style={{ width: 90, textAlign: "center", borderColor: bad ? "#dc2626" : undefined }} />
+              <select value={v} onChange={(e) => setScores((s) => ({ ...s, [i.id]: e.target.value }))}
+                className="judge-text-input" style={{ width: 96, textAlign: "center", fontWeight: 700, borderColor: bad ? "#dc2626" : undefined }}>
+                <option value="">—</option>
+                {Array.from({ length: max - min + 1 }, (_, k) => min + k).map((n) => <option key={n} value={n}>{n}</option>)}
+              </select>
             </div>
           );
         })}
@@ -153,7 +169,8 @@ function Scoring({ t, day, room, onBack, onSent }: {
       {!judgeName.trim() && <div className="judge-warn">يجب اختيار/إدخال اسم المحكم</div>}
 
       <button onClick={() => setConfirming(true)} disabled={!canSend}
-        className={`judge-btn ${canSend ? "judge-btn-submit" : "judge-btn-disabled"}`}>📤 تسليم الدرجات</button>
+        className={`judge-btn ${canSend ? "judge-btn-submit" : "judge-btn-disabled"}`}>🏁 إنهاء التحكيم</button>
+      {saved && <div className="judge-success-sub" style={{ textAlign: "center" }}>{saved === "saving" ? "جارٍ الحفظ التلقائي…" : "✓ تم الحفظ التلقائي — يمكنك تعديل الدرجات قبل إنهاء التحكيم"}</div>}
       {onBack && <button onClick={onBack} className="judge-btn judge-btn-back">← الرجوع للقاعات</button>}
     </Shell>
   );

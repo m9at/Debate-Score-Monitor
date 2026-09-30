@@ -139,7 +139,7 @@ export default function TournamentNewPage() {
       // Every round gets the wizard's rooms (or 8), filled in later by hand.
       const labels = setup.rooms.length ? setup.rooms.map((r) => r.label) : null;
       const info = buildInfo(setup.name.trim(), setup.totalRounds, labels?.length ?? 8,
-        setup.settings.scoreMin, setup.settings.scoreMax);
+        59, 82); // Leadership debates are scored 59–82.
       if (labels) info.days.forEach((d) => d.rooms.forEach((r, i) => { r.label = labels[i]; }));
       try {
         const leaderId = await createLeader(info);

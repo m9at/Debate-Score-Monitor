@@ -21,6 +21,8 @@ const id = (req: Request) => String(req.params.id ?? "");
 type Room = { id: string; locked?: boolean; individuals?: { id: string }[] };
 type Info = { scoreMin: number; scoreMax: number; days: { scoreMin?: number; scoreMax?: number; rooms: Room[] }[] };
 
+const DRAFTS = "__drafts";
+
 async function load(sessionId: string) {
   const rows = await db
     .select()
@@ -57,7 +59,9 @@ leaderRouter.get(
       res.status(404).json({ error: "not found" });
       return;
     }
-    res.json({ id: row.id, info: row.info, results: row.results || {} });
+    // Judges' autosaved drafts live under a reserved key, returned separately.
+    const { [DRAFTS]: drafts = {}, ...results } = (row.results || {}) as Record<string, unknown>;
+    res.json({ id: row.id, info: row.info, results, drafts });
   }),
 );
 
@@ -136,6 +140,9 @@ leaderRouter.put(
     }
     const clean = Object.fromEntries(ids.map((i) => [i, scores![i]]));
     results[key] = { roomId, judgeName, scores: clean, submittedAt: Date.now() };
+    const drafts = { ...((results[DRAFTS] || {}) as Record<string, unknown>) };
+    delete drafts[roomId];
+    results[DRAFTS] = drafts;
     await db.update(judgeSessions).set({ results }).where(eq(judgeSessions.id, row.id));
     res.json({ ok: true });
   }),
@@ -152,6 +159,34 @@ leaderRouter.delete(
     }
     const results = { ...((row.results || {}) as Record<string, unknown>) };
     delete results[String(req.params.key)];
+    await db.update(judgeSessions).set({ results }).where(eq(judgeSessions.id, row.id));
+    res.json({ ok: true });
+  }),
+);
+
+/** Judge autosave: keeps unsent scores so nothing is lost and the room shows "in progress". */
+leaderRouter.put(
+  "/api/leader/:id/drafts/:roomId",
+  wrap(async (req, res) => {
+    const row = await load(id(req));
+    if (!row) {
+      res.status(404).json({ error: "not found" });
+      return;
+    }
+    const roomId = String(req.params.roomId);
+    const results = { ...((row.results || {}) as Record<string, unknown>) };
+    if (results[roomId]) {
+      res.status(409).json({ error: "already submitted" });
+      return;
+    }
+    const scores = (req.body?.scores ?? {}) as Record<string, unknown>;
+    const drafts = { ...((results[DRAFTS] || {}) as Record<string, unknown>) };
+    drafts[roomId] = {
+      judgeName: String(req.body?.judgeName ?? "").slice(0, 100),
+      scores: Object.fromEntries(Object.entries(scores).filter(([, v]) => Number.isInteger(v))),
+      updatedAt: Date.now(),
+    };
+    results[DRAFTS] = drafts;
     await db.update(judgeSessions).set({ results }).where(eq(judgeSessions.id, row.id));
     res.json({ ok: true });
   }),
