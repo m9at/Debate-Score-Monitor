@@ -1,12 +1,13 @@
 import { useMemo, useState } from "react";
 import ExcelJS from "exceljs";
+import LeaderReport from "./LeaderReport";
 import { roomRows, totalRows, type LeaderTournament, type RankRow } from "@/lib/leaderApi";
 
-type View = "total" | "day" | "room";
+type View = "report" | "total" | "day" | "room";
 
 /** Rankings three ways: overall (sum of days), per day, per room. */
 export default function LeaderResults({ t }: { t: LeaderTournament }) {
-  const [view, setView] = useState<View>("total");
+  const [view, setView] = useState<View>("report");
   const rooms = useMemo(() => roomRows(t), [t]);
   const totals = useMemo(() => totalRows(t), [t]);
   const days = t.info.days.map((d) => d.day);
@@ -31,7 +32,7 @@ export default function LeaderResults({ t }: { t: LeaderTournament }) {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2">
-        {([["total", "المجموع الكلي"], ["day", "حسب الجولة"], ["room", "حسب القاعة"]] as const).map(([k, l]) => (
+        {([["report", "📊 التقرير الشامل"], ["total", "المجموع الكلي"], ["day", "حسب الجولة"], ["room", "حسب القاعة"]] as const).map(([k, l]) => (
           <button key={k} onClick={() => setView(k)} className="rounded-lg px-3 py-1.5 text-sm font-bold"
             style={view === k ? { background: "#29ABE2", color: "#fff" } : { background: "#fff", color: "#29ABE2" }}>
             {l}
@@ -39,6 +40,8 @@ export default function LeaderResults({ t }: { t: LeaderTournament }) {
         ))}
         <button onClick={exportXlsx} className="mr-auto rounded-lg border px-3 py-1.5 text-sm font-bold">⬇️ تصدير Excel</button>
       </div>
+
+      {view === "report" && <LeaderReport t={t} />}
 
       {view === "total" && (
         <Table

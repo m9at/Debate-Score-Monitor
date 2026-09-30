@@ -111,6 +111,7 @@ export default function LeaderDetailPage() {
                 <RoomCard
                   key={room.id}
                   room={room}
+                  usedJudges={day.rooms.filter((_, i) => i !== ri).flatMap((r) => r.judges.map((j) => j.trim()))}
                   sheets={Object.entries(t.results).filter(([, s]) => s.roomId === room.id)}
                   onChange={(fn) => edit((dr) => fn(dr.days[dayIdx].rooms[ri]))}
                   onRemove={() => { if (confirm("حذف القاعة؟")) edit((dr) => { dr.days[dayIdx].rooms.splice(ri, 1); }); }}
@@ -141,8 +142,9 @@ function TabBtn({ active, onClick, children }: { active: boolean; onClick: () =>
   );
 }
 
-function RoomCard({ room, sheets, onChange, onRemove, onToggleLock, onCopyLink, onDeleteSheet }: {
+function RoomCard({ room, usedJudges, sheets, onChange, onRemove, onToggleLock, onCopyLink, onDeleteSheet }: {
   room: LeaderRoom;
+  usedJudges: string[];
   sheets: [string, { judgeName: string }][];
   onChange: (fn: (r: LeaderRoom) => void) => void;
   onRemove: () => void;
@@ -151,6 +153,17 @@ function RoomCard({ room, sheets, onChange, onRemove, onToggleLock, onCopyLink, 
   onDeleteSheet: (key: string) => void;
 }) {
   const [judgeDraft, setJudgeDraft] = useState("");
+  /** A judge belongs to one room per round — no repeats across rooms. */
+  const addJudge = () => {
+    const v = judgeDraft.trim();
+    if (!v) return;
+    if (usedJudges.includes(v) || room.judges.includes(v)) {
+      alert("هذا المحكم معيَّن بالفعل في قاعة أخرى في هذه الجولة");
+      return;
+    }
+    onChange((r) => { r.judges.push(v); });
+    setJudgeDraft("");
+  };
   return (
     <div className="space-y-3 rounded-2xl bg-white p-4 shadow-sm" style={{ borderTop: `4px solid ${room.locked ? "#999" : CYAN}` }}>
       <div className="flex items-center gap-2">
@@ -196,9 +209,9 @@ function RoomCard({ room, sheets, onChange, onRemove, onToggleLock, onCopyLink, 
         </div>
         <div className="mt-1 flex gap-1">
           <input value={judgeDraft} onChange={(e) => setJudgeDraft(e.target.value)} placeholder="اسم المحكم"
-            onKeyDown={(e) => { if (e.key === "Enter" && judgeDraft.trim()) { const v = judgeDraft.trim(); onChange((r) => { r.judges.push(v); }); setJudgeDraft(""); } }}
+            onKeyDown={(e) => { if (e.key === "Enter") addJudge(); }}
             className="flex-1 rounded border px-2 py-1 text-sm" />
-          <button onClick={() => { const v = judgeDraft.trim(); if (v) { onChange((r) => { r.judges.push(v); }); setJudgeDraft(""); } }}
+          <button onClick={addJudge}
             className="text-xs font-bold" style={{ color: PURPLE }}>إضافة</button>
         </div>
       </div>

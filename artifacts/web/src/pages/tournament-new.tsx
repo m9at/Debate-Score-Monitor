@@ -5,6 +5,7 @@ import { useGroups } from "@/context/GroupContext";
 import { useToast } from "@/hooks/use-toast";
 import { WIZARD_STEPS, emptySetup, type TournamentSetup } from "@/lib/wizard/types";
 import { deleteDraft, fetchDraft, saveDraft } from "@/lib/draftsApi";
+import { buildInfo, createLeader } from "@/lib/leaderApi";
 import WizardShell from "@/components/wizard/WizardShell";
 import StepInfo from "@/components/wizard/StepInfo";
 import StepOrganise from "@/components/wizard/StepOrganise";
@@ -128,7 +129,30 @@ export default function TournamentNewPage() {
     }
   })();
 
-  const create = () => {
+  const isLeader = setup.kind === "leadership";
+  /** Team-only steps a leadership debate skips (no teams, draw or win system). */
+  const skipStep = (i: number) =>
+    isLeader && ["teams", "system", "draw"].includes(WIZARD_STEPS[i]?.key);
+
+  const create = async () => {
+    if (isLeader) {
+      // Every round gets the wizard's rooms (or 8), filled in later by hand.
+      const labels = setup.rooms.length ? setup.rooms.map((r) => r.label) : null;
+      const info = buildInfo(setup.name.trim(), setup.totalRounds, labels?.length ?? 8,
+        setup.settings.scoreMin, setup.settings.scoreMax);
+      if (labels) info.days.forEach((d) => d.rooms.forEach((r, i) => { r.label = labels[i]; }));
+      try {
+        const leaderId = await createLeader(info);
+        const id = createTournamentFromSetup({ ...setup, leaderId });
+        deleteDraft(setup.draftId).catch(() => {});
+        if (setup.folderId) moveTournamentToGroup(id, setup.folderId);
+        toast({ title: "تم إنشاء المناظرة القيادية", description: "أضف الأفراد والمحكم لكل قاعة" });
+        navigate(`/leader/${leaderId}`);
+      } catch {
+        toast({ title: "تعذّر إنشاء البطولة", description: "حاول مرة أخرى", variant: "destructive" });
+      }
+      return;
+    }
     const id = createTournamentFromSetup(setup);
     deleteDraft(setup.draftId).catch(() => {});
     if (setup.folderId) moveTournamentToGroup(id, setup.folderId);
@@ -142,8 +166,12 @@ export default function TournamentNewPage() {
   };
 
   const onNext = () => {
-    if (isLast) return create();
-    setStepIndex((i) => Math.min(i + 1, WIZARD_STEPS.length - 1));
+    if (isLast) return void create();
+    setStepIndex((i) => {
+      let n = i + 1;
+      while (skipStep(n)) n++;
+      return Math.min(n, WIZARD_STEPS.length - 1);
+    });
   };
 
   /** Closing the wizard saves, never discards. */
@@ -161,7 +189,11 @@ export default function TournamentNewPage() {
 
   const onBack = () => {
     if (stepIndex === 0) return void onCancel();
-    setStepIndex((i) => i - 1);
+    setStepIndex((i) => {
+      let n = i - 1;
+      while (n > 0 && skipStep(n)) n--;
+      return n;
+    });
   };
 
   const meta = STEP_META[stepKey];

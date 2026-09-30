@@ -116,6 +116,14 @@ leaderRouter.put(
       res.status(400).json({ error: `scores must be integers ${info.scoreMin}-${info.scoreMax}` });
       return;
     }
+    // A judge scores one room per round.
+    const day = info.days.find((d) => d.rooms.some((r) => r.id === roomId));
+    const sameDay = new Set((day?.rooms ?? []).map((r) => r.id));
+    const prev = (row.results || {}) as Record<string, { roomId: string; judgeName: string }>;
+    if (Object.values(prev).some((s) => s.roomId !== roomId && sameDay.has(s.roomId) && s.judgeName === judgeName)) {
+      res.status(409).json({ error: "judge already used in this round" });
+      return;
+    }
     // One judge per room: the first sheet is final and locks the room.
     const key = roomId;
     const results = { ...((row.results || {}) as Record<string, unknown>) };

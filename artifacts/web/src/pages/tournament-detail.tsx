@@ -1267,14 +1267,14 @@ export default function TournamentDetail() {
 
   // Add team dialog state
   const [teamName, setTeamName] = useState("");
-  const [speakersPerTeam, setSpeakersPerTeam] = useState<"1" | "3" | "4">(tournament?.kind === "leadership" ? "1" : "3");
-  const [speakerNames, setSpeakerNames] = useState<string[]>(tournament?.kind === "leadership" ? [""] : ["", "", ""]);
+  const [speakersPerTeam, setSpeakersPerTeam] = useState<"3" | "4">("3");
+  const [speakerNames, setSpeakerNames] = useState<string[]>(["", "", ""]);
   const [dialogOpen, setDialogOpen] = useState(false);
 
   // Edit team dialog state
   const [editingTeamId, setEditingTeamId] = useState<string | null>(null);
   const [editTeamName, setEditTeamName] = useState("");
-  const [editSpeakersCount, setEditSpeakersCount] = useState<"1" | "3" | "4">("3");
+  const [editSpeakersCount, setEditSpeakersCount] = useState<"3" | "4">("3");
   const [editSpeakerNames, setEditSpeakerNames] = useState<string[]>([]);
   const [editTeamLogo, setEditTeamLogo] = useState<string | undefined>();
 
@@ -1687,7 +1687,7 @@ export default function TournamentDetail() {
     !canGenerateFinal;
 
   const handleSpeakerCountChange = (val: string) => {
-    setSpeakersPerTeam(val as "1" | "3" | "4");
+    setSpeakersPerTeam(val as "3" | "4");
     const count = parseInt(val);
     setSpeakerNames((prev) => {
       if (count > prev.length)
@@ -1701,7 +1701,7 @@ export default function TournamentDetail() {
     addTeam(
       tournament.id,
       teamName.trim(),
-      parseInt(speakersPerTeam) as 1 | 3 | 4,
+      parseInt(speakersPerTeam) as 3 | 4,
       speakerNames
     );
     setTeamName("");
@@ -2528,15 +2528,15 @@ export default function TournamentDetail() {
     setEditingTeamId(team.id);
     setEditTeamName(team.name);
     setEditTeamLogo(team.logoDataUrl);
-    const count = (team.speakersPerTeam ?? 3) as 1 | 3 | 4;
-    setEditSpeakersCount(String(count) as "1" | "3" | "4");
+    const count = (team.speakersPerTeam ?? 3) as 3 | 4;
+    setEditSpeakersCount(String(count) as "3" | "4");
     const names = [...(team.speakerNames ?? [])];
     while (names.length < count) names.push("");
     setEditSpeakerNames(names.slice(0, count));
   };
 
   const handleEditCountChange = (val: string) => {
-    setEditSpeakersCount(val as "1" | "3" | "4");
+    setEditSpeakersCount(val as "3" | "4");
     const n = parseInt(val);
     setEditSpeakerNames((prev) => {
       const updated = [...prev];
@@ -2566,7 +2566,7 @@ export default function TournamentDetail() {
     }
     const orig = tournament.teams.find((t) => t.id === editingTeamId);
     if (!orig) return;
-    const count = parseInt(editSpeakersCount) as 1 | 3 | 4;
+    const count = parseInt(editSpeakersCount) as 3 | 4;
     const updated = {
       ...orig,
       name: editTeamName.trim(),
@@ -3112,7 +3112,6 @@ export default function TournamentDetail() {
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            {tournament.kind === "leadership" && <SelectItem value="1">فرد واحد</SelectItem>}
                             <SelectItem value="3">3 أعضاء</SelectItem>
                             <SelectItem value="4">4 أعضاء</SelectItem>
                           </SelectContent>
