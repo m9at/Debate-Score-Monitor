@@ -90,7 +90,7 @@ export function exportLeaderPdf(t: LeaderTournament, scope: PdfScope) {
   .score { font-weight: 800; color: #7B2D8E; }
   footer { margin-top: 20px; font-size: 10px; color: #94A3B8; text-align: center; border-top: 1px solid #E7E9F2; padding-top: 6px; }
 </style></head><body>
-  <div class="wm"><img src="${esc(logoUrl(t))}"><div>${esc(info.watermarkText || "مركز عُمان للمناظرات")}</div></div>
+  <div class="wm"><img src="${esc(logoUrl(t))}">${info.watermarkText ? `<div>${esc(info.watermarkText)}</div>` : ""}</div>
   <header><img src="${esc(logoUrl(t))}"><div>
     <div class="k">البطولة القيادية</div><h1>${esc(info.name)}</h1><div class="sub">${esc(title)}</div></div></header>
   <div class="info">

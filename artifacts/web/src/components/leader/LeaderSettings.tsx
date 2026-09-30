@@ -1,5 +1,10 @@
 import { Field, inputClass, inputStyle } from "@/components/wizard/ui";
-import { periodLabel, type LeaderInfo, type LeaderTournament } from "@/lib/leaderApi";
+import { useState } from "react";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
+  AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { periodLabel, resetLeaderScores, type LeaderInfo, type LeaderTournament } from "@/lib/leaderApi";
 import { BRAND } from "@/lib/brand";
 import PdfMenu from "./PdfMenu";
 import { SectionHeader } from "./ui";
@@ -8,7 +13,11 @@ type Edit = (fn: (d: LeaderInfo) => void) => void;
 type TextKey = "name" | "organizer" | "startDate" | "endDate" | "description" | "logoUrl" | "watermarkText";
 
 /** Tournament settings grouped into clear sections. Every change autosaves. */
-export default function LeaderSettings({ t, info, edit }: { t: LeaderTournament; info: LeaderInfo; edit: Edit }) {
+export default function LeaderSettings({ t, info, edit, onReset }: {
+  t: LeaderTournament; info: LeaderInfo; edit: Edit; onReset: () => void;
+}) {
+  const [confirmReset, setConfirmReset] = useState(false);
+  const sheets = Object.keys(t.results).length;
   const text = (k: TextKey) => ({
     value: info[k] ?? "", className: inputClass, style: inputStyle,
     onChange: (e: { target: { value: string } }) => edit((d) => { d[k] = e.target.value; }),
@@ -30,7 +39,7 @@ export default function LeaderSettings({ t, info, edit }: { t: LeaderTournament;
             <textarea rows={2} {...text("description")} style={{ ...inputStyle, height: "auto" }} />
           </Field>
           <div className="grid gap-3 sm:grid-cols-3">
-            <Field label="الجهة المنظمة"><input {...text("organizer")} placeholder="مركز عُمان للمناظرات" /></Field>
+            <Field label="الجهة المنظمة"><input {...text("organizer")} placeholder="اسم الجهة" /></Field>
             <Field label="تاريخ البداية"><input type="date" {...text("startDate")} /></Field>
             <Field label="تاريخ النهاية"><input type="date" {...text("endDate")} /></Field>
           </div>
@@ -80,15 +89,35 @@ export default function LeaderSettings({ t, info, edit }: { t: LeaderTournament;
           <PdfMenu t={{ ...t, info }} />
         </Card>
 
+        <Card icon="🔄" title="إعادة إدخال الدرجات">
+          <Info label="أوراق الدرجات المرسلة" value={sheets} />
+          <Note>يحذف كل الدرجات المرسلة والمسودات ويعيد فتح جميع القاعات ليُدخل المحكمون الدرجات من جديد. الأفراد والقاعات والإعدادات تبقى كما هي.</Note>
+          <button onClick={() => setConfirmReset(true)} disabled={!sheets && !Object.keys(t.drafts ?? {}).length}
+            className="rounded-xl px-4 py-2 text-[13px] font-bold text-white disabled:opacity-40"
+            style={{ background: BRAND.purple }} data-testid="button-reset-scores">🔄 إعادة ضبط إدخال الدرجات</button>
+        </Card>
+
         <Card icon="🎨" title="إعدادات الهوية">
           <Field label="رابط شعار البطولة (اتركه فارغاً لشعار المركز)"><input {...text("logoUrl")} placeholder="https://…" dir="ltr" /></Field>
-          <Field label="نص العلامة المائية"><input {...text("watermarkText")} placeholder="مركز عُمان للمناظرات" /></Field>
+          <Field label="نص العلامة المائية"><input {...text("watermarkText")} placeholder="اختياري — الشعار فقط إن تُرك فارغاً" /></Field>
           <div className="flex items-center gap-3 rounded-xl p-3" style={{ background: BRAND.surface }}>
             <img src={logo} alt="" className="h-12 w-12 object-contain" />
             <span className="text-[12px]" style={{ color: `${BRAND.ink}99` }}>يظهر الشعار في رأس تقارير PDF، والعلامة المائية خفيفة في الخلفية.</span>
           </div>
         </Card>
       </div>
+      <AlertDialog open={confirmReset} onOpenChange={setConfirmReset}>
+        <AlertDialogContent dir="rtl">
+          <AlertDialogHeader>
+            <AlertDialogTitle>إعادة ضبط إدخال الدرجات؟</AlertDialogTitle>
+            <AlertDialogDescription>سيتم حذف {sheets} ورقة درجات نهائياً وإعادة فتح جميع القاعات. لا يمكن التراجع.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="gap-2">
+            <AlertDialogCancel>إلغاء</AlertDialogCancel>
+            <AlertDialogAction onClick={() => void resetLeaderScores(t.id).then(onReset)}>نعم، أعد الضبط</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

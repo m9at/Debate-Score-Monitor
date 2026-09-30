@@ -174,6 +174,25 @@ leaderRouter.put(
   }),
 );
 
+/** Organiser resets score entry: clears every sheet and draft and reopens all rooms. */
+leaderRouter.delete(
+  "/api/leader/:id/results",
+  wrap(async (req, res) => {
+    const row = await load(id(req));
+    if (!row) {
+      res.status(404).json({ error: "not found" });
+      return;
+    }
+    const info = row.info as Info;
+    info.days.forEach((d) => {
+      d.closed = false;
+      d.rooms.forEach((r) => { r.locked = false; });
+    });
+    await db.update(judgeSessions).set({ results: {}, info }).where(eq(judgeSessions.id, row.id));
+    res.json({ ok: true });
+  }),
+);
+
 /** Organiser removes one judge's sheet so it can be re-entered. */
 leaderRouter.delete(
   "/api/leader/:id/results/:key",

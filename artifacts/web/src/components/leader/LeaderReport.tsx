@@ -31,18 +31,17 @@ export default function LeaderReport({ t }: { t: LeaderTournament }) {
       {/* Official print identity: header, watermark and footer appear only on paper */}
       <div aria-hidden className="pointer-events-none fixed inset-0 z-0 hidden place-items-center opacity-[0.06] print:grid">
         <div className="-rotate-[25deg] text-center"><img src={logo} className="mx-auto h-64" alt="" />
-          <div className="mt-2 text-5xl font-extrabold" style={{ color: PURPLE }}>{t.info.watermarkText || "مركز عُمان للمناظرات"}</div></div>
+          {t.info.watermarkText && <div className="mt-2 text-5xl font-extrabold" style={{ color: PURPLE }}>{t.info.watermarkText}</div>}</div>
       </div>
       <div className="hidden items-center gap-4 border-b-4 pb-3 print:flex" style={{ borderColor: CYAN }}>
         <img src={logo} className="h-16" alt="" />
         <div className="flex-1">
-          <div className="text-xl font-extrabold" style={{ color: PURPLE }}>مركز عُمان للمناظرات</div>
-          <div className="font-bold">{t.info.name} — التقرير الشامل</div>
+          <div className="text-xl font-extrabold" style={{ color: PURPLE }}>{t.info.name} — التقرير الشامل</div>
         </div>
         <div className="text-xs text-gray-500">{new Date().toLocaleDateString("ar")}</div>
       </div>
       <div className="fixed bottom-0 left-0 right-0 hidden border-t py-1 text-center text-[10px] text-gray-500 print:block">
-        وثيقة رسمية صادرة عن مركز عُمان للمناظرات
+        وثيقة رسمية
       </div>
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {cards.map(([l, v]) => (

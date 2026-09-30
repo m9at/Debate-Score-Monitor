@@ -1179,7 +1179,7 @@ interface TournamentContextType {
   ) => void;
   setTournamentArchived: (tournamentId: string, archived: boolean) => void;
   /** Deep-copies a tournament under a new id and name. Returns the new id. */
-  duplicateTournament: (tournamentId: string) => string | undefined;
+  duplicateTournament: (tournamentId: string, patch?: Partial<Tournament>) => string | undefined;
   /** A trial copy: same structure, numbered teams/judges, no rounds drawn. */
   duplicateTournamentForTest: (tournamentId: string) => string | undefined;
   /** Creates a fully configured tournament from the setup wizard. Returns its id. */
@@ -1667,15 +1667,16 @@ export function TournamentProvider({ children }: { children: ReactNode }) {
     []
   );
 
-  const duplicateTournament = useCallback((tournamentId: string) => {
+  const duplicateTournament = useCallback((tournamentId: string, patch?: Partial<Tournament>) => {
     const t = stateRef.current.tournaments.find((x) => x.id === tournamentId);
     if (!t) return undefined;
     const copy: Tournament = {
       ...structuredClone(t),
       id: crypto.randomUUID(),
-      name: `${t.name} (نسخة)`,
       createdAt: Date.now(),
       archived: false,
+      isCopy: true,
+      ...patch,
     };
     dispatch({ type: "ADD_TOURNAMENT", tournament: copy });
     return copy.id;

@@ -1,5 +1,6 @@
 import {
   Archive,
+  Copy,
   ArchiveRestore,
   FolderInput,
   Link2,
@@ -28,6 +29,7 @@ interface Props {
   onMoveToFolder: () => void;
   onToggleArchive: () => void;
   onSettings: () => void;
+  onDuplicate: () => void;
   onDelete: () => void;
 }
 
@@ -43,6 +45,7 @@ export default function TournamentCardMenu({
   onMoveToFolder,
   onToggleArchive,
   onSettings,
+  onDuplicate,
   onDelete,
 }: Props) {
   return (
@@ -84,6 +87,10 @@ export default function TournamentCardMenu({
         <DropdownMenuItem onClick={onSettings} data-testid="menu-tournament-settings">
           <Settings className="w-4 h-4" />
           إعدادات البطولة
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={onDuplicate} data-testid="menu-duplicate">
+          <Copy className="w-4 h-4" />
+          استنساخ البطولة
         </DropdownMenuItem>
         <DropdownMenuItem onClick={onMoveToFolder} data-testid="menu-move-folder">
           <FolderInput className="w-4 h-4" />

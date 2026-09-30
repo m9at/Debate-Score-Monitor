@@ -186,6 +186,8 @@ export interface Tournament {
   protection?: TournamentProtection;
   /** Hidden from the main list until restored. */
   archived?: boolean;
+  /** Made with «استنساخ البطولة» — shown as a small «نسخة» badge. */
+  isCopy?: boolean;
   /** السماح للجمهور بمتابعة البطولة — shows it in وضع الجمهور (read-only). */
   publicVisible?: boolean;
   /** Motion entered at creation, applied to the first round once it exists. */

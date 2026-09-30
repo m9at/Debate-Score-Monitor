@@ -218,7 +218,7 @@ export default function LeaderDetailPage() {
             </div>
           )}
 
-          {tab === "settings" && <LeaderSettings t={t} info={info} edit={edit} />}
+          {tab === "settings" && <LeaderSettings t={t} info={info} edit={edit} onReset={() => { flash("تمت إعادة ضبط الدرجات"); void refresh(); }} />}
         </div>
       </main>
     </div>

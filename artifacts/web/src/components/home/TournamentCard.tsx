@@ -14,6 +14,8 @@ import { BRAND, BRAND_GRADIENT, BTN, BTN_PRIMARY_STYLE } from "@/lib/brand";
 import { getTournamentCounts, getTournamentStatus } from "@/lib/tournamentStatus";
 import { getRoundProgress } from "@/lib/roundProgress";
 import StatusBadge from "./StatusBadge";
+import { useTournament } from "@/context/TournamentContext";
+import { createLeader, getLeader } from "@/lib/leaderApi";
 
 interface TournamentCardProps {
   tournament: Tournament;
@@ -72,6 +74,19 @@ export default function TournamentCard({
   const [confirmDelete, setConfirmDelete] = useState(false);
   const status = getTournamentStatus(tournament);
   const c = getTournamentCounts(tournament);
+  const { duplicateTournament } = useTournament();
+  /** Same name + a small «نسخة» badge; a leadership copy gets its own server record (setup only, no scores). */
+  const duplicate = async () => {
+    if (tournament.kind === "leadership" && tournament.leaderId) {
+      try {
+        const { info } = await getLeader(tournament.leaderId);
+        info.days.forEach((d) => { d.closed = false; d.rooms.forEach((r) => { r.locked = false; }); });
+        duplicateTournament(tournament.id, { leaderId: await createLeader(info) });
+      } catch { alert("تعذّر استنساخ البطولة — حاول مرة أخرى"); }
+      return;
+    }
+    duplicateTournament(tournament.id);
+  };
   const isProtected = !!tournament.protection?.enabled;
   const progress = c.totalRounds ? (c.currentRound / c.totalRounds) * 100 : 0;
   const round = getRoundProgress(tournament);
@@ -123,6 +138,10 @@ export default function TournamentCard({
             >
               {tournament.name}
             </h3>
+            {tournament.isCopy && (
+              <span className="shrink-0 mt-1 text-[10px] font-bold px-1.5 py-0.5 rounded-md"
+                style={{ backgroundColor: `${BRAND.purple}14`, color: BRAND.purple }} data-testid="badge-copy">نسخة</span>
+            )}
             {isProtected && (
               <Lock
                 className="w-4 h-4 shrink-0"
@@ -140,6 +159,7 @@ export default function TournamentCard({
                 onMoveToFolder={onMoveToFolder}
                 onToggleArchive={onToggleArchive}
                 onSettings={onSettings}
+                onDuplicate={duplicate}
                 onDelete={() => setConfirmDelete(true)}
               />
             </div>
