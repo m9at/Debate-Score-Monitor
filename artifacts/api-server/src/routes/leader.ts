@@ -161,6 +161,13 @@ leaderRouter.put(
       if (!pool.some((p) => p.name.trim() === e.name)) pool.push({ id: e.id, name: e.name });
       infoChanged = true;
     }
+    // Register the judge in the tournament's judges list and on this room's panel.
+    const jp = (info.judgePool ??= []);
+    if (!jp.some((n) => n.trim() === judgeName)) { jp.push(judgeName); infoChanged = true; }
+    if (room.chair?.trim() !== judgeName && !room.judges.some((n) => n.trim() === judgeName)) {
+      if (room.chair) room.judges.push(judgeName); else room.chair = judgeName;
+      infoChanged = true;
+    }
     const clean = Object.fromEntries(entries.map((e) => [e.id!, e.score as number]));
     results[key] = { roomId, judgeName, scores: clean, submittedAt: Date.now() };
     const drafts = { ...((results[DRAFTS] || {}) as Record<string, unknown>) };
