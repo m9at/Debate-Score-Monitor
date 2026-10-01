@@ -156,9 +156,13 @@ leaderRouter.put(
     let infoChanged = false;
     for (const e of entries) {
       if (e.id) continue;
-      e.id = Math.random().toString(36).slice(2, 10);
+      // Same name as a registered debater who isn't already in another room this
+      // round → same person; otherwise it's a different debater with his own id.
+      const taken = new Set((day?.rooms ?? []).filter((r) => r.id !== roomId).flatMap((r) => r.individuals.map((x) => x.id)));
+      const same = pool.filter((p) => p.name.trim() === e.name && !taken.has(p.id));
+      e.id = same.length === 1 ? same[0].id : Math.random().toString(36).slice(2, 10);
       room.individuals.push({ id: e.id, name: e.name });
-      if (!pool.some((p) => p.name.trim() === e.name)) pool.push({ id: e.id, name: e.name });
+      if (!pool.some((p) => p.id === e.id)) pool.push({ id: e.id, name: e.name });
       infoChanged = true;
     }
     // Register the judge in the tournament's judges list and on this room's panel.

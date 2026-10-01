@@ -171,6 +171,8 @@ export const removeLocal = (id: string) =>
 // ── Results ────────────────────────────────────────────────────────────────
 
 export interface RankRow {
+  /** Debater id — two debaters with the same name stay separate. */
+  id?: string;
   name: string;
   room?: string;
   day?: number;
@@ -195,21 +197,32 @@ export function roomRows(t: LeaderTournament): RankRow[] {
       for (const ind of r.individuals) {
         const v = sheet.scores[ind.id];
         if (typeof v !== "number") continue;
-        rows.push({ name: ind.name.trim() || "—", room: r.label, day: d.day, score: v, judge: sheet.judgeName });
+        rows.push({ id: ind.id, name: ind.name.trim() || "—", room: r.label, day: d.day, score: v, judge: sheet.judgeName });
       }
     }
+  }
+  // Same name, different debaters: add the room where each first appeared.
+  const ids = new Map<string, Map<string, string>>();
+  for (const r of rows) {
+    const m = ids.get(r.name) ?? new Map<string, string>();
+    if (!m.has(r.id!)) m.set(r.id!, r.room!);
+    ids.set(r.name, m);
+  }
+  for (const r of rows) {
+    const m = ids.get(r.name)!;
+    if (m.size > 1) r.name = `${r.name} (${m.get(r.id!)})`;
   }
   return rows.sort(byScore);
 }
 
-/** Individuals summed across days (matched by name). */
+/** Individuals summed across days (matched by debater id). */
 export function totalRows(t: LeaderTournament): RankRow[] {
   const map = new Map<string, RankRow>();
   for (const r of roomRows(t)) {
-    const cur = map.get(r.name) ?? { name: r.name, score: 0, perDay: {} };
+    const cur = map.get(r.id!) ?? { id: r.id, name: r.name, score: 0, perDay: {} };
     cur.perDay![r.day!] = round2((cur.perDay![r.day!] ?? 0) + r.score);
     cur.score = round2(cur.score + r.score);
-    map.set(r.name, cur);
+    map.set(r.id!, cur);
   }
   return [...map.values()].sort(byScore);
 }
