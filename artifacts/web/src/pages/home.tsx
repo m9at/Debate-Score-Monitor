@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useLocation } from "wouter";
 import { useTournament } from "@/context/TournamentContext";
+import BackupButtons from "@/components/home/BackupButtons";
 import ShareLinkDialog from "@/components/tournament/ShareLinkDialog";
 import { useGroups } from "@/context/GroupContext";
 import { Button } from "@/components/ui/button";
@@ -156,6 +157,7 @@ export default function Home() {
       <HomeHeader
         actions={
           <>
+            <BackupButtons />
             <button
               onClick={() => setPublicLinkOpen(true)}
               className={`${BTN.base} ${BTN.secondary} ${BTN_SIZE.md}`}
