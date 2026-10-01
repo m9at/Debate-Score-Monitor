@@ -1,4 +1,5 @@
 import { createContext, useContext, useReducer, useEffect, useCallback, useRef, useState, type ReactNode } from "react";
+import { addToTrash, removeFromTrash } from "@/lib/trash";
 import type {
   Tournament,
   Team,
@@ -1105,6 +1106,8 @@ interface TournamentContextType {
     elimination?: { semifinal?: boolean; final?: boolean }
   ) => string;
   deleteTournament: (id: string) => void;
+  /** Brings a tournament back from the deleted list. */
+  restoreTournament: (t: Tournament) => void;
   getTournament: (id: string) => Tournament | undefined;
   addTeam: (tournamentId: string, name: string, speakersPerTeam: 3 | 4, speakerNames: string[]) => void;
   deleteTeam: (tournamentId: string, teamId: string) => void;
@@ -1539,7 +1542,15 @@ export function TournamentProvider({ children }: { children: ReactNode }) {
     return tournament.id;
   }, []);
 
+  const restoreTournament = useCallback((t: Tournament) => {
+    pendingDeletesRef.current.delete(t.id);
+    dispatch({ type: "IMPORT_TOURNAMENT", tournament: t, overwrite: true });
+    removeFromTrash(t.id);
+  }, []);
+
   const deleteTournament = useCallback((id: string) => {
+    const doomed = stateRef.current.tournaments.find((t) => t.id === id);
+    if (doomed) addToTrash(doomed);
     pendingDeletesRef.current.add(id);
     lastSerializedRef.current.delete(id);
     dirtyIdsRef.current.delete(id);
@@ -2219,6 +2230,7 @@ export function TournamentProvider({ children }: { children: ReactNode }) {
         tournaments: state.tournaments,
         addTournament,
         deleteTournament,
+        restoreTournament,
         getTournament,
         addTeam,
         deleteTeam,

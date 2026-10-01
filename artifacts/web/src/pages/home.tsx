@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useLocation } from "wouter";
 import { useTournament } from "@/context/TournamentContext";
-import BackupButtons from "@/components/home/BackupButtons";
+import HomeMoreMenu from "@/components/home/HomeMoreMenu";
 import ShareLinkDialog from "@/components/tournament/ShareLinkDialog";
 import { useGroups } from "@/context/GroupContext";
 import { Button } from "@/components/ui/button";
@@ -157,15 +157,7 @@ export default function Home() {
       <HomeHeader
         actions={
           <>
-            <BackupButtons />
-            <button
-              onClick={() => setPublicLinkOpen(true)}
-              className={`${BTN.base} ${BTN.secondary} ${BTN_SIZE.md}`}
-              data-testid="button-public-mode-link"
-            >
-              <Eye className="w-4 h-4" strokeWidth={2.5} />
-              رابط وضع الجمهور
-            </button>
+            <HomeMoreMenu onPublicLink={() => setPublicLinkOpen(true)} />
             <button
               onClick={() => setGroupDialogOpen(true)}
               className={`${BTN.base} ${BTN.primary} ${BTN_SIZE.md} shadow-lg`}
