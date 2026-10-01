@@ -55,7 +55,11 @@ export default function LeaderDetailPage() {
       setT(data);
       // Never overwrite what this user is typing right now.
       if (!dirtyRef.current) setInfo(data.info);
-    } catch { setMissing(true); }
+    } catch (e) {
+      // Only a real "not found" means missing; a brief network/server hiccup
+      // keeps the page open and the next 2-second poll recovers.
+      if (String(e).includes("HTTP 404") || !lastJson.current) setMissing(true);
+    }
   };
   useEffect(() => { void refresh(); }, [id]);
   // Live sync: pick up other editors' changes and judges' scores every 2 seconds.
