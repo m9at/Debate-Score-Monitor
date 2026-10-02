@@ -47,36 +47,54 @@ export default function JudgeLinkCard({ t, day, onCopy, onPick }: {
       </div>
       {/* The chosen round's own rooms and their status. */}
       <div className="border-t px-4 pb-4 pt-3" style={{ borderColor: BRAND.border }}>
-        <div className="mb-2 text-[12.5px] font-bold" style={{ color: `${BRAND.ink}b3` }}>
+        <div className="mb-3 text-[16px] font-extrabold" style={{ color: BRAND.ink }}>
           قاعات الجولة {current.day} · {missing ? `${missing} من ${current.rooms.length} لم تُدخل درجاتها بعد` : "كل القاعات أرسلت ✓"}
         </div>
-        <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
           {current.rooms.map((r) => {
             const st = roomStatus(t, r.id);
             const sent = t.results[r.id];
             return (
-              <div key={r.id} className="relative overflow-hidden rounded-2xl border p-3 shadow-sm" style={{
-                borderColor: st === "done" ? "transparent" : `${BRAND.purple}26`,
-                background: st === "done" ? BRAND_GRADIENT : st === "progress" ? `linear-gradient(135deg, ${BRAND.blue}14, #fff)` : `linear-gradient(135deg, ${BRAND.purple}08, #fff)`,
-                color: st === "done" ? "#fff" : BRAND.ink,
-              }}>
-                <div className="absolute inset-x-0 top-0 h-1" style={{ background: st === "done" ? "rgba(255,255,255,.35)" : st === "progress" ? BRAND.blue : `${BRAND.purple}30` }} />
-                <div className="flex items-center gap-2">
-                  <div className="grid h-8 w-8 shrink-0 place-items-center rounded-lg" style={{ background: st === "done" ? "rgba(255,255,255,.2)" : `${BRAND.purple}14`, color: st === "done" ? "#fff" : BRAND.purple }}>
-                    <Gavel className="h-4 w-4" />
-                  </div>
-                  <div className="min-w-0 text-[14px] font-extrabold">{r.label}</div>
-                </div>
-                <div className="mt-2 inline-block rounded-full px-2.5 py-0.5 text-[11.5px] font-bold" style={{
-                  background: st === "done" ? "rgba(255,255,255,.22)" : st === "progress" ? `${BRAND.blue}22` : `${BRAND.purple}12`,
-                  color: st === "done" ? "#fff" : st === "progress" ? BRAND.blueDeep : `${BRAND.ink}99`,
+              <div key={r.id} className="flex flex-col items-center rounded-2xl border bg-white p-4 shadow-sm" style={{ borderColor: `${BRAND.purple}1f` }}>
+                <ProgressRing value={roomProgress(t, r.id, r.individuals.length)} label={r.label} gradId={`ring-${r.id}`} />
+                <div className="mt-3 w-full max-w-[150px] rounded-full py-1 text-center text-[12.5px] font-bold" style={{
+                  background: st === "progress" ? `${BRAND.blue}1a` : `${BRAND.purple}14`,
+                  color: st === "done" ? BRAND.purple : st === "progress" ? BRAND.blueDeep : `${BRAND.ink}80`,
                 }}>{ROOM_STATUS[st]}</div>
-                {sent && <div className="mt-1 truncate text-[11.5px] opacity-90">المحكم: {sent.judgeName}</div>}
+                {sent && <div className="mt-1.5 truncate text-[12px]" style={{ color: `${BRAND.ink}b3` }}>المحكم: {sent.judgeName}</div>}
               </div>
             );
           })}
         </div>
       </div>
+    </div>
+  );
+}
+
+/** 0–1 share of a room's individuals scored: full when sent, partial from the live draft. */
+function roomProgress(t: LeaderTournament, roomId: string, total: number) {
+  if (t.results[roomId]) return 1;
+  const draft = t.drafts?.[roomId];
+  if (!draft || !total) return 0;
+  return Math.min(1, Math.max(0.08, Object.keys(draft.scores ?? {}).length / total));
+}
+
+/** Gradient ring (purple → blue) with the room name in the centre. */
+function ProgressRing({ value, label, gradId }: { value: number; label: string; gradId: string }) {
+  const r = 44, c = 2 * Math.PI * r;
+  return (
+    <div className="relative h-[110px] w-[110px]">
+      <svg viewBox="0 0 110 110" className="h-full w-full -rotate-90">
+        <defs>
+          <linearGradient id={gradId} x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stopColor={BRAND.purple} /><stop offset="100%" stopColor={BRAND.blue} />
+          </linearGradient>
+        </defs>
+        <circle cx="55" cy="55" r={r} fill="none" strokeWidth="10" stroke={value ? "#ECE8F7" : "#E4E2E8"} />
+        {value > 0 && <circle cx="55" cy="55" r={r} fill="none" strokeWidth="10" strokeLinecap="round"
+          stroke={`url(#${gradId})`} strokeDasharray={c} strokeDashoffset={c * (1 - value)} />}
+      </svg>
+      <div className="absolute inset-0 grid place-items-center px-3 text-center text-[16px] font-extrabold leading-tight" style={{ color: BRAND.ink }}>{label}</div>
     </div>
   );
 }
