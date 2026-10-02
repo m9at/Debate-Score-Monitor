@@ -7,8 +7,8 @@ export const judgeUrl = (id: string, query: string) =>
   `${window.location.origin}${import.meta.env.BASE_URL.replace(/\/$/, "")}/leader/judge/${id}${query}`;
 
 /** Judge link hub: pick a round, then copy or open that round's link. */
-export default function JudgeLinkCard({ t, day, onCopy }: {
-  t: LeaderTournament; day: number; onCopy: (day: number) => void;
+export default function JudgeLinkCard({ t, day, onCopy, onPick }: {
+  t: LeaderTournament; day: number; onCopy: (day: number) => void; onPick?: (day: number) => void;
 }) {
   const { id, info: { days } } = t;
   const [pick, setPick] = useState(day);
@@ -27,7 +27,7 @@ export default function JudgeLinkCard({ t, day, onCopy }: {
         </div>
       </div>
       <div className="flex flex-wrap items-center gap-2 p-4">
-        <select value={current.day} onChange={(e) => setPick(+e.target.value)}
+        <select value={current.day} onChange={(e) => { setPick(+e.target.value); onPick?.(+e.target.value); }}
           className="h-10 min-w-[220px] rounded-xl border bg-white px-3 text-[13.5px] font-bold outline-none"
           style={{ borderColor: `${BRAND.purple}40`, color: BRAND.ink }}>
           {days.map((d) => (
