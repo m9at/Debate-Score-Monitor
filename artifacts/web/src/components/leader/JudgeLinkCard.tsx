@@ -55,14 +55,23 @@ export default function JudgeLinkCard({ t, day, onCopy, onPick }: {
             const st = roomStatus(t, r.id);
             const sent = t.results[r.id];
             return (
-              <div key={r.id} className="rounded-xl border px-3 py-2" style={{
-                borderColor: st === "done" ? BRAND.purple : BRAND.border,
-                background: st === "done" ? `${BRAND.purple}0f` : st === "progress" ? `${BRAND.blue}12` : "#fff",
+              <div key={r.id} className="relative overflow-hidden rounded-2xl border p-3 shadow-sm" style={{
+                borderColor: st === "done" ? "transparent" : `${BRAND.purple}26`,
+                background: st === "done" ? BRAND_GRADIENT : st === "progress" ? `linear-gradient(135deg, ${BRAND.blue}14, #fff)` : `linear-gradient(135deg, ${BRAND.purple}08, #fff)`,
+                color: st === "done" ? "#fff" : BRAND.ink,
               }}>
-                <div className="text-[13px] font-extrabold" style={{ color: BRAND.ink }}>{r.label}</div>
-                <div className="text-[11.5px]" style={{ color: st === "done" ? BRAND.purple : `${BRAND.ink}8c` }}>
-                  {ROOM_STATUS[st]}{sent ? ` · ${sent.judgeName}` : ""}
+                <div className="absolute inset-x-0 top-0 h-1" style={{ background: st === "done" ? "rgba(255,255,255,.35)" : st === "progress" ? BRAND.blue : `${BRAND.purple}30` }} />
+                <div className="flex items-center gap-2">
+                  <div className="grid h-8 w-8 shrink-0 place-items-center rounded-lg" style={{ background: st === "done" ? "rgba(255,255,255,.2)" : `${BRAND.purple}14`, color: st === "done" ? "#fff" : BRAND.purple }}>
+                    <Gavel className="h-4 w-4" />
+                  </div>
+                  <div className="min-w-0 text-[14px] font-extrabold">{r.label}</div>
                 </div>
+                <div className="mt-2 inline-block rounded-full px-2.5 py-0.5 text-[11.5px] font-bold" style={{
+                  background: st === "done" ? "rgba(255,255,255,.22)" : st === "progress" ? `${BRAND.blue}22` : `${BRAND.purple}12`,
+                  color: st === "done" ? "#fff" : st === "progress" ? BRAND.blueDeep : `${BRAND.ink}99`,
+                }}>{ROOM_STATUS[st]}</div>
+                {sent && <div className="mt-1 truncate text-[11.5px] opacity-90">المحكم: {sent.judgeName}</div>}
               </div>
             );
           })}
