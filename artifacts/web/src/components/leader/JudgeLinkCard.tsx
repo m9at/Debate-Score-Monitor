@@ -1,19 +1,21 @@
 import { useEffect, useState } from "react";
 import { Copy, ExternalLink, Gavel } from "lucide-react";
 import { BRAND, BRAND_GRADIENT } from "@/lib/brand";
-import { periodLabel, type LeaderDay } from "@/lib/leaderApi";
+import { periodLabel, roomStatus, ROOM_STATUS, type LeaderTournament } from "@/lib/leaderApi";
 
 export const judgeUrl = (id: string, query: string) =>
   `${window.location.origin}${import.meta.env.BASE_URL.replace(/\/$/, "")}/leader/judge/${id}${query}`;
 
 /** Judge link hub: pick a round, then copy or open that round's link. */
-export default function JudgeLinkCard({ id, days, day, onCopy }: {
-  id: string; days: LeaderDay[]; day: number; onCopy: (day: number) => void;
+export default function JudgeLinkCard({ t, day, onCopy }: {
+  t: LeaderTournament; day: number; onCopy: (day: number) => void;
 }) {
+  const { id, info: { days } } = t;
   const [pick, setPick] = useState(day);
   useEffect(() => setPick(day), [day]);
   const current = days.find((d) => d.day === pick) ?? days[0];
   if (!current) return null;
+  const missing = current.rooms.filter((r) => !t.results[r.id]).length;
   const url = judgeUrl(id, `?day=${current.day}`);
   return (
     <div className="overflow-hidden rounded-2xl border bg-white shadow-sm" style={{ borderColor: BRAND.border }}>
@@ -42,6 +44,29 @@ export default function JudgeLinkCard({ id, days, day, onCopy }: {
           style={{ borderColor: `${BRAND.purple}40`, color: BRAND.purple }}>
           <ExternalLink className="h-4 w-4" /> فتح
         </a>
+      </div>
+      {/* The chosen round's own rooms and their status. */}
+      <div className="border-t px-4 pb-4 pt-3" style={{ borderColor: BRAND.border }}>
+        <div className="mb-2 text-[12.5px] font-bold" style={{ color: `${BRAND.ink}b3` }}>
+          قاعات الجولة {current.day} · {missing ? `${missing} من ${current.rooms.length} لم تُدخل درجاتها بعد` : "كل القاعات أرسلت ✓"}
+        </div>
+        <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
+          {current.rooms.map((r) => {
+            const st = roomStatus(t, r.id);
+            const sent = t.results[r.id];
+            return (
+              <div key={r.id} className="rounded-xl border px-3 py-2" style={{
+                borderColor: st === "done" ? BRAND.purple : BRAND.border,
+                background: st === "done" ? `${BRAND.purple}0f` : st === "progress" ? `${BRAND.blue}12` : "#fff",
+              }}>
+                <div className="text-[13px] font-extrabold" style={{ color: BRAND.ink }}>{r.label}</div>
+                <div className="text-[11.5px]" style={{ color: st === "done" ? BRAND.purple : `${BRAND.ink}8c` }}>
+                  {ROOM_STATUS[st]}{sent ? ` · ${sent.judgeName}` : ""}
+                </div>
+              </div>
+            );
+          })}
+        </div>
       </div>
     </div>
   );

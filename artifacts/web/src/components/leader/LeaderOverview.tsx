@@ -127,7 +127,7 @@ export default function LeaderOverview({ t, copyLink }: { t: LeaderTournament; c
         </div>
       </div>
 
-      {current && <JudgeLinkCard id={t.id} days={t.info.days} day={current.day} onCopy={(n) => copyLink(`?day=${n}`)} />}
+      {current && <JudgeLinkCard t={t} day={current.day} onCopy={(n) => copyLink(`?day=${n}`)} />}
     </div>
   );
 }

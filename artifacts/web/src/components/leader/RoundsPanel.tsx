@@ -104,7 +104,7 @@ export default function RoundsPanel({ t, info, edit, onToggleLock, onDeleteSheet
           </div>
 
           <RoundSummary t={tl} day={day} />
-          <JudgeLinkCard id={t.id} days={info.days} day={day.day} onCopy={(n) => copyLink(`?day=${n}`)} />
+          <JudgeLinkCard t={{ ...t, info }} day={day.day} onCopy={(n) => copyLink(`?day=${n}`)} />
 
           {day.rooms.length === 0 && <p className="py-6 text-center text-[13px]" style={{ color: `${BRAND.ink}66` }}>لا توجد قاعات — أضف قاعة للبدء</p>}
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
