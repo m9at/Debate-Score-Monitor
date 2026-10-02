@@ -35,6 +35,8 @@ export interface LeaderInfo {
   scoreMax: number;
   days: LeaderDay[];
   /** Judges registered for the tournament; rooms pick from this list. */
+  /** Organizer tie-break: debater ids that win ties, highest priority first. */
+  tieBreak?: string[];
   judgePool?: string[];
   /** Registered individuals; rooms pick from this list. */
   individualPool?: LeaderIndividual[];
@@ -183,7 +185,12 @@ export interface RankRow {
 }
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
-const byScore = (a: RankRow, b: RankRow) => b.score - a.score;
+/** Higher score first; on a tie, debaters listed in info.tieBreak come first (in that order). */
+const byScore = (t: LeaderTournament) => {
+  const prio = t.info.tieBreak ?? [];
+  const rank = (id?: string) => { const i = prio.indexOf(id ?? ""); return i < 0 ? prio.length : i; };
+  return (a: RankRow, b: RankRow) => b.score - a.score || rank(a.id) - rank(b.id);
+};
 
 /** One row per individual per room: the average of the judges who scored them. */
 export function roomRows(t: LeaderTournament): RankRow[] {
@@ -212,7 +219,7 @@ export function roomRows(t: LeaderTournament): RankRow[] {
     const m = ids.get(r.name)!;
     if (m.size > 1) r.name = `${r.name} (${m.get(r.id!)})`;
   }
-  return rows.sort(byScore);
+  return rows.sort(byScore(t));
 }
 
 /** Individuals summed across days (matched by debater id). */
@@ -224,5 +231,5 @@ export function totalRows(t: LeaderTournament): RankRow[] {
     cur.score = round2(cur.score + r.score);
     map.set(r.id!, cur);
   }
-  return [...map.values()].sort(byScore);
+  return [...map.values()].sort(byScore(t));
 }
