@@ -12,8 +12,7 @@ services:
     runtime: docker
     plan: starter
     dockerfilePath: ./Dockerfile
-    # Deploy straight from this branch — no merge into main needed.
-    branch: app-link
+    branch: main
     healthCheckPath: /api/healthz
     autoDeploy: true
     envVars:
