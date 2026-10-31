@@ -15,8 +15,6 @@ import {
 import {
   Archive,
   ChevronDown,
-  ClipboardList,
-  Eye,
   FolderPlus,
   Plus,
   Search,
@@ -25,6 +23,7 @@ import {
 } from "lucide-react";
 import { motion } from "framer-motion";
 import HomeHeader from "@/components/home/HomeHeader";
+import ShareLinksMenu from "@/components/home/ShareLinksMenu";
 import TournamentCard from "@/components/home/TournamentCard";
 import FolderStrip from "@/components/home/FolderStrip";
 import MoveToFolderDialog from "@/components/home/MoveToFolderDialog";
@@ -159,22 +158,10 @@ export default function Home() {
       <HomeHeader
         actions={
           <>
-            <button
-              onClick={() => setPublicLinkOpen(true)}
-              className={`${BTN.base} ${BTN.secondary} ${BTN_SIZE.md}`}
-              data-testid="button-public-mode-link"
-            >
-              <Eye className="w-4 h-4" strokeWidth={2.5} />
-              رابط وضع الجمهور
-            </button>
-            <button
-              onClick={() => setAdminLinkOpen(true)}
-              className={`${BTN.base} ${BTN.secondary} ${BTN_SIZE.md}`}
-              data-testid="button-admin-mode-link"
-            >
-              <ClipboardList className="w-4 h-4" strokeWidth={2.5} />
-              رابط رصد الدرجات
-            </button>
+            <ShareLinksMenu
+              onPublicLink={() => setPublicLinkOpen(true)}
+              onAdminLink={() => setAdminLinkOpen(true)}
+            />
             <button
               onClick={() => setGroupDialogOpen(true)}
               className={`${BTN.base} ${BTN.primary} ${BTN_SIZE.md} shadow-lg`}
