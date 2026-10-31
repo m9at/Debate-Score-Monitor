@@ -13,9 +13,9 @@ import {
   buildSessionUrl,
   buildJudgeSessionUrl,
   decodeScores,
+  type RoomInfo,
   type RoundData,
 } from "@/lib/judgeCodec";
-import { buildRoundSessionData } from "@/lib/roundSessionData";
 import {
   buildRegisterUrl,
   buildAdminUrl,
@@ -88,7 +88,6 @@ import RoundJudgeBoard from "@/components/tournament/RoundJudgeBoard";
 import ImageUploadField from "@/components/common/ImageUploadField";
 import ReportsPanel from "@/components/tournament/ReportsPanel";
 import SettingsPanel from "@/components/tournament/SettingsPanel";
-import ManualPairingsDialog from "@/components/tournament/ManualPairingsDialog";
 import IdentityPanel from "@/components/tournament/IdentityPanel";
 import CountdownPanel from "@/components/tournament/CountdownPanel";
 import PublicStatsPanel from "@/components/tournament/PublicStatsPanel";
@@ -151,10 +150,6 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
-import { ToastAction } from "@/components/ui/toast";
-import { canRedrawRound } from "@/context/TournamentContext";
-import { DEFAULT_SETTINGS } from "@/lib/wizard/types";
-import { SPEAKER_MAX, SPEAKER_MIN } from "@/lib/scoreValidation";
 import type * as XLSXType from "@/lib/excel-export";
 import type {
   Tournament,
@@ -366,9 +361,7 @@ function buildPdfHtml(tournament: Tournament): string {
 
   // ───── Round sections (with judges, best speaker, judge notes) ─────
   const roundLabel = (r: { kind?: string; roundNumber: number }) =>
-    r.kind === "quarterfinal"
-      ? "ربع النهائي"
-      : r.kind === "semifinal"
+    r.kind === "semifinal"
       ? "نصف النهائي"
       : r.kind === "final"
       ? "النهائي"
@@ -892,9 +885,7 @@ function StandingRow({ team, rank, rounds, onClick, hideScores }: StandingRowPro
       if (!m || !m.completed) return null;
       const mt = m.team1.teamId === team.id ? m.team1 : m.team2;
       const label =
-        r.kind === "quarterfinal"
-          ? "ربع"
-          : r.kind === "semifinal"
+        r.kind === "semifinal"
           ? "نصف"
           : r.kind === "final"
           ? "نهائي"
@@ -987,8 +978,6 @@ export default function TournamentDetail() {
   const [, setLocation] = useLocation();
   const {
     getTournament,
-    setTeamDisabled,
-    setRoomDisabled,
     addTeam,
     deleteTeam,
     updateTeam,
@@ -1020,11 +1009,6 @@ export default function TournamentDetail() {
     setRoundJudgesPerRoom,
     setMatchJudges,
     autoAssignJudges,
-    clearRoundJudges,
-    redrawRound,
-    setRoundPairings,
-    generateKnockout,
-    duplicateTournamentForTest,
     setRoundLocked,
     markResultAnnounced,
     setPublicVisible,
@@ -1240,31 +1224,6 @@ export default function TournamentDetail() {
     };
   }, [tournament?.id]);
 
-  // When a room's result lands (from any link or entered by hand), mark it
-  // locked on the round's judging links so nobody can submit it again.
-  const completedSig = (tournament?.rounds ?? [])
-    .map((r) => `${r.roundNumber}:${r.matches.filter((m) => m.completed).map((m) => m.id).join(",")}`)
-    .join("|");
-  const lastCompletedSigRef = useRef<Map<number, string>>(new Map());
-  useEffect(() => {
-    const t = tournamentRef.current;
-    if (!t) return;
-    const seen = lastCompletedSigRef.current;
-    for (const round of t.rounds) {
-      if (round.matches.length === 0) continue;
-      const sig = round.matches.filter((m) => m.completed).map((m) => m.id).join(",");
-      const first = !seen.has(round.roundNumber);
-      if (seen.get(round.roundNumber) === sig) continue;
-      seen.set(round.roundNumber, sig);
-      if (first && !sig) continue;
-      void syncRoundSessionsForRound(
-        t.id,
-        round.roundNumber,
-        buildRoundSessionData(t, round),
-      ).catch(() => {});
-    }
-  }, [completedSig]);
-
   // Add team dialog state
   const [teamName, setTeamName] = useState("");
   const [speakersPerTeam, setSpeakersPerTeam] = useState<"3" | "4">("3");
@@ -1281,9 +1240,6 @@ export default function TournamentDetail() {
   // Delete tournament confirmation
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   const [confirmFinishOpen, setConfirmFinishOpen] = useState(false);
-  const [advancementDismissed, setAdvancementDismissed] = useState(false);
-  const [manualPairingsOpen, setManualPairingsOpen] = useState(false);
-  const [confirmRedrawRound, setConfirmRedrawRound] = useState<number | null>(null);
   const [confirmReopenOpen, setConfirmReopenOpen] = useState(false);
 
   // Switch default tab to "rounds" when tournament starts
@@ -1332,8 +1288,8 @@ export default function TournamentDetail() {
       rules: s
         ? {
             speakersPerTeam: [3, 4],
-            scoreMin: SPEAKER_MIN,
-            scoreMax: SPEAKER_MAX,
+            scoreMin: s.scoreMin,
+            scoreMax: s.scoreMax,
             judgesPerRoom: s.judgesPerRoom,
             replySpeech: s.replySpeech,
             text: s.rules,
@@ -1467,9 +1423,7 @@ export default function TournamentDetail() {
   }, [tournament, sortedTeams, standingsRoundFilter]);
 
   const standingsRoundLabel = (r: { kind?: string; roundNumber: number }) =>
-    r.kind === "quarterfinal"
-      ? "ربع النهائي"
-      : r.kind === "semifinal"
+    r.kind === "semifinal"
       ? "نصف النهائي"
       : r.kind === "final"
       ? "النهائي"
@@ -1651,21 +1605,19 @@ export default function TournamentDetail() {
     regularRounds.length >= tournament.totalRounds &&
     regularRounds.every((r) => r.completed);
   const lastIsKnockout =
-    !!lastRound && !!lastRound.kind && lastRound.kind !== "regular";
+    !!lastRound && (lastRound.kind === "semifinal" || lastRound.kind === "final");
   const canGenerateRound =
     tournament.started &&
     !tournament.finished &&
     !lastIsKnockout &&
     (tournament.rounds.length === 0 || lastRound?.completed);
-  // A finished quarterfinal always leads to the semifinal (its winners advance).
-  const quarterfinalDone =
-    lastRound?.kind === "quarterfinal" && isCurrentRoundComplete();
   const canGenerateSemifinal =
     tournament.started &&
     !tournament.finished &&
+    !!tournament.semifinalEnabled &&
     !hasSemifinal &&
     !hasFinal &&
-    (quarterfinalDone || (!!tournament.semifinalEnabled && allRegularDone)) &&
+    allRegularDone &&
     tournament.teams.length >= 4;
   const canGenerateFinal =
     tournament.started &&
@@ -1734,22 +1686,6 @@ export default function TournamentDetail() {
    * pairings → rooms → judges → the round becomes the live one. Nothing is
    * started before every readiness check passes.
    */
-  /** Empties a round's draw; the organiser draws it again and assigns judges manually. */
-  const handleRedraw = (roundNumber: number) => setConfirmRedrawRound(roundNumber);
-
-  const confirmRedraw = (roundNumber: number) => {
-    if (!tournament) return;
-    setConfirmRedrawRound(null);
-    redrawRound(tournament.id, roundNumber);
-    logAction(tournament.id, "إعادة القرعة", `الجولة ${roundNumber}`);
-    setViewingRound(roundNumber);
-    setActiveTab("overview");
-    toast({
-      title: `تم تصفير قرعة الجولة ${roundNumber}`,
-      description: "اضغط «بدء القرعة» لإجراء القرعة من جديد، ثم وزّع المحكمين بنفسك.",
-    });
-  };
-
   const prepareAndStartNextRound = () => {
     if (!tournament) return;
     const nextNum = currentRoundNum + 1;
@@ -1773,8 +1709,46 @@ export default function TournamentDetail() {
     toast({ title: `تم تجهيز الجولة ${nextNum} وبدؤها` });
   };
 
-  const buildRoundData = (): RoundData =>
-    buildRoundSessionData(tournament, currentRound!);
+  /**
+   * The round as the judging link sees it: rooms, rosters and — so the link can
+   * identify the judge itself — the judges assigned to each room.
+   */
+  const buildRoundData = (): RoundData => {
+    const rooms: RoomInfo[] = (currentRound?.matches ?? []).map((m) => {
+      const gov = tournament.teams.find((t) => t.id === m.team1.teamId);
+      const opp = tournament.teams.find((t) => t.id === m.team2.teamId);
+      const a = m.judgeAssignment;
+      const ids = [
+        ...(a?.chairJudgeId ? [a.chairJudgeId] : []),
+        ...(a?.panelistJudgeIds ?? []),
+      ];
+      return {
+        roomNumber: m.roomNumber,
+        roomLabel: m.roomLabel,
+        matchId: m.id,
+        govTeamName: gov?.name ?? "الموالاة",
+        oppTeamName: opp?.name ?? "المعارضة",
+        govTeamId: m.team1.teamId,
+        govSpeakerNames: gov?.speakerNames ?? [],
+        oppSpeakerNames: opp?.speakerNames ?? [],
+        govSpeakersCount: gov?.speakersPerTeam ?? 3,
+        oppSpeakersCount: opp?.speakersPerTeam ?? 3,
+        judges: ids
+          .map((id) => {
+            const j = (tournament.judges ?? []).find((x) => x.id === id);
+            return j ? { id: j.id, name: j.name, chair: a?.chairJudgeId === id } : null;
+          })
+          .filter(Boolean) as { id: string; name: string; chair: boolean }[],
+      };
+    });
+    return {
+      tournamentId: tournament.id,
+      tournamentName: tournament.name,
+      roundNumber: currentRoundNum,
+      rooms,
+      caseText: currentRound?.caseText,
+    };
+  };
 
   /** Personal link for one judge: their room only, their name pre-filled. */
   const handleJudgeLink = async (judgeId: string) => {
@@ -2567,30 +2541,13 @@ export default function TournamentDetail() {
     const orig = tournament.teams.find((t) => t.id === editingTeamId);
     if (!orig) return;
     const count = parseInt(editSpeakersCount) as 3 | 4;
-    const updated = {
+    updateTeam(tournament.id, {
       ...orig,
       name: editTeamName.trim(),
       logoDataUrl: editTeamLogo,
       speakersPerTeam: count,
       speakerNames: editSpeakerNames.slice(0, count).map((n) => n.trim()),
-    };
-    updateTeam(tournament.id, updated);
-    // Push the new name/roster to judge links of every round still in play.
-    const synced = {
-      ...tournament,
-      teams: tournament.teams.map((t) => (t.id === updated.id ? updated : t)),
-    };
-    for (const round of tournament.rounds) {
-      const involved = round.matches.some(
-        (m) => !m.completed && (m.team1.teamId === updated.id || m.team2.teamId === updated.id),
-      );
-      if (!involved) continue;
-      void syncRoundSessionsForRound(
-        tournament.id,
-        round.roundNumber,
-        buildRoundSessionData(synced, round),
-      ).catch(() => {});
-    }
+    });
     setEditingTeamId(null);
   };
 
@@ -2777,8 +2734,6 @@ export default function TournamentDetail() {
                   toast({ title: `وضع العرض يعرض الجولة ${currentRoundNum}` });
                 }}
                 onDraw={() => generateRound(tournament.id)}
-                canRedraw={canRedrawRound(tournament, currentRoundNum) && (currentRound?.matches.length ?? 0) > 0}
-                onRedraw={() => handleRedraw(currentRoundNum)}
                 onAutoAssignJudges={() => {
                   autoAssignJudges(tournament.id, currentRoundNum);
                   toast({ title: "تم توزيع المحكمين على القاعات" });
@@ -2886,12 +2841,6 @@ export default function TournamentDetail() {
                   logAction(tournament.id, "بدء الجولة", `الجولة ${currentRoundNum}`);
                   toast({ title: `الجولة الجارية الآن: الجولة ${currentRoundNum}` });
                 }}
-                onDraw={() => {
-                  generateRound(tournament.id);
-                  logAction(tournament.id, "إجراء القرعة", `الجولة ${currentRoundNum}`);
-                  toast({ title: "تمت القرعة", description: "وزّع المحكمين على القاعات من تبويب المحكمين." });
-                }}
-                onOpenJudges={() => setActiveTab("judges")}
                 canManage={can("manageJudges")}
               />
             }
@@ -3013,43 +2962,6 @@ export default function TournamentDetail() {
             onFinish={() => setConfirmFinishOpen(true)}
             onReopen={() => setConfirmReopenOpen(true)}
             onDelete={() => setConfirmDeleteOpen(true)}
-            onUpdateSettings={(patch) =>
-              updateTournamentInfo(tournament.id, {
-                settings: { ...DEFAULT_SETTINGS, ...tournament.settings, ...patch },
-              })
-            }
-            redrawRoundNumber={tournament.currentRound}
-            canRedraw={
-              canRedrawRound(tournament, tournament.currentRound) &&
-              (tournament.rounds.find((r) => r.roundNumber === tournament.currentRound)?.matches.length ?? 0) > 0
-            }
-            onRedraw={() => handleRedraw(tournament.currentRound)}
-            onOpenManualPairings={() => setManualPairingsOpen(true)}
-            onGenerateKnockout={(kind, teamCount) => {
-              generateKnockout(tournament.id, kind, teamCount);
-              const label = kind === "quarterfinal" ? "ربع النهائي" : kind === "semifinal" ? "نصف النهائي" : "النهائي";
-              logAction(tournament.id, "بدء دور إقصائي", label);
-              setViewingRound(null);
-              setActiveTab("overview");
-              toast({ title: `تم إنشاء ${label}`, description: "وزّع المحكمين على القاعات ثم ابدأ الجولة." });
-            }}
-            onToggleTeam={(teamId, disabled) => setTeamDisabled(tournament.id, teamId, disabled)}
-            onToggleRoom={(roomNumber, disabled) => setRoomDisabled(tournament.id, roomNumber, disabled)}
-            onDuplicateForTest={() => {
-              const id = duplicateTournamentForTest(tournament.id);
-              if (!id) return;
-              toast({ title: "تم إنشاء نسخة تجريبية من البطولة" });
-              setLocation(`/tournament/${id}`);
-            }}
-          />
-          <ManualPairingsDialog
-            open={manualPairingsOpen}
-            onOpenChange={setManualPairingsOpen}
-            tournament={tournament}
-            onSave={(roundNumber, pairs) => {
-              setRoundPairings(tournament.id, roundNumber, pairs);
-              toast({ title: `تم حفظ مواجهات الجولة ${roundNumber}` });
-            }}
           />
           </div>
         )}
@@ -3250,9 +3162,7 @@ export default function TournamentDetail() {
                                   const mt =
                                     m.team1.teamId === team.id ? m.team1 : m.team2;
                                   const label =
-                                    r.kind === "quarterfinal"
-                                      ? "ربع"
-                                      : r.kind === "semifinal"
+                                    r.kind === "semifinal"
                                       ? "نصف"
                                       : r.kind === "final"
                                       ? "نهائي"
@@ -3824,17 +3734,7 @@ export default function TournamentDetail() {
             onAssignJudges={(matchId, assignment) =>
               setMatchJudges(tournament.id, currentRoundNum, matchId, assignment)
             }
-            onAutoAssign={() => {
-              autoAssignJudges(tournament.id, currentRoundNum);
-              toast({ title: "تم توزيع المحكمين عشوائياً على القاعات" });
-            }}
-            onClearAll={() => {
-              clearRoundJudges(tournament.id, currentRoundNum);
-              toast({ title: "تم تصفير توزيع المحكمين" });
-            }}
-            onSetJudgesPerRoom={(n) =>
-              setRoundJudgesPerRoom(tournament.id, currentRoundNum, n)
-            }
+            onAutoAssign={() => autoAssignJudges(tournament.id, currentRoundNum)}
             onJudgeLink={handleJudgeLink}
             canManage={can("manageJudges")}
           />
@@ -3941,7 +3841,7 @@ export default function TournamentDetail() {
       )}
 
       {/* Bottom action bar - Advancement suggestion (rounds count reached) */}
-      {activeTab === "rounds" && showAdvancementSuggestion && !advancementDismissed && (
+      {activeTab === "rounds" && showAdvancementSuggestion && (
         <div
           className="fixed bottom-0 left-0 right-0 bg-background border-t border-border p-4 z-20"
           data-testid="card-advancement-suggestion"
@@ -3949,18 +3849,9 @@ export default function TournamentDetail() {
           <div className="max-w-5xl mx-auto">
             <div className="flex items-center gap-2 mb-3">
               <Flag className="w-4 h-4" style={{ color: GOLD }} />
-              <p className="text-sm font-bold flex-1">
+              <p className="text-sm font-bold">
                 اكتملت جميع الجولات — ماذا تريد بعد ذلك؟
               </p>
-              <button
-                type="button"
-                onClick={() => setAdvancementDismissed(true)}
-                className="p-1 rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
-                aria-label="إغلاق"
-                data-testid="button-dismiss-advancement"
-              >
-                <X className="w-4 h-4" />
-              </button>
             </div>
             <div className="flex flex-col gap-2">
               {tournament.teams.length >= 4 && (
@@ -4144,31 +4035,6 @@ export default function TournamentDetail() {
           </div>
         </DialogContent>
       </Dialog>
-
-      {/* Redraw Round Confirmation */}
-      <AlertDialog
-        open={confirmRedrawRound !== null}
-        onOpenChange={(open) => !open && setConfirmRedrawRound(null)}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>إعادة قرعة الجولة {confirmRedrawRound} من الصفر</AlertDialogTitle>
-            <AlertDialogDescription>
-              سيتم حذف جميع القاعات والمواجهات والمحكمين في هذه الجولة (دون المساس
-              بالفرق المسجلة). بعدها اضغط «بدء القرعة» لإجراء القرعة من جديد.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>إلغاء</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => confirmRedrawRound !== null && confirmRedraw(confirmRedrawRound)}
-              data-testid="button-confirm-redraw"
-            >
-              حذف القاعات وإعادة القرعة
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
 
       {/* Finish Tournament Confirmation */}
       <AlertDialog open={confirmFinishOpen} onOpenChange={setConfirmFinishOpen}>
@@ -4418,11 +4284,28 @@ export default function TournamentDetail() {
                           ? { ...mm, roomNumber: newRoomNum ?? mm.roomNumber, roomLabel: newLabel }
                           : mm,
                       );
-                      const roundData = buildRoundSessionData(
-                        tournament,
-                        targetRound,
-                        updatedMatches,
-                      );
+                      const rooms: RoomInfo[] = updatedMatches.map((m) => {
+                        const gov = tournament.teams.find((t) => t.id === m.team1.teamId);
+                        const opp = tournament.teams.find((t) => t.id === m.team2.teamId);
+                        return {
+                          roomNumber: m.roomNumber,
+                          roomLabel: m.roomLabel,
+                          matchId: m.id,
+                          govTeamName: gov?.name ?? "الموالاة",
+                          oppTeamName: opp?.name ?? "المعارضة",
+                          govTeamId: m.team1.teamId,
+                          govSpeakerNames: gov?.speakerNames ?? [],
+                          oppSpeakerNames: opp?.speakerNames ?? [],
+                          govSpeakersCount: gov?.speakersPerTeam ?? 3,
+                          oppSpeakersCount: opp?.speakersPerTeam ?? 3,
+                        };
+                      });
+                      const roundData: RoundData = {
+                        tournamentId: tournament.id,
+                        tournamentName: tournament.name,
+                        roundNumber: targetRoundNum,
+                        rooms,
+                      };
                       void syncRoundSessionsForRound(
                         tournament.id,
                         targetRoundNum,

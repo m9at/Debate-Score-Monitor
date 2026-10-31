@@ -6,7 +6,6 @@ import {
   MoreVertical,
   PlayCircle,
   Projector,
-  RotateCcw,
   Trash2,
   Users,
 } from "lucide-react";
@@ -41,9 +40,6 @@ interface RoundOptionsMenuProps {
   onSetCurrent: () => void;
   onSetPresented: () => void;
   onDraw: () => void;
-  /** Re-pairs the round from scratch (only while it has no results). */
-  canRedraw: boolean;
-  onRedraw: () => void;
   onAutoAssignJudges: () => void;
   onToggleLock: (locked: boolean) => void;
   onDelete: () => void;
@@ -62,8 +58,6 @@ export default function RoundOptionsMenu({
   onSetCurrent,
   onSetPresented,
   onDraw,
-  canRedraw,
-  onRedraw,
   onAutoAssignJudges,
   onToggleLock,
   onDelete,
@@ -125,18 +119,6 @@ export default function RoundOptionsMenu({
             <Dices className="w-4 h-4" />
             {hasMatches ? "القرعة أُجريت" : "إجراء القرعة"}
           </DropdownMenuItem>
-
-          {hasMatches && (
-            <DropdownMenuItem
-              disabled={!canRedraw}
-              onSelect={onRedraw}
-              className="gap-2"
-              data-testid="option-round-redraw"
-            >
-              <RotateCcw className="w-4 h-4" />
-              {canRedraw ? "إعادة القرعة من الصفر" : "لا يمكن إعادة القرعة — سُجّلت نتائج"}
-            </DropdownMenuItem>
-          )}
 
           <DropdownMenuItem
             disabled={!hasMatches}
