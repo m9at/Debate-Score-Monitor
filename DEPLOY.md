@@ -23,9 +23,16 @@
 
 ## Render
 
-- New → **Web Service** → Runtime: **Docker**.
-- أنشئ Postgres منفصلاً وانسخ `DATABASE_URL` إلى متغيرات الخدمة.
-- أضف `VITE_CLERK_PUBLISHABLE_KEY` كـ **Environment Variable** ومع `--build-arg` في إعدادات الـ Docker build.
+المستودع يحتوي ملف `render.yaml` (Blueprint) ينشئ الخدمة وقاعدة Postgres معاً:
+
+1. في Render: **New → Blueprint** واختر هذا المستودع، والفرع **`main`**.
+2. سيطلب منك قيمة `VITE_CLERK_PUBLISHABLE_KEY` — الصق مفتاح Clerk العام (`pk_live_...`).
+   (Render يمرّر متغيرات البيئة إلى `docker build` كـ build args تلقائياً.)
+3. اضغط **Apply** — يُنشأ Postgres ويُربط `DATABASE_URL` تلقائياً، ثم يُبنى ويُنشر.
+4. الرابط العام يظهر أعلى صفحة الخدمة (مثل `https://oman-debates.onrender.com`).
+5. أضف هذا الدومين في لوحة Clerk (Allowed origins / Domains).
+
+فحص الصحة مضبوط على `/api/healthz`، والنشر يتكرر تلقائياً مع كل push.
 
 ## أي VPS
 

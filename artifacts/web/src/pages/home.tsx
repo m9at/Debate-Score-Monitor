@@ -15,7 +15,6 @@ import {
 import {
   Archive,
   ChevronDown,
-  Eye,
   FolderPlus,
   Plus,
   Search,
@@ -24,6 +23,7 @@ import {
 } from "lucide-react";
 import { motion } from "framer-motion";
 import HomeHeader from "@/components/home/HomeHeader";
+import ShareLinksMenu from "@/components/home/ShareLinksMenu";
 import TournamentCard from "@/components/home/TournamentCard";
 import FolderStrip from "@/components/home/FolderStrip";
 import MoveToFolderDialog from "@/components/home/MoveToFolderDialog";
@@ -55,6 +55,8 @@ export default function Home() {
   const [groupDialogOpen, setGroupDialogOpen] = useState(false);
   /** Shows the shareable وضع الجمهور link of the whole platform. */
   const [publicLinkOpen, setPublicLinkOpen] = useState(false);
+  /** Shows the shareable organiser (scoring control) link. */
+  const [adminLinkOpen, setAdminLinkOpen] = useState(false);
   const [groupName, setGroupName] = useState("");
   const [groupDesc, setGroupDesc] = useState("");
   const [groupIsArchive, setGroupIsArchive] = useState(false);
@@ -156,14 +158,10 @@ export default function Home() {
       <HomeHeader
         actions={
           <>
-            <button
-              onClick={() => setPublicLinkOpen(true)}
-              className={`${BTN.base} ${BTN.secondary} ${BTN_SIZE.md}`}
-              data-testid="button-public-mode-link"
-            >
-              <Eye className="w-4 h-4" strokeWidth={2.5} />
-              رابط وضع الجمهور
-            </button>
+            <ShareLinksMenu
+              onPublicLink={() => setPublicLinkOpen(true)}
+              onAdminLink={() => setAdminLinkOpen(true)}
+            />
             <button
               onClick={() => setGroupDialogOpen(true)}
               className={`${BTN.base} ${BTN.primary} ${BTN_SIZE.md} shadow-lg`}
@@ -192,6 +190,14 @@ export default function Home() {
         title="رابط وضع الجمهور"
         description="رابط المنصة للجمهور: مشاهدة فقط للبطولات التي سُمح للجمهور بمتابعتها، مع الجولات والقضايا والفرق ونتائج الجولات المعلنة."
         url={`${window.location.origin}${import.meta.env.BASE_URL.replace(/\/$/, "")}/public`}
+      />
+
+      <ShareLinkDialog
+        open={adminLinkOpen}
+        onOpenChange={setAdminLinkOpen}
+        title="رابط رصد الدرجات"
+        description="رابط لوحة التحكم ورصد الدرجات للمنظّمين: إدارة البطولات والجولات والقاعات ومتابعة إدخال الدرجات."
+        url={`${window.location.origin}${import.meta.env.BASE_URL.replace(/\/$/, "")}/`}
       />
 
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 md:px-6 py-5 md:py-7">
