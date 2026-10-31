@@ -2,7 +2,7 @@
 # Render → New → Blueprint → select this repo.
 databases:
   - name: oman-debates-db
-    plan: basic-256mb
+    plan: free
     databaseName: oman_debates
     postgresMajorVersion: "16"
 
@@ -10,7 +10,7 @@ services:
   - type: web
     name: oman-debates
     runtime: docker
-    plan: starter
+    plan: free
     dockerfilePath: ./Dockerfile
     branch: main
     healthCheckPath: /api/healthz
